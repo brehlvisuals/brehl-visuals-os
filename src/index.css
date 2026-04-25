@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    background: #f5f4f2;
+    color: #1a1a1a;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    height: 100%;
+    overflow: hidden;
+  }
+  #root { height: 100%; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 2px; }
+}
+
+@layer components {
+  .card { @apply bg-white rounded-xl border border-gray-100 shadow-sm; }
+  .btn-primary { @apply bg-[#ff6b01] text-white font-semibold rounded-lg px-4 py-2 text-sm hover:bg-[#e55f00] active:scale-95 transition-all; }
+  .btn-secondary { @apply bg-white text-gray-600 font-medium rounded-lg px-4 py-2 text-sm border border-gray-200 hover:bg-gray-50 active:scale-95 transition-all; }
+  .input { @apply w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff6b01]/20 focus:border-[#ff6b01] transition-all; }
+  .label { @apply block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5; }
+  .pill { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium; }
+  .page-header { @apply flex items-center justify-between mb-5; }
+  .section-title { @apply text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3; }
+}
+
+/* Mobile bottom nav */
+.mobile-nav { display: none; }
+@media (max-width: 768px) {
+  .mobile-nav { display: flex; }
+  .desktop-sidebar { display: none !important; }
+  .main-content { padding-bottom: 70px !important; }
+}
+
+/* Kanban horizontal scroll */
+.kanban-scroll { 
+  display: flex; 
+  gap: 10px; 
+  overflow-x: auto; 
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.kanban-scroll::-webkit-scrollbar { display: none; }
