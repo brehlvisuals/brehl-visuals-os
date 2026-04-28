@@ -11,19 +11,36 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) loadProfile(session.user.id)
+      if (session?.user) loadProfile(session.user.id, session.user.email)
       else setLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) loadProfile(session.user.id)
+      if (session?.user) loadProfile(session.user.id, session.user.email)
       else { setProfile(null); setLoading(false) }
     })
     return () => subscription.unsubscribe()
   }, [])
 
-  async function loadProfile(uid) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
+  async function loadProfile(uid, email) {
+    // Versuche Profil zu laden
+    let { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
+    
+    // Falls kein Profil existiert, erstelle eines
+    if (!data) {
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .upsert({ id: uid, email, role: 'mitarbeiter', permissions: [] })
+        .select()
+        .single()
+      data = newProfile
+    }
+    
+    // Falls immer noch kein Profil, nutze Fallback
+    if (!data) {
+      data = { id: uid, email, role: 'mitarbeiter', permissions: [] }
+    }
+    
     setProfile(data)
     setLoading(false)
   }
