@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 
 const Ctx = createContext({})
 
+// Admin E-Mails - diese User sind immer Admin
+const ADMIN_EMAILS = ['felix.brehl@brehlvisuals.de']
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -23,25 +26,43 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function loadProfile(uid, email) {
-    // Versuche Profil zu laden
-    let { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
+    // Sofort Admin setzen wenn E-Mail bekannt
+    const isKnownAdmin = ADMIN_EMAILS.includes(email)
     
-    // Falls kein Profil existiert, erstelle eines
-    if (!data) {
-      const { data: newProfile } = await supabase
+    try {
+      const { data } = await supabase
         .from('profiles')
-        .upsert({ id: uid, email, role: 'mitarbeiter', permissions: [] })
-        .select()
+        .select('*')
+        .eq('id', uid)
         .single()
-      data = newProfile
+
+      if (data) {
+        // Wenn Admin-Email aber Rolle noch nicht gesetzt, lokal überschreiben
+        if (isKnownAdmin && data.role !== 'admin') {
+          setProfile({ ...data, role: 'admin', full_name: data.full_name || 'Felix Brehl' })
+        } else {
+          setProfile(data)
+        }
+      } else {
+        // Kein Profil gefunden - Fallback
+        setProfile({
+          id: uid,
+          email,
+          role: isKnownAdmin ? 'admin' : 'mitarbeiter',
+          full_name: isKnownAdmin ? 'Felix Brehl' : email.split('@')[0],
+          permissions: []
+        })
+      }
+    } catch {
+      // Fehler - Fallback mit Admin-Check
+      setProfile({
+        id: uid,
+        email,
+        role: isKnownAdmin ? 'admin' : 'mitarbeiter',
+        full_name: isKnownAdmin ? 'Felix Brehl' : email.split('@')[0],
+        permissions: []
+      })
     }
-    
-    // Falls immer noch kein Profil, nutze Fallback
-    if (!data) {
-      data = { id: uid, email, role: 'mitarbeiter', permissions: [] }
-    }
-    
-    setProfile(data)
     setLoading(false)
   }
 
