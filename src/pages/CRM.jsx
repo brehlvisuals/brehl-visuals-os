@@ -132,6 +132,12 @@ export default function CRM() {
           onClose={() => setSelected(null)}
           onStatusChange={s => changeStatus(selected.id, s)}
           onRefresh={fetchAll}
+          onDelete={async () => {
+            if (!confirm(`"${selected.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return
+            await supabase.from(cat.table).delete().eq('id', selected.id)
+            setSelected(null)
+            fetchAll()
+          }}
           isLead={activeCat === 'leads'}
         />
       )}
@@ -145,7 +151,7 @@ export default function CRM() {
               <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl">×</button>
             </div>
             <AddForm cat={cat} onSave={async data => {
-              await supabase.from(cat.table).insert(data)
+              await supabase.from(cat.table).insert({ ...data, status: 'neu' })
               setShowAdd(false); fetchAll()
             }} onClose={() => setShowAdd(false)} isLead={activeCat === 'leads'} />
           </div>
@@ -220,7 +226,7 @@ function AddCatForm({ onSave, onClose }) {
   )
 }
 
-function CRMDetail({ item, cat, tasks, isLead, onClose, onStatusChange, onRefresh }) {
+function CRMDetail({ item, cat, tasks, isLead, onClose, onStatusChange, onRefresh, onDelete }) {
   const [tab, setTab] = useState('info')
   const [notes, setNotes] = useState([])
   const [noteText, setNoteText] = useState('')
@@ -295,18 +301,42 @@ function CRMDetail({ item, cat, tasks, isLead, onClose, onStatusChange, onRefres
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {tab === 'info' && [
-            ['E-Mail', item.email, `mailto:${item.email}`],
-            ['Telefon', item.telefon, `tel:${item.telefon}`],
-            ['Website', item.website, `https://${item.website}`],
-            ...(isLead ? [['Quelle', item.quelle], ['UTM Source', item.utm_source]] : [['Alter', item.alter_jahre ? `${item.alter_jahre} Jahre` : null], ['Instagram', item.instagram]]),
-            ['Erstellt', item.created_at ? new Date(item.created_at).toLocaleDateString('de-DE') : null],
-          ].filter(f => f[1]).map(([l, v, href]) => (
-            <div key={l} className="flex items-center gap-3 py-2 border-b border-gray-50">
-              <span className="text-xs text-gray-400 w-20 flex-shrink-0">{l}</span>
-              {href ? <a href={href} className="text-xs text-[#ff6b01] hover:underline truncate">{v}</a> : <span className="text-xs text-gray-700">{v}</span>}
+          {tab === 'info' && <>
+            {[
+              ['E-Mail', item.email, `mailto:${item.email}`],
+              ['Telefon', item.telefon, `tel:${item.telefon}`],
+              ['Website', item.website, item.website ? `https://${item.website.replace(/^https?:\/\//, '')}` : null],
+              ...(isLead ? [
+                ['Paket', item.Paket],
+                ['Quelle', item.quelle],
+                ['UTM Source', item.utm_source],
+                ['UTM Medium', item.utm_medium],
+              ] : [
+                ['Alter', item.alter_jahre ? `${item.alter_jahre} Jahre` : null],
+                ['Instagram', item.instagram],
+              ]),
+              ['Erstellt', item.created_at ? new Date(item.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null],
+            ].filter(f => f[1]).map(([l, v, href]) => (
+              <div key={l} className="flex items-center gap-3 py-2 border-b border-gray-50">
+                <span className="text-xs text-gray-400 w-20 flex-shrink-0">{l}</span>
+                {href ? <a href={href} className="text-xs text-[#ff6b01] hover:underline truncate">{v}</a> : <span className="text-xs text-gray-700 break-words">{v}</span>}
+              </div>
+            ))}
+            {isLead && item.Nachricht && (
+              <div className="pt-3 mt-2">
+                <p className="text-xs text-gray-400 mb-1.5">Nachricht</p>
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+                  <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words">{item.Nachricht}</p>
+                </div>
+              </div>
+            )}
+            {/* Delete-Button am Ende des Info-Tabs */}
+            <div className="pt-6 mt-4 border-t border-gray-100">
+              <button onClick={onDelete} className="w-full text-xs text-red-500 hover:text-white hover:bg-red-500 border border-red-200 hover:border-red-500 rounded-xl py-2.5 transition-all font-medium">
+                🗑 Lead löschen
+              </button>
             </div>
-          ))}
+          </>}
 
           {tab === 'notizen' && (
             <>
