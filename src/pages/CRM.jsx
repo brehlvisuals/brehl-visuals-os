@@ -151,7 +151,23 @@ export default function CRM() {
               <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl">×</button>
             </div>
             <AddForm cat={cat} onSave={async data => {
-              await supabase.from(cat.table).insert({ ...data, status: 'neu' })
+              // Leere Strings zu null umwandeln, alter_jahre zu int
+              const cleaned = {}
+              for (const [k, v] of Object.entries(data)) {
+                if (v === '' || v === undefined) {
+                  cleaned[k] = null
+                } else if (k === 'alter_jahre') {
+                  const n = parseInt(v, 10)
+                  cleaned[k] = isNaN(n) ? null : n
+                } else {
+                  cleaned[k] = v
+                }
+              }
+              const { error } = await supabase.from(cat.table).insert({ ...cleaned, status: 'neu' })
+              if (error) {
+                alert('Fehler beim Speichern: ' + error.message)
+                return
+              }
               setShowAdd(false); fetchAll()
             }} onClose={() => setShowAdd(false)} isLead={activeCat === 'leads'} />
           </div>
@@ -177,6 +193,16 @@ export default function CRM() {
 function AddForm({ isLead, onSave, onClose }) {
   const [form, setForm] = useState({ name: '', firma: '', email: '', telefon: '', website: '', quelle: '', alter_jahre: '', erfahrung: '', instagram: '' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  function handleSave() {
+    if (!form.name) return
+    // Nur die Felder mitschicken, die zur jeweiligen Tabelle gehören
+    const payload = isLead
+      ? { name: form.name, firma: form.firma, email: form.email, telefon: form.telefon, website: form.website, quelle: form.quelle }
+      : { name: form.name, email: form.email, telefon: form.telefon, alter_jahre: form.alter_jahre, instagram: form.instagram, erfahrung: form.erfahrung }
+    onSave(payload)
+  }
+
   return (
     <div className="space-y-3">
       <div><label className="label">Name *</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Vor- und Nachname" /></div>
@@ -193,7 +219,7 @@ function AddForm({ isLead, onSave, onClose }) {
       </>}
       <div className="flex gap-3 pt-2">
         <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
-        <button onClick={() => { if (form.name) onSave(form) }} className="btn-primary flex-1">Speichern →</button>
+        <button onClick={handleSave} className="btn-primary flex-1">Speichern →</button>
       </div>
     </div>
   )
@@ -302,38 +328,47 @@ function CRMDetail({ item, cat, tasks, isLead, onClose, onStatusChange, onRefres
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {tab === 'info' && <>
-            {[
-              ['E-Mail', item.email, `mailto:${item.email}`],
-              ['Telefon', item.telefon, `tel:${item.telefon}`],
-              ['Website', item.website, item.website ? `https://${item.website.replace(/^https?:\/\//, '')}` : null],
-              ...(isLead ? [
-                ['Paket', item.Paket],
-                ['Quelle', item.quelle],
-                ['UTM Source', item.utm_source],
-                ['UTM Medium', item.utm_medium],
-              ] : [
-                ['Alter', item.alter_jahre ? `${item.alter_jahre} Jahre` : null],
-                ['Instagram', item.instagram],
-              ]),
-              ['Erstellt', item.created_at ? new Date(item.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null],
-            ].filter(f => f[1]).map(([l, v, href]) => (
-              <div key={l} className="flex items-center gap-3 py-2 border-b border-gray-50">
-                <span className="text-xs text-gray-400 w-20 flex-shrink-0">{l}</span>
-                {href ? <a href={href} className="text-xs text-[#ff6b01] hover:underline truncate">{v}</a> : <span className="text-xs text-gray-700 break-words">{v}</span>}
-              </div>
+            {(isLead
+              ? [
+                  ['name', 'Name', item.name, 'text'],
+                  ['firma', 'Firma', item.firma, 'text'],
+                  ['email', 'E-Mail', item.email, 'email'],
+                  ['telefon', 'Telefon', item.telefon, 'tel'],
+                  ['website', 'Website', item.website, 'text'],
+                  ['Paket', 'Paket', item.Paket, 'text'],
+                  ['quelle', 'Quelle', item.quelle, 'text'],
+                  ['utm_source', 'UTM Source', item.utm_source, 'text'],
+                  ['utm_medium', 'UTM Medium', item.utm_medium, 'text'],
+                ]
+              : [
+                  ['name', 'Name', item.name, 'text'],
+                  ['email', 'E-Mail', item.email, 'email'],
+                  ['telefon', 'Telefon', item.telefon, 'tel'],
+                  ['alter_jahre', 'Alter', item.alter_jahre, 'number'],
+                  ['instagram', 'Instagram', item.instagram, 'text'],
+                  ['erfahrung', 'Erfahrung', item.erfahrung, 'text'],
+                ]
+            ).map(([key, label, val, type]) => (
+              <EditableField key={key} fieldKey={key} label={label} value={val} type={type} item={item} cat={cat} onSaved={onRefresh} />
             ))}
-            {isLead && item.Nachricht && (
+            {/* Erstellt-Datum (read-only) */}
+            {item.created_at && (
+              <div className="flex items-center gap-3 py-2 border-b border-gray-50">
+                <span className="text-xs text-gray-400 w-20 flex-shrink-0">Erstellt</span>
+                <span className="text-xs text-gray-500">{new Date(item.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            )}
+            {/* Nachricht als großer Block (auch editierbar) */}
+            {isLead && (
               <div className="pt-3 mt-2">
                 <p className="text-xs text-gray-400 mb-1.5">Nachricht</p>
-                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-                  <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words">{item.Nachricht}</p>
-                </div>
+                <EditableTextarea fieldKey="Nachricht" value={item.Nachricht} item={item} cat={cat} onSaved={onRefresh} />
               </div>
             )}
             {/* Delete-Button am Ende des Info-Tabs */}
             <div className="pt-6 mt-4 border-t border-gray-100">
               <button onClick={onDelete} className="w-full text-xs text-red-500 hover:text-white hover:bg-red-500 border border-red-200 hover:border-red-500 rounded-xl py-2.5 transition-all font-medium">
-                🗑 Lead löschen
+                🗑 {isLead ? 'Lead' : 'Darsteller'} löschen
               </button>
             </div>
           </>}
@@ -388,6 +423,90 @@ function CRMDetail({ item, cat, tasks, isLead, onClose, onStatusChange, onRefres
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function EditableField({ fieldKey, label, value, type, item, cat, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(value || '')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (val === (value || '')) { setEditing(false); return }
+    setSaving(true)
+    let saveVal = val.trim() === '' ? null : val
+    if (type === 'number' && saveVal !== null) saveVal = parseInt(saveVal, 10) || null
+    await supabase.from(cat.table).update({ [fieldKey]: saveVal }).eq('id', item.id)
+    setSaving(false); setEditing(false); onSaved()
+  }
+
+  const displayVal = type === 'number' && value ? `${value} Jahre` : value
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-3 py-2 border-b border-gray-50">
+        <span className="text-xs text-gray-400 w-20 flex-shrink-0">{label}</span>
+        <input
+          type={type}
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onBlur={save}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setVal(value || ''); setEditing(false) } }}
+          autoFocus
+          disabled={saving}
+          className="flex-1 text-xs bg-[#ff6b01]/5 border border-[#ff6b01]/30 rounded-md px-2 py-1 focus:outline-none focus:border-[#ff6b01]"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={() => setEditing(true)} className="group flex items-center gap-3 py-2 border-b border-gray-50 cursor-pointer hover:bg-gray-50/50 -mx-2 px-2 rounded-md transition-colors">
+      <span className="text-xs text-gray-400 w-20 flex-shrink-0">{label}</span>
+      <span className={`text-xs flex-1 break-words ${value ? 'text-gray-700' : 'text-gray-300 italic'}`}>{displayVal || 'leer – klicken zum Bearbeiten'}</span>
+      <span className="text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
+    </div>
+  )
+}
+
+function EditableTextarea({ fieldKey, value, item, cat, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(value || '')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (val === (value || '')) { setEditing(false); return }
+    setSaving(true)
+    const saveVal = val.trim() === '' ? null : val
+    await supabase.from(cat.table).update({ [fieldKey]: saveVal }).eq('id', item.id)
+    setSaving(false); setEditing(false); onSaved()
+  }
+
+  if (editing) {
+    return (
+      <textarea
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onBlur={save}
+        onKeyDown={e => { if (e.key === 'Escape') { setVal(value || ''); setEditing(false) } }}
+        autoFocus
+        disabled={saving}
+        rows={5}
+        placeholder="Nachricht eingeben..."
+        className="w-full text-xs bg-[#ff6b01]/5 border border-[#ff6b01]/30 rounded-xl p-3 focus:outline-none focus:border-[#ff6b01] resize-none leading-relaxed"
+      />
+    )
+  }
+
+  return (
+    <div onClick={() => setEditing(true)} className="group bg-gray-50 border border-gray-100 hover:border-[#ff6b01]/30 rounded-xl p-3 cursor-pointer transition-colors relative">
+      {value ? (
+        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words">{value}</p>
+      ) : (
+        <p className="text-xs text-gray-300 italic">Keine Nachricht – klicken zum Hinzufügen</p>
+      )}
+      <span className="absolute top-2 right-2 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
     </div>
   )
 }
