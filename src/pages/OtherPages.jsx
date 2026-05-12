@@ -505,8 +505,32 @@ export function Team() {
             <div className="flex gap-3 mt-4">
               <button onClick={() => setShowInvite(false)} className="btn-secondary flex-1">Abbrechen</button>
               <button onClick={async () => {
-                setMsg('Einladung wurde gespeichert. Sende den Login-Link manuell an ' + inviteEmail)
+                if (!inviteEmail) { setMsg('Bitte E-Mail eingeben'); return }
+                setMsg('Sende Einladung...')
+                // Magic Link via signInWithOtp: erstellt User falls noch nicht vorhanden + sendet Login-Link per Mail
+                const { error } = await supabase.auth.signInWithOtp({
+                  email: inviteEmail,
+                  options: {
+                    emailRedirectTo: window.location.origin + '/dashboard',
+                    data: { full_name: inviteName || null },
+                  },
+                })
+                if (error) {
+                  setMsg('Fehler: ' + error.message)
+                  return
+                }
+                // Optional: profile-Name aktualisieren falls Name eingegeben
+                if (inviteName) {
+                  // Trigger erstellt profile automatisch nach Email-Bestätigung
+                  // Wir warten kurz und versuchen den Namen zu setzen
+                  setTimeout(async () => {
+                    await supabase.from('profiles').update({ full_name: inviteName }).eq('email', inviteEmail)
+                    fetchMembers()
+                  }, 1500)
+                }
+                setMsg(`✓ Einladungs-Link an ${inviteEmail} gesendet.`)
                 setShowInvite(false); setInviteEmail(''); setInviteName('')
+                fetchMembers()
               }} className="btn-primary flex-1">Einladen →</button>
             </div>
           </div>
