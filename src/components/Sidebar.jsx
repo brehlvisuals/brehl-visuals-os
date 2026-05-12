@@ -10,7 +10,6 @@ const NAV = [
     { to: '/projekte', icon: '▦', label: 'Projekte', mod: 'projekte' },
     { to: '/crm', icon: '◉', label: 'CRM', mod: 'crm' },
     { to: '/tasks', icon: '◷', label: 'Tasks', mod: 'crm', sub: true },
-    { to: '/funnels', icon: '⌁', label: 'Funnels & LPs', mod: 'crm', sub: true },
   ]},
   { divider: true },
   { section: '', items: [
@@ -117,7 +116,6 @@ export default function Sidebar() {
             onClick={e => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { to: '/funnels', icon: '⌁', label: 'Funnels' },
                 { to: '/kalender', icon: '◻', label: 'Kalender' },
                 ...(isAdmin ? [{ to: '/team', icon: '◎', label: 'Team' }] : []),
                 { to: '/einstellungen', icon: '⚙', label: 'Einstellungen' },
