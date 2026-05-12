@@ -5,7 +5,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Projekte from './pages/Projekte'
 import CRM from './pages/CRM'
-import { Tasks, Funnels, Kalender, Team, Einstellungen } from './pages/OtherPages'
+import { Tasks, Kalender, Team, Einstellungen } from './pages/OtherPages'
 
 function Layout({ children }) {
   return (
@@ -46,7 +46,6 @@ export default function App() {
           <Route path="/projekte" element={<Protected mod="projekte"><Layout><Projekte /></Layout></Protected>} />
           <Route path="/crm" element={<Protected mod="crm"><Layout><CRM /></Layout></Protected>} />
           <Route path="/tasks" element={<Protected mod="crm"><Layout><Tasks /></Layout></Protected>} />
-          <Route path="/funnels" element={<Protected mod="crm"><Layout><Funnels /></Layout></Protected>} />
           <Route path="/kalender" element={<Protected><Layout><Kalender /></Layout></Protected>} />
           <Route path="/team" element={<Protected adminOnly><Layout><Team /></Layout></Protected>} />
           <Route path="/einstellungen" element={<Protected><Layout><Einstellungen /></Layout></Protected>} />
