@@ -97,6 +97,12 @@ export default function CRM() {
 
       setData(newData)
       setTasks(taskRes.data || [])
+
+      // Selected-Item mit frischen Daten aktualisieren (falls offen)
+      if (selected) {
+        const fresh = (newData[activeCat] || []).find(x => x.id === selected.id)
+        if (fresh) setSelected(fresh)
+      }
     } catch (e) {
       console.error('fetchAll error', e)
     }
@@ -105,9 +111,13 @@ export default function CRM() {
 
   async function changeStatus(id, status) {
     const table = getTable(activeCat)
-    await supabase.from(table).update({ status }).eq('id', id)
-    fetchAll()
+    const { error } = await supabase.from(table).update({ status }).eq('id', id)
+    if (error) {
+      alert('Status konnte nicht geändert werden:\n' + error.message)
+      return
+    }
     if (selected?.id === id) setSelected(p => ({ ...p, status }))
+    fetchAll()
   }
 
   // Drag & Drop Handler
@@ -135,8 +145,10 @@ export default function CRM() {
     }
     const count = (data[catId] || []).length
     if (!confirm(`Kategorie "${target.label}" mit ${count} Einträgen wirklich löschen?`)) return
-    await supabase.from('crm_custom_entries').delete().eq('category_id', catId)
-    await supabase.from('crm_categories').delete().eq('id', catId)
+    const r1 = await supabase.from('crm_custom_entries').delete().eq('category_id', catId)
+    if (r1.error) { alert('Einträge konnten nicht gelöscht werden: ' + r1.error.message); return }
+    const r2 = await supabase.from('crm_categories').delete().eq('id', catId)
+    if (r2.error) { alert('Kategorie konnte nicht gelöscht werden: ' + r2.error.message); return }
     setActiveCat('leads')
     fetchAll()
   }
@@ -235,7 +247,8 @@ export default function CRM() {
           onDelete={async () => {
             if (!confirm(`"${selected.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return
             const table = getTable(activeCat)
-            await supabase.from(table).delete().eq('id', selected.id)
+            const { error } = await supabase.from(table).delete().eq('id', selected.id)
+            if (error) { alert('Eintrag konnte nicht gelöscht werden: ' + error.message); return }
             setSelected(null)
             fetchAll()
           }}
@@ -485,7 +498,9 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
   }
 
   async function completeTask(id) {
-    await supabase.from('crm_tasks').update({ erledigt: true }).eq('id', id); onRefresh()
+    const { error } = await supabase.from('crm_tasks').update({ erledigt: true }).eq('id', id)
+    if (error) { alert('Task konnte nicht als erledigt markiert werden: ' + error.message); return }
+    onRefresh()
   }
 
   function quickFollowUp(days) {
@@ -641,13 +656,26 @@ function EditableField({ fieldKey, label, value, type, item, cat, onSaved }) {
   const [val, setVal] = useState(value || '')
   const [saving, setSaving] = useState(false)
 
+  // Sync local state with prop changes (z.B. nach fetchAll)
+  useEffect(() => {
+    if (!editing) setVal(value || '')
+  }, [value, editing])
+
   async function save() {
     if (val === (value || '')) { setEditing(false); return }
     setSaving(true)
     let saveVal = val.trim() === '' ? null : val
     if (type === 'number' && saveVal !== null) saveVal = parseInt(saveVal, 10) || null
-    await supabase.from(cat.table).update({ [fieldKey]: saveVal }).eq('id', item.id)
-    setSaving(false); setEditing(false); onSaved()
+    const { error } = await supabase.from(cat.table).update({ [fieldKey]: saveVal }).eq('id', item.id)
+    setSaving(false)
+    if (error) {
+      console.error('EditableField save error:', error)
+      alert(`Feld "${label}" konnte nicht gespeichert werden:\n\n${error.message}\n\n(Tabelle: ${cat.table}, Feld: ${fieldKey})`)
+      setVal(value || '')  // Reset auf alten Wert
+      return
+    }
+    setEditing(false)
+    onSaved()
   }
 
   const displayVal = type === 'number' && value ? `${value} Jahre` : value
@@ -684,12 +712,24 @@ function EditableTextarea({ fieldKey, value, item, cat, onSaved }) {
   const [val, setVal] = useState(value || '')
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    if (!editing) setVal(value || '')
+  }, [value, editing])
+
   async function save() {
     if (val === (value || '')) { setEditing(false); return }
     setSaving(true)
     const saveVal = val.trim() === '' ? null : val
-    await supabase.from(cat.table).update({ [fieldKey]: saveVal }).eq('id', item.id)
-    setSaving(false); setEditing(false); onSaved()
+    const { error } = await supabase.from(cat.table).update({ [fieldKey]: saveVal }).eq('id', item.id)
+    setSaving(false)
+    if (error) {
+      console.error('EditableTextarea save error:', error)
+      alert(`Feld "${fieldKey}" konnte nicht gespeichert werden:\n\n${error.message}\n\n(Tabelle: ${cat.table})`)
+      setVal(value || '')
+      return
+    }
+    setEditing(false)
+    onSaved()
   }
 
   if (editing) {
