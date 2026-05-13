@@ -13,6 +13,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState('login')
   const [sent, setSent] = useState(false)
+  const [magicSent, setMagicSent] = useState(false)
 
   useEffect(() => {
     if (user) navigate('/dashboard')
@@ -25,6 +26,18 @@ export default function Login() {
     setLoading(true); setError('')
     const { error } = await signIn(email, password)
     if (error) { setError('E-Mail oder Passwort falsch.'); setLoading(false) }
+  }
+
+  async function handleMagic(e) {
+    e.preventDefault()
+    setLoading(true); setError('')
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+    })
+    if (error) setError('Fehler: ' + error.message)
+    else setMagicSent(true)
+    setLoading(false)
   }
 
   async function handleReset(e) {
@@ -67,8 +80,37 @@ export default function Login() {
                 {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
                 <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Wird angemeldet...' : 'Anmelden →'}</button>
               </form>
+              <div className="my-4 flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-100"></div>
+                <span className="text-[10px] text-gray-300 uppercase tracking-wider">oder</span>
+                <div className="flex-1 h-px bg-gray-100"></div>
+              </div>
+              <button onClick={() => { setMode('magic'); setError(''); setMagicSent(false) }} className="btn-secondary w-full text-xs">✉ Login-Link per E-Mail</button>
               <button onClick={() => setMode('reset')} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-4 transition-colors">Passwort vergessen?</button>
             </>
+          )}
+
+          {mode === 'magic' && !magicSent && (
+            <>
+              <p className="text-sm font-medium text-gray-700 mb-1">Login-Link per E-Mail</p>
+              <p className="text-xs text-gray-400 mb-4">Ohne Passwort einloggen – Link kommt per E-Mail.</p>
+              <form onSubmit={handleMagic} className="space-y-3">
+                <div><label className="label">E-Mail</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input" placeholder="name@brehlvisuals.de" /></div>
+                {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+                <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Wird gesendet...' : 'Link anfordern →'}</button>
+              </form>
+              <button onClick={() => setMode('login')} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-4 transition-colors">← Zurück</button>
+            </>
+          )}
+
+          {mode === 'magic' && magicSent && (
+            <div className="text-center py-4">
+              <div className="text-3xl mb-3">✉️</div>
+              <p className="text-sm font-medium text-gray-800 mb-1">Login-Link gesendet!</p>
+              <p className="text-xs text-gray-400">Prüf dein Postfach und klick auf den Link.</p>
+              <p className="text-[10px] text-gray-300 mt-2">Hinweis: Der Link funktioniert nur einmal.</p>
+              <button onClick={() => { setMode('login'); setMagicSent(false) }} className="text-xs text-gray-400 hover:text-gray-600 mt-4 block mx-auto">← Zurück zum Login</button>
+            </div>
           )}
 
           {mode === 'reset' && !sent && (
