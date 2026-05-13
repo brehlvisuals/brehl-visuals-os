@@ -363,7 +363,7 @@ function AddForm({ isLead, isCustom, onSave, onClose }) {
     if (isLead) {
       payload = { name: form.name, firma: form.firma, email: form.email, telefon: form.telefon, website: form.website, quelle: form.quelle }
     } else if (isCustom) {
-      payload = { name: form.name, firma: form.firma, email: form.email, telefon: form.telefon, notizen: form.notizen }
+      payload = { name: form.name, firma: form.firma, email: form.email, telefon: form.telefon }
     } else {
       payload = { name: form.name, email: form.email, telefon: form.telefon, alter_jahre: form.alter_jahre, instagram: form.instagram, erfahrung: form.erfahrung }
     }
@@ -384,9 +384,6 @@ function AddForm({ isLead, isCustom, onSave, onClose }) {
         <div><label className="label">Alter</label><input className="input" type="number" value={form.alter_jahre} onChange={e => set('alter_jahre', e.target.value)} /></div>
         <div><label className="label">Instagram</label><input className="input" value={form.instagram} onChange={e => set('instagram', e.target.value)} /></div>
       </>}
-      {isCustom && (
-        <div><label className="label">Notizen</label><textarea className="input" rows={3} value={form.notizen} onChange={e => set('notizen', e.target.value)} /></div>
-      )}
       <div className="flex gap-3 pt-2">
         <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
         <button onClick={handleSave} className="btn-primary flex-1">Speichern →</button>
@@ -457,19 +454,33 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
   useEffect(() => { fetchNotes() }, [item.id])
 
   async function fetchNotes() {
-    const { data } = await supabase.from('crm_notizen').select('*').eq(fk, item.id).order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('crm_notizen').select('*').eq(fk, item.id).order('created_at', { ascending: false })
+    if (error) {
+      console.error('fetchNotes error:', error)
+      return
+    }
     if (data) setNotes(data)
   }
 
   async function addNote() {
     if (!noteText.trim()) return
-    await supabase.from('crm_notizen').insert({ [fk]: item.id, text: noteText.trim() })
+    const { error } = await supabase.from('crm_notizen').insert({ [fk]: item.id, text: noteText.trim() })
+    if (error) {
+      console.error('addNote error:', error)
+      alert('Notiz konnte nicht gespeichert werden:\n\n' + error.message + '\n\n(FK: ' + fk + ', ID: ' + item.id + ')')
+      return
+    }
     setNoteText(''); fetchNotes()
   }
 
   async function addTask() {
     if (!newTask.titel.trim()) return
-    await supabase.from('crm_tasks').insert({ [fk]: item.id, titel: newTask.titel, faellig_am: newTask.faellig_am || null })
+    const { error } = await supabase.from('crm_tasks').insert({ [fk]: item.id, titel: newTask.titel, faellig_am: newTask.faellig_am || null })
+    if (error) {
+      console.error('addTask error:', error)
+      alert('Task konnte nicht gespeichert werden:\n\n' + error.message + '\n\n(FK: ' + fk + ', ID: ' + item.id + ')')
+      return
+    }
     setNewTask({ titel: '', faellig_am: '' }); setShowTaskForm(false); onRefresh()
   }
 
@@ -540,7 +551,6 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
                   ['firma', 'Firma', item.firma, 'text'],
                   ['email', 'E-Mail', item.email, 'email'],
                   ['telefon', 'Telefon', item.telefon, 'tel'],
-                  ['notizen', 'Notizen', item.notizen, 'text'],
                 ]
               : [
                   ['name', 'Name', item.name, 'text'],
