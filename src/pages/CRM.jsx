@@ -191,7 +191,7 @@ export default function CRM() {
               </div>
               <div className="space-y-2 min-h-16">
                 {cols.map(item => {
-                  const itemTasks = isCustom ? [] : tasks.filter(t => t[isLead ? 'lead_id' : 'darsteller_id'] === item.id)
+                  const itemTasks = tasks.filter(t => t[isLead ? 'lead_id' : isCustom ? 'custom_entry_id' : 'darsteller_id'] === item.id)
                   const hasOverdue = itemTasks.some(t => t.faellig_am && new Date(t.faellig_am) < new Date())
                   return (
                     <div key={item.id}
@@ -228,7 +228,7 @@ export default function CRM() {
 
       {/* Detail Panel */}
       {selected && (
-        <CRMDetail item={selected} cat={cat} tasks={tasks.filter(t => t[isLead ? 'lead_id' : 'darsteller_id'] === selected.id)}
+        <CRMDetail item={selected} cat={cat} tasks={tasks.filter(t => t[isLead ? 'lead_id' : isCustom ? 'custom_entry_id' : 'darsteller_id'] === selected.id)}
           onClose={() => setSelected(null)}
           onStatusChange={s => changeStatus(selected.id, s)}
           onRefresh={fetchAll}
@@ -263,7 +263,8 @@ export default function CRM() {
                   } else cleaned[k] = v
                 }
                 const table = getTable(activeCat)
-                const insertData = { ...cleaned, status: 'neu' }
+                const defaultStatus = cat?.statuses?.[0]?.id || 'neu'
+                const insertData = { ...cleaned, status: defaultStatus }
                 if (isCustom) insertData.category_id = activeCat
                 const { error } = await supabase.from(table).insert(insertData)
                 if (error) {
@@ -450,9 +451,10 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
   const [noteText, setNoteText] = useState('')
   const [newTask, setNewTask] = useState({ titel: '', faellig_am: '' })
   const [showTaskForm, setShowTaskForm] = useState(false)
-  const fk = isLead ? 'lead_id' : 'darsteller_id'
+  // Foreign Key: je nach Item-Typ andere Spalte
+  const fk = isLead ? 'lead_id' : isCustom ? 'custom_entry_id' : 'darsteller_id'
 
-  useEffect(() => { if (!isCustom) fetchNotes() }, [item.id])
+  useEffect(() => { fetchNotes() }, [item.id])
 
   async function fetchNotes() {
     const { data } = await supabase.from('crm_notizen').select('*').eq(fk, item.id).order('created_at', { ascending: false })
@@ -493,7 +495,7 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
             <div className="flex gap-2 mt-2 flex-wrap">
               {item.telefon && <a href={`tel:${item.telefon}`} onClick={e => e.stopPropagation()} className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg transition-all">📞 Anrufen</a>}
               {item.email && <a href={`mailto:${item.email}`} onClick={e => e.stopPropagation()} className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg transition-all">✉️ E-Mail</a>}
-              {!isCustom && [3,7,14].map(d => <button key={d} onClick={() => quickFollowUp(d)} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">+{d}T</button>)}
+              {[3,7,14].map(d => <button key={d} onClick={() => quickFollowUp(d)} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">+{d}T</button>)}
             </div>
           </div>
           <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 text-sm ml-2">×</button>
@@ -509,16 +511,14 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
           ))}
         </div>
 
-        {!isCustom ? (
-          <div className="flex border-b border-gray-100 flex-shrink-0">
-            {[['info','Info'],['notizen',`Notizen (${notes.length})`],['tasks',`Tasks (${openTasks.length})`]].map(([id, label]) => (
-              <button key={id} onClick={() => setTab(id)}
-                className={`flex-1 py-2.5 text-xs font-medium transition-all border-b-2 ${tab === id ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        <div className="flex border-b border-gray-100 flex-shrink-0">
+          {[['info','Info'],['notizen',`Notizen (${notes.length})`],['tasks',`Tasks (${openTasks.length})`]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`flex-1 py-2.5 text-xs font-medium transition-all border-b-2 ${tab === id ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {tab === 'info' && <>
@@ -572,7 +572,7 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
             </div>
           </>}
 
-          {tab === 'notizen' && !isCustom && (
+          {tab === 'notizen' && (
             <>
               <div className="flex gap-2">
                 <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Notiz hinzufügen..." rows={3}
@@ -589,7 +589,7 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
             </>
           )}
 
-          {tab === 'tasks' && !isCustom && (
+          {tab === 'tasks' && (
             <>
               <div className="flex gap-2 flex-wrap mb-2">
                 {[3,7,14,30].map(d => <button key={d} onClick={() => quickFollowUp(d)} className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-all">In {d} Tagen</button>)}
