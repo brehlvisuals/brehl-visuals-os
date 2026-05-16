@@ -8,6 +8,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [leads, setLeads] = useState([])
   const [tasks, setTasks] = useState([])
+  const [tasksCount, setTasksCount] = useState(0)
   const [drehs, setDrehs] = useState([])
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,8 +21,11 @@ export default function Dashboard() {
 
   async function fetchAll() {
     const queries = [
+      // Liste: nur die nächsten 6 für die Anzeige
       supabase.from('crm_tasks').select('*, crm_leads(name)').eq('erledigt', false).order('faellig_am').limit(6),
       supabase.from('portal_news').select('*').order('created_at', { ascending: false }).limit(3),
+      // Count: alle offenen Tasks zählen
+      supabase.from('crm_tasks').select('id', { count: 'exact', head: true }).eq('erledigt', false),
     ]
     if (isAdmin) {
       queries.push(supabase.from('crm_leads').select('status'))
@@ -30,14 +34,16 @@ export default function Dashboard() {
     const results = await Promise.all(queries)
     if (results[0].data) setTasks(results[0].data)
     if (results[1].data) setNews(results[1].data)
-    if (results[2]?.data) setLeads(results[2].data)
-    if (results[3]?.data) setDrehs(results[3].data)
+    setTasksCount(results[2].count ?? 0)
+    if (results[3]?.data) setLeads(results[3].data)
+    if (results[4]?.data) setDrehs(results[4].data)
     setLoading(false)
   }
 
   async function completeTask(id) {
     await supabase.from('crm_tasks').update({ erledigt: true }).eq('id', id)
     setTasks(prev => prev.filter(t => t.id !== id))
+    setTasksCount(c => Math.max(0, c - 1))
   }
 
   const newLeads = leads.filter(l => l.status === 'neu').length
@@ -70,7 +76,7 @@ export default function Dashboard() {
             { label: 'Leads gesamt', value: leads.length, sub: 'Alle Leads', color: '' },
             { label: 'Neue Leads', value: newLeads, sub: 'Warten auf Kontakt', color: 'text-[#ff6b01]' },
             { label: 'Erfolgreich', value: successLeads, sub: `${leads.length ? Math.round(successLeads/leads.length*100) : 0}% Conversion`, color: 'text-green-600' },
-            { label: 'Offene Tasks', value: tasks.length, sub: overdueTasks.length > 0 ? `${overdueTasks.length} überfällig` : 'Alles im Plan', color: overdueTasks.length > 0 ? 'text-red-500' : '' },
+            { label: 'Offene Tasks', value: tasksCount, sub: overdueTasks.length > 0 ? `${overdueTasks.length} überfällig` : 'Alles im Plan', color: overdueTasks.length > 0 ? 'text-red-500' : '' },
           ].map(kpi => (
             <div key={kpi.label} className="card p-4">
               <p className="text-xs text-gray-400 mb-1">{kpi.label}</p>
@@ -86,32 +92,40 @@ export default function Dashboard() {
         <div className="md:col-span-2 card p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Meine Tasks</h2>
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tasks.length} offen</span>
+            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tasksCount} offen</span>
           </div>
-          {tasks.length === 0 ? (
+          {tasksCount === 0 ? (
             <div className="text-center py-8">
               <p className="text-2xl mb-2">🎉</p>
               <p className="text-sm text-gray-400">Keine offenen Tasks!</p>
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {tasks.map(t => {
-                const overdue = t.faellig_am && new Date(t.faellig_am) < new Date()
-                return (
-                  <div key={t.id} className={`flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0 ${overdue ? 'bg-red-50 -mx-4 px-4 rounded' : ''}`}>
-                    <button onClick={() => completeTask(t.id)}
-                      className="w-4 h-4 rounded-full border-2 border-gray-300 hover:border-[#ff6b01] flex-shrink-0 mt-0.5 transition-colors" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{t.titel}</p>
-                      <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-gray-400'}`}>
-                        {t.crm_leads?.name && `${t.crm_leads.name} · `}
-                        {overdue ? '⚠ Überfällig' : t.faellig_am ? new Date(t.faellig_am).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' }) : ''}
-                      </p>
+            <>
+              <div className="space-y-0.5">
+                {tasks.map(t => {
+                  const overdue = t.faellig_am && new Date(t.faellig_am) < new Date()
+                  return (
+                    <div key={t.id} className={`flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0 ${overdue ? 'bg-red-50 -mx-4 px-4 rounded' : ''}`}>
+                      <button onClick={() => completeTask(t.id)}
+                        className="w-4 h-4 rounded-full border-2 border-gray-300 hover:border-[#ff6b01] flex-shrink-0 mt-0.5 transition-colors" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{t.titel}</p>
+                        <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-gray-400'}`}>
+                          {t.crm_leads?.name && `${t.crm_leads.name} · `}
+                          {overdue ? '⚠ Überfällig' : t.faellig_am ? new Date(t.faellig_am).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' }) : ''}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+              {tasksCount > tasks.length && (
+                <button onClick={() => navigate('/tasks')}
+                  className="mt-3 w-full text-center text-xs text-[#ff6b01] hover:text-[#e55f00] font-medium py-2 transition-colors">
+                  Alle {tasksCount} Tasks anzeigen →
+                </button>
+              )}
+            </>
           )}
         </div>
 
