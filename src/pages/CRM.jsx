@@ -173,7 +173,7 @@ export default function CRM() {
             {!c.is_default && activeCat === c.id && (
               <button onClick={(e) => { e.stopPropagation(); deleteCategory(c.id) }}
                 title="Kategorie löschen"
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-md">
                 ×
               </button>
             )}
@@ -259,7 +259,7 @@ export default function CRM() {
 
       {/* Add Modal */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
+        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Neuer Eintrag in {cat?.label}</h3>
@@ -292,7 +292,7 @@ export default function CRM() {
 
       {/* Quick Add (Klick auf "+ Hinzufügen" unter Spalte) */}
       {showQuickAdd && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4" onClick={() => setShowQuickAdd(null)}>
+        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowQuickAdd(null)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Schnell hinzufügen</h3>
@@ -317,7 +317,7 @@ export default function CRM() {
 
       {/* Add Category Modal */}
       {showAddCat && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4" onClick={() => setShowAddCat(false)}>
+        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowAddCat(false)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Neue Kategorie</h3>
@@ -512,8 +512,8 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
   const openTasks = tasks.filter(t => !t.erledigt)
 
   return (
-    <div className="fixed inset-0 bg-black/10 z-40 flex" onClick={onClose}>
-      <div className="ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/10 z-[60] flex" onClick={onClose}>
+      <div className="crm-detail-panel ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
         <div className="px-4 py-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
           <div>
             <p className="font-bold text-gray-900">{item.name}</p>
@@ -540,7 +540,7 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
         <div className="flex border-b border-gray-100 flex-shrink-0">
           {[['info','Info'],['notizen',`Notizen (${notes.length})`],['tasks',`Tasks (${openTasks.length})`]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}
-              className={`flex-1 py-2.5 text-xs font-medium transition-all border-b-2 ${tab === id ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>
+              className={`flex-1 py-3 text-xs font-medium transition-all border-b-2 ${tab === id ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>
               {label}
             </button>
           ))}
