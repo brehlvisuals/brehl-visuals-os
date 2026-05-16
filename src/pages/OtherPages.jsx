@@ -427,8 +427,8 @@ export function Team() {
 
       {msg && <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl px-4 py-3">{msg}</div>}
 
-      <div className="card overflow-hidden">
-        <table className="w-full">
+      <div className="card overflow-hidden table-scroll">
+        <table className="w-full min-w-[400px]">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Mitarbeiter</th>
@@ -491,7 +491,7 @@ export function Team() {
       </div>
 
       {showInvite && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4" onClick={() => setShowInvite(false)}>
+        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowInvite(false)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Mitarbeiter einladen</h3>
