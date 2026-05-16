@@ -147,7 +147,7 @@ export default function Projekte() {
           )}
 
           {view === 'tabelle' && (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-x-auto">
+            <div className="bg-white border border-gray-100 rounded-xl table-scroll">
               <table className="w-full min-w-max">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
@@ -296,7 +296,7 @@ export default function Projekte() {
 
 function Modal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900">{title}</h3>
@@ -421,7 +421,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
 
   return (
-    <div className="fixed inset-0 bg-black/10 z-40 flex" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/10 z-[60] flex" onClick={onClose}>
       <div className="ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
