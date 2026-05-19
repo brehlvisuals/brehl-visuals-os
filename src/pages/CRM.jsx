@@ -559,6 +559,8 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
                   ['quelle', 'Quelle', item.quelle, 'text'],
                   ['utm_source', 'UTM Source', item.utm_source, 'text'],
                   ['utm_medium', 'UTM Medium', item.utm_medium, 'text'],
+                ['empfehler_name', 'Empfehler', item.empfehler_name, 'text'], 
+                ['empfehler_email', 'Empfehler-Mail', item.empfehler_email, 'email'],
                 ]
               : isCustom
               ? [
