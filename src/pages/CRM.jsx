@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import KundenBetreuung from '../components/KundenBetreuung'
 
 // Fallback Defaults (falls Supabase Tabelle leer/Fehler – sollte normalerweise nie greifen)
 const FALLBACK_CATS = [
@@ -463,6 +464,8 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
   const [showTaskForm, setShowTaskForm] = useState(false)
   // Foreign Key: je nach Item-Typ andere Spalte
   const fk = isLead ? 'lead_id' : isCustom ? 'custom_entry_id' : 'darsteller_id'
+  // Kunden-Board erkennen (Custom-Board mit Label "Kunden")
+  const isKunde = isCustom && (cat?.label || '').trim().toLowerCase() === 'kunden'
 
   useEffect(() => { fetchNotes() }, [item.id])
 
@@ -538,7 +541,7 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
         </div>
 
         <div className="flex border-b border-gray-100 flex-shrink-0">
-          {[['info','Info'],['notizen',`Notizen (${notes.length})`],['tasks',`Tasks (${openTasks.length})`]].map(([id, label]) => (
+          {[['info','Info'],['notizen',`Notizen (${notes.length})`],['tasks',`Tasks (${openTasks.length})`],...(isKunde ? [['betreuung','Betreuung']] : [])].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}
               className={`flex-1 py-3 text-xs font-medium transition-all border-b-2 ${tab === id ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>
               {label}
@@ -646,6 +649,10 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
               })}
               {openTasks.length === 0 && <p className="text-xs text-gray-400 text-center py-4">Keine Tasks</p>}
             </>
+          )}
+
+          {tab === 'betreuung' && isKunde && (
+            <KundenBetreuung kundeId={item.id} />
           )}
         </div>
       </div>
