@@ -465,9 +465,19 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
   // Foreign Key: je nach Item-Typ andere Spalte
   const fk = isLead ? 'lead_id' : isCustom ? 'custom_entry_id' : 'darsteller_id'
   // Kunden-Board erkennen (Custom-Board mit Label "Kunden")
-  const isKunde = isCustom && (cat?.label || '').trim().toLowerCase() === 'kunden'
+  const isKundenBoard = isCustom && (cat?.label || '').trim().toLowerCase() === 'kunden'
+  // Status-Label des aktuellen Eintrags ermitteln
+  const statusLabel = (cat?.statuses?.find(s => s.id === item.status)?.label || '').trim().toLowerCase()
+  // Betreuung nur bei AKTIVEN Kunden zeigen. Daten bleiben bei "inaktiv"
+  // in der DB erhalten — der Tab wird nur ausgeblendet.
+  const isKunde = isKundenBoard && statusLabel === 'aktiv'
 
   useEffect(() => { fetchNotes() }, [item.id])
+
+  // Falls Betreuung-Tab offen ist aber Kunde inaktiv wird → zurück zu Info
+  useEffect(() => {
+    if (tab === 'betreuung' && !isKunde) setTab('info')
+  }, [tab, isKunde])
 
   async function fetchNotes() {
     const { data, error } = await supabase.from('crm_notizen').select('*').eq(fk, item.id).order('created_at', { ascending: false })
