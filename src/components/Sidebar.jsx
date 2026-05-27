@@ -10,6 +10,7 @@ const NAV = [
     { to: '/projekte', icon: '▦', label: 'Projekte', mod: 'projekte' },
     { to: '/crm', icon: '◉', label: 'CRM', mod: 'crm' },
     { to: '/tasks', icon: '◷', label: 'Tasks', mod: 'crm', sub: true },
+    { to: '/prozess-kunde', icon: '◳', label: 'Prozess Kunde', mod: 'crm', sub: true },
   ]},
   { divider: true },
   { section: '', items: [
