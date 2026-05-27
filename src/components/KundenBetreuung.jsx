@@ -4,7 +4,7 @@
 // Einbinden in CRM.jsx im Detail-Panel: 
 //   {tab === 'betreuung' && <KundenBetreuung kundeId={item.id} />}
 // ============================================================
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const CALL_TYPES = {
@@ -81,10 +81,16 @@ export default function KundenBetreuung({ kundeId }) {
 
   useEffect(() => { load() }, [load])
 
-  // Fehlende Calls beim ersten Laden automatisch anlegen
+  // Fehlende Calls EINMALIG anlegen — nur wenn ein Call-Typ noch GAR NICHT existiert
+  // (weder offen noch erledigt). Läuft genau einmal pro Kunde dank seededRef.
+  const seededRef = useRef(null)
   useEffect(() => {
     if (loading) return
+    if (seededRef.current === kundeId) return // schon gemacht für diesen Kunden
+    seededRef.current = kundeId
+
     const ensureMissing = async () => {
+      // Alle jemals existierenden Call-Typen dieses Kunden (offen + erledigt)
       const existing = new Set(calls.map(c => c.call_typ))
       const toCreate = Object.keys(CALL_TYPES)
         .filter(t => !existing.has(t))
@@ -97,21 +103,30 @@ export default function KundenBetreuung({ kundeId }) {
     }
     ensureMissing()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading])
+  }, [loading, kundeId])
 
+  const [busyCall, setBusyCall] = useState(null)
   async function markCallDone(call) {
+    if (busyCall) return // schützt vor Doppelklick
+    setBusyCall(call.id)
     const heute = todayStr()
     try {
-      const { error } = await supabase.from('kunden_calls')
-        .update({ status: 'erledigt', erledigt_am: heute }).eq('id', call.id)
+      // Nur abhaken wenn der Call wirklich noch offen ist (Schutz vor Race)
+      const { data: updated, error } = await supabase.from('kunden_calls')
+        .update({ status: 'erledigt', erledigt_am: heute })
+        .eq('id', call.id)
+        .eq('status', 'offen')
+        .select()
       if (error) throw error
-      if (CALL_TYPES[call.call_typ]?.recurring) {
+      // Nur wenn wirklich eine Zeile geändert wurde + recurring → neuen Slot anlegen
+      if (updated && updated.length > 0 && CALL_TYPES[call.call_typ]?.recurring) {
         await supabase.from('kunden_calls').insert({
           kunde_id: kundeId, call_typ: call.call_typ, status: 'offen', faellig_am: addDays(heute, 28),
         })
       }
-      load()
+      await load()
     } catch (e) { console.error('markCallDone error:', e); setErr(e.message) }
+    finally { setBusyCall(null) }
   }
 
   async function saveNote(callId, text) {
@@ -169,6 +184,7 @@ export default function KundenBetreuung({ kundeId }) {
       )}
       {offeneCalls.map(call => (
         <CallCard key={call.id} call={call} onDone={() => markCallDone(call)}
+          busy={busyCall === call.id}
           onSaveNote={saveNote} savingNote={savingNote === call.id} />
       ))}
 
@@ -254,7 +270,7 @@ function TouchpointSection({ tpDieseWoche, tpProgress, touchpoints, onAdd, onDel
   )
 }
 
-function CallCard({ call, onDone, onSaveNote, savingNote, done }) {
+function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
   const cfg = CALL_TYPES[call.call_typ] || {}
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState(call.notizen || '')
@@ -285,9 +301,9 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done }) {
           </p>
         </div>
         {!done && (
-          <button onClick={onDone}
-            className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors">
-            ✓ Geführt
+          <button onClick={onDone} disabled={busy}
+            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors">
+            {busy ? '…' : '✓ Geführt'}
           </button>
         )}
       </div>
