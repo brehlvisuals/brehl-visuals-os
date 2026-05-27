@@ -328,7 +328,6 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
           </div>
         </div>
       )}
-      </div>
 
       {cfg.erklaerung && !done && (
         <p className="text-[11px] text-gray-500 leading-relaxed mt-2 bg-gray-50 rounded-lg px-2.5 py-2">
