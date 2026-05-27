@@ -21,8 +21,8 @@ const CALL_TYPES = {
     erklaerung: 'Alle 4 Wochen. Vor jedem Dreh wird die inhaltliche Ausrichtung abgestimmt: Welche Themen, welche Formate, welche Botschaften. Sorgt dafür, dass jeder Dreh strategisch sitzt.',
   },
   strategie: {
-    label: 'Strategie- & Wachstums-Call', recurring: true, icon: '📈',
-    erklaerung: 'Alle 4 Wochen. Strategische Abholung des Kunden: Warum haben bestimmte Inhalte funktioniert, welche Trigger wurden genutzt, wo steht das 90-Tage-Ziel. Macht Wachstum sichtbar und festigt die Zusammenarbeit als langfristige Investition.',
+    label: 'Feedback- & Wachstumscall', recurring: true, icon: '📈',
+    erklaerung: 'Alle 4 Wochen. Strategische Abholung des Kunden: Warum haben bestimmte Inhalte funktioniert, welche Trigger wurden genutzt, wo steht das 90-Tage-Ziel. Macht Wachstum sichtbar und festigt die Zusammenarbeit als langfristige Investition. Wichtig: aktiv das Empfehlungsprogramm ansprechen — zufriedene Kunden hier gezielt auf eine Weiterempfehlung hinweisen.',
   },
 }
 
@@ -106,22 +106,23 @@ export default function KundenBetreuung({ kundeId }) {
   }, [loading, kundeId])
 
   const [busyCall, setBusyCall] = useState(null)
-  async function markCallDone(call) {
+  async function markCallDone(call, datum) {
     if (busyCall) return // schützt vor Doppelklick
     setBusyCall(call.id)
-    const heute = todayStr()
+    const erledigtAm = datum || todayStr()
     try {
       // Nur abhaken wenn der Call wirklich noch offen ist (Schutz vor Race)
       const { data: updated, error } = await supabase.from('kunden_calls')
-        .update({ status: 'erledigt', erledigt_am: heute })
+        .update({ status: 'erledigt', erledigt_am: erledigtAm })
         .eq('id', call.id)
         .eq('status', 'offen')
         .select()
       if (error) throw error
       // Nur wenn wirklich eine Zeile geändert wurde + recurring → neuen Slot anlegen
+      // Die 4-Wochen-Uhr läuft ab dem eingegebenen Erledigt-Datum
       if (updated && updated.length > 0 && CALL_TYPES[call.call_typ]?.recurring) {
         await supabase.from('kunden_calls').insert({
-          kunde_id: kundeId, call_typ: call.call_typ, status: 'offen', faellig_am: addDays(heute, 28),
+          kunde_id: kundeId, call_typ: call.call_typ, status: 'offen', faellig_am: addDays(erledigtAm, 28),
         })
       }
       await load()
@@ -183,7 +184,7 @@ export default function KundenBetreuung({ kundeId }) {
         <p className="text-xs text-gray-400 py-2">Keine offenen Gespräche.</p>
       )}
       {offeneCalls.map(call => (
-        <CallCard key={call.id} call={call} onDone={() => markCallDone(call)}
+        <CallCard key={call.id} call={call} onDone={markCallDone}
           busy={busyCall === call.id}
           onSaveNote={saveNote} savingNote={savingNote === call.id} />
       ))}
@@ -274,6 +275,8 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
   const cfg = CALL_TYPES[call.call_typ] || {}
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState(call.notizen || '')
+  const [dateOpen, setDateOpen] = useState(false)
+  const [doneDate, setDoneDate] = useState(todayStr())
   const ueberfaellig = !done && call.faellig_am && call.faellig_am < todayStr()
 
   return (
@@ -300,12 +303,31 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
               : call.faellig_am ? `Fällig ab ${fmtDate(call.faellig_am)}` : ''}
           </p>
         </div>
-        {!done && (
-          <button onClick={onDone} disabled={busy}
+        {!done && !dateOpen && (
+          <button onClick={() => setDateOpen(true)} disabled={busy}
             className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors">
             {busy ? '…' : '✓ Geführt'}
           </button>
         )}
+      </div>
+
+      {/* Datum-Bestätigung beim Abhaken */}
+      {!done && dateOpen && (
+        <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-2.5">
+          <p className="text-[11px] text-gray-600 mb-1.5 font-medium">Wann wurde der Call geführt?</p>
+          <div className="flex gap-2 items-center">
+            <input type="date" value={doneDate} max={todayStr()}
+              onChange={e => setDoneDate(e.target.value)}
+              className="input text-xs flex-1" />
+            <button onClick={() => { onDone(call, doneDate); setDateOpen(false) }} disabled={busy}
+              className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg px-3 py-2 whitespace-nowrap">
+              {busy ? '…' : 'Bestätigen'}
+            </button>
+            <button onClick={() => { setDateOpen(false); setDoneDate(todayStr()) }}
+              className="text-gray-400 hover:text-gray-600 text-sm px-1">×</button>
+          </div>
+        </div>
+      )}
       </div>
 
       {cfg.erklaerung && !done && (
