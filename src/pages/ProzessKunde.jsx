@@ -39,7 +39,7 @@ export default function ProzessKunde() {
     try {
       // 1. Kunden-Kategorie finden (Custom-Board "Kunden")
       const { data: cats, error: catErr } = await supabase
-        .from('crm_categories').select('id,label')
+        .from('crm_categories').select('id,label,statuses')
       if (catErr) throw catErr
       const kundenCat = (cats || []).find(
         c => (c.label || '').trim().toLowerCase() === 'kunden'
@@ -49,16 +49,22 @@ export default function ProzessKunde() {
         setLoading(false); return
       }
 
-      // 2. Alle Kunden-Einträge
+      // Status-IDs ermitteln deren Label "aktiv" ist
+      const aktivStatusIds = (Array.isArray(kundenCat.statuses) ? kundenCat.statuses : [])
+        .filter(s => (s.label || '').trim().toLowerCase() === 'aktiv')
+        .map(s => s.id)
+
+      // 2. Nur AKTIVE Kunden-Einträge (inaktive werden nicht betreut)
       const { data: entries, error: entErr } = await supabase
-        .from('crm_custom_entries').select('id,name,firma')
+        .from('crm_custom_entries').select('id,name,firma,status')
         .eq('category_id', kundenCat.id)
       if (entErr) throw entErr
+      const aktiveEntries = (entries || []).filter(e => aktivStatusIds.includes(e.status))
       const kMap = {}
-      ;(entries || []).forEach(e => { kMap[e.id] = { name: e.name, firma: e.firma } })
+      aktiveEntries.forEach(e => { kMap[e.id] = { name: e.name, firma: e.firma } })
       setKunden(kMap)
 
-      const kundenIds = (entries || []).map(e => e.id)
+      const kundenIds = aktiveEntries.map(e => e.id)
       if (kundenIds.length === 0) {
         setCalls([]); setTouchpoints([]); setLoading(false); return
       }
