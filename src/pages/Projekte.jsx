@@ -17,6 +17,15 @@ const INTERN_STATUSES = [
   { id: 'posting',  label: 'Posting',  color: '#f97316', bg: 'rgba(249,115,22,0.1)',  text: '#c2410c' },
 ]
 
+// Leere Auswahl-/Datumsfelder müssen als null gespeichert werden –
+// Postgres lehnt "" bei uuid- und date-Spalten sonst mit einem 400 ab.
+const NULLABLE_KEYS = ['datum', 'kunde_id', 'zustaendig_id', 'darsteller_id']
+function cleanDreh(data) {
+  const out = { ...data }
+  for (const k of NULLABLE_KEYS) if (out[k] === '') out[k] = null
+  return out
+}
+
 function Pill({ status, statuses = STATUSES }) {
   const s = statuses.find(x => x.id === status)
   if (!s) return null
@@ -271,7 +280,7 @@ export default function Projekte() {
         <Modal title="Neuer Dreh" onClose={() => setShowAdd(false)}>
           <AddDrehForm kunden={kunden} darsteller={darsteller} profiles={profiles}
             onSave={async data => {
-              await supabase.from('proj_drehs').insert(data)
+              await supabase.from('proj_drehs').insert(cleanDreh(data))
               setShowAdd(false); fetchAll()
             }}
             onClose={() => setShowAdd(false)}
@@ -400,7 +409,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
   async function save() {
     setSaving(true)
-    await supabase.from('proj_drehs').update({ ...form, videos }).eq('id', dreh.id)
+    await supabase.from('proj_drehs').update(cleanDreh({ ...form, videos })).eq('id', dreh.id)
     setSaving(false); onRefresh()
   }
 
@@ -417,7 +426,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     onStatusChange(status)
   }
 
-  function addVideo() { setVideos(prev => [...prev, { titel: '', datei_url: '', datei_name: '' }]) }
+  function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
 
   return (
@@ -527,6 +536,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
+                  <textarea className="input text-xs mb-2" rows={4} value={v.planung || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: e.target.value } : vid))} placeholder="Video-Planung / Konzept..." />
                   {v.datei_name ? (
                     <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between">
                       <span className="text-xs text-green-600 font-medium">▶ {v.datei_name}</span>
