@@ -350,7 +350,7 @@ function AddDrehForm({ kunden, darsteller, profiles, onSave, onClose }) {
           {darsteller.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>
-      <div><label className="label">Geplante Videos</label><input type="number" className="input" value={form.video_count} onChange={e => set('video_count', parseInt(e.target.value))} min={1} max={30} /></div>
+      <div><label className="label">Geplante Videos</label><input type="number" className="input" value={form.video_count} onChange={e => set('video_count', parseInt(e.target.value) || 0)} min={1} /></div>
       <div className="flex gap-3 pt-2">
         <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
         <button onClick={() => onSave(form)} className="btn-primary flex-1">Anlegen →</button>
