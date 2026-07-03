@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from './AuthProvider'
+import { supabase } from '../lib/supabase'
 
 const NAV = [
   { section: 'Übersicht', items: [
@@ -37,8 +38,21 @@ const MOBILE_NAV = [
 export default function Sidebar() {
   const { profile, isAdmin, canAccess, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [badges, setBadges] = useState({ urlaub: 0, zeit: 0 })
   const location = useLocation()
   const name = profile?.full_name || profile?.email?.split('@')[0] || 'User'
+
+  useEffect(() => {
+    if (!isAdmin || !profile?.id) { setBadges({ urlaub: 0, zeit: 0 }); return }
+    let alive = true
+    Promise.all([
+      supabase.from('urlaubsantraege').select('id', { count: 'exact', head: true }).eq('status', 'offen').neq('user_id', profile.id),
+      supabase.from('zeit_aenderungsantraege').select('id', { count: 'exact', head: true }).eq('status', 'offen'),
+    ]).then(([u, z]) => { if (alive) setBadges({ urlaub: u.count || 0, zeit: z.count || 0 }) })
+    return () => { alive = false }
+  }, [isAdmin, profile?.id, location.pathname])
+
+  const badgeFor = to => to === '/urlaub' ? badges.urlaub : to === '/zeiterfassung' ? badges.zeit : 0
 
   return (
     <>
@@ -70,7 +84,8 @@ export default function Sidebar() {
                       }`
                     }>
                     <span className="text-base w-4 text-center">{item.icon}</span>
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {badgeFor(item.to) > 0 && <span className="bg-red-500 text-white text-[10px] font-semibold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">{badgeFor(item.to)}</span>}
                   </NavLink>
                 )
               })}
@@ -100,8 +115,9 @@ export default function Sidebar() {
             const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
             return (
               <NavLink key={item.to} to={item.to}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${active ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${active ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
                 <span className="text-lg leading-none">{item.icon}</span>
+                {badgeFor(item.to) > 0 && <span className="absolute top-0 right-1.5 bg-red-500 text-white text-[8px] font-semibold rounded-full min-w-[14px] h-3.5 px-1 flex items-center justify-center">{badgeFor(item.to)}</span>}
                 <span className="text-[10px] font-medium">{item.label}</span>
               </NavLink>
             )
