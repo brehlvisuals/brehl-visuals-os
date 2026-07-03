@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const STATUSES = [
@@ -33,6 +34,7 @@ function Pill({ status, statuses = STATUSES }) {
 }
 
 export default function Projekte() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('kunden')
   const [view, setView] = useState('kanban')
   const [drehs, setDrehs] = useState([])
@@ -237,6 +239,7 @@ export default function Projekte() {
                     {k.kontakt && <p className="text-xs text-gray-400">{k.kontakt}</p>}
                   </div>
                   <div className="flex gap-2">
+                    <button onClick={() => navigate('/journal', { state: { kundeId: k.id } })} className="text-xs text-[#ff6b01] hover:text-[#e05f00]">Journal</button>
                     <button className="text-xs text-gray-500 hover:text-gray-700">Bearbeiten</button>
                     <button onClick={async () => { await supabase.from('proj_kunden').delete().eq('id', k.id); fetchAll() }} className="text-xs text-red-400 hover:text-red-600">Löschen</button>
                   </div>

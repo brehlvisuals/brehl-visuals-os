@@ -12,6 +12,7 @@ const NAV = [
     { to: '/crm', icon: '◉', label: 'CRM', mod: 'crm' },
     { to: '/tasks', icon: '◷', label: 'Tasks', mod: 'crm', sub: true },
     { to: '/prozess-kunde', icon: '◳', label: 'Prozess Kunde', mod: 'crm', sub: true },
+    { to: '/journal', icon: '✎', label: 'Kunden-Journal', mod: 'projekte', sub: true },
   ]},
   { section: 'Zeit', items: [
     { to: '/zeiterfassung', icon: '⏱', label: 'Zeiterfassung' },
@@ -141,6 +142,7 @@ export default function Sidebar() {
                 ...(canAccess('projekte') ? [{ to: '/projekte', icon: '▦', label: 'Projekte' }] : []),
                 ...(canAccess('crm') ? [{ to: '/crm', icon: '◉', label: 'CRM' }] : []),
                 ...(canAccess('crm') ? [{ to: '/tasks', icon: '◷', label: 'Tasks' }] : []),
+                ...(canAccess('projekte') ? [{ to: '/journal', icon: '✎', label: 'Journal' }] : []),
                 ...(isAdmin ? [{ to: '/team', icon: '◎', label: 'Team' }] : []),
                 { to: '/einstellungen', icon: '⚙', label: 'Einstellungen' },
               ].map(item => (

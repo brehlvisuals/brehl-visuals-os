@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Projekte from './pages/Projekte'
 import CRM from './pages/CRM'
 import ProzessKunde from './pages/ProzessKunde'
+import KundenJournal from './pages/KundenJournal'
 import { Tasks, Kalender, Team, Einstellungen } from './pages/OtherPages'
 import { Zeiterfassung, Urlaub, Auswertung } from './pages/Zeiterfassung'
 
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/projekte" element={<Protected mod="projekte"><Layout><Projekte /></Layout></Protected>} />
           <Route path="/crm" element={<Protected mod="crm"><Layout><CRM /></Layout></Protected>} />
           <Route path="/prozess-kunde" element={<Protected mod="crm"><Layout><ProzessKunde /></Layout></Protected>} />
+          <Route path="/journal" element={<Protected mod="projekte"><Layout><KundenJournal /></Layout></Protected>} />
           <Route path="/tasks" element={<Protected mod="crm"><Layout><Tasks /></Layout></Protected>} />
           <Route path="/zeiterfassung" element={<Protected><Layout><Zeiterfassung /></Layout></Protected>} />
           <Route path="/urlaub" element={<Protected><Layout><Urlaub /></Layout></Protected>} />
