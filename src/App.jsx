@@ -7,6 +7,7 @@ import Projekte from './pages/Projekte'
 import CRM from './pages/CRM'
 import ProzessKunde from './pages/ProzessKunde'
 import { Tasks, Kalender, Team, Einstellungen } from './pages/OtherPages'
+import { Zeiterfassung, Urlaub, Auswertung } from './pages/Zeiterfassung'
 
 function Layout({ children }) {
   return (
@@ -48,6 +49,9 @@ export default function App() {
           <Route path="/crm" element={<Protected mod="crm"><Layout><CRM /></Layout></Protected>} />
           <Route path="/prozess-kunde" element={<Protected mod="crm"><Layout><ProzessKunde /></Layout></Protected>} />
           <Route path="/tasks" element={<Protected mod="crm"><Layout><Tasks /></Layout></Protected>} />
+          <Route path="/zeiterfassung" element={<Protected><Layout><Zeiterfassung /></Layout></Protected>} />
+          <Route path="/urlaub" element={<Protected><Layout><Urlaub /></Layout></Protected>} />
+          <Route path="/auswertung" element={<Protected><Layout><Auswertung /></Layout></Protected>} />
           <Route path="/kalender" element={<Protected><Layout><Kalender /></Layout></Protected>} />
           <Route path="/team" element={<Protected adminOnly><Layout><Team /></Layout></Protected>} />
           <Route path="/einstellungen" element={<Protected><Layout><Einstellungen /></Layout></Protected>} />

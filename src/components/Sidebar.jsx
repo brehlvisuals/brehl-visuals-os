@@ -12,6 +12,11 @@ const NAV = [
     { to: '/tasks', icon: '◷', label: 'Tasks', mod: 'crm', sub: true },
     { to: '/prozess-kunde', icon: '◳', label: 'Prozess Kunde', mod: 'crm', sub: true },
   ]},
+  { section: 'Zeit', items: [
+    { to: '/zeiterfassung', icon: '⏱', label: 'Zeiterfassung' },
+    { to: '/urlaub', icon: '⛱', label: 'Urlaub' },
+    { to: '/auswertung', icon: '▤', label: 'Auswertung' },
+  ]},
   { divider: true },
   { section: '', items: [
     { to: '/kalender', icon: '◻', label: 'Kalender' },
@@ -24,9 +29,8 @@ const NAV = [
 
 const MOBILE_NAV = [
   { to: '/dashboard', icon: '⊞', label: 'Home' },
-  { to: '/projekte', icon: '▦', label: 'Projekte' },
-  { to: '/crm', icon: '◉', label: 'CRM' },
-  { to: '/tasks', icon: '◷', label: 'Tasks' },
+  { to: '/zeiterfassung', icon: '⏱', label: 'Zeit' },
+  { to: '/urlaub', icon: '⛱', label: 'Urlaub' },
   { to: '/kalender', icon: '◻', label: 'Kalender' },
 ]
 
@@ -117,7 +121,10 @@ export default function Sidebar() {
             onClick={e => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { to: '/kalender', icon: '◻', label: 'Kalender' },
+                { to: '/auswertung', icon: '▤', label: 'Auswertung' },
+                ...(canAccess('projekte') ? [{ to: '/projekte', icon: '▦', label: 'Projekte' }] : []),
+                ...(canAccess('crm') ? [{ to: '/crm', icon: '◉', label: 'CRM' }] : []),
+                ...(canAccess('crm') ? [{ to: '/tasks', icon: '◷', label: 'Tasks' }] : []),
                 ...(isAdmin ? [{ to: '/team', icon: '◎', label: 'Team' }] : []),
                 { to: '/einstellungen', icon: '⚙', label: 'Einstellungen' },
               ].map(item => (

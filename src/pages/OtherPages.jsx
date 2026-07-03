@@ -402,6 +402,14 @@ export function Team() {
     setLoading(false)
   }
 
+  function setLocalStamm(id, patch) {
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m))
+  }
+  async function saveStamm(id, field, raw) {
+    const n = parseFloat(String(raw ?? '').replace(',', '.'))
+    await supabase.from('profiles').update({ [field]: isNaN(n) ? null : n }).eq('id', id)
+  }
+
   async function togglePermission(memberId, mod, currentPerms) {
     const perms = currentPerms || []
     let newPerms
@@ -488,6 +496,40 @@ export function Team() {
 
       <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-xs text-yellow-700">
         * Tasks ist nur verfügbar wenn CRM-Zugriff aktiv ist.
+      </div>
+
+      {/* Soll-Stunden & Urlaubsanspruch */}
+      <div className="card p-4">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Soll-Stunden & Urlaub</h3>
+        <div className="space-y-1">
+          {members.map(m => (
+            <div key={m.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{m.full_name || '—'}</p>
+                <p className="text-xs text-gray-400 truncate">{m.email}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input type="number" step="0.5" inputMode="decimal"
+                  className="input text-xs w-16 text-center px-1"
+                  value={m.soll_stunden_woche ?? ''}
+                  onChange={e => setLocalStamm(m.id, { soll_stunden_woche: e.target.value })}
+                  onBlur={e => saveStamm(m.id, 'soll_stunden_woche', e.target.value)}
+                  placeholder="–" />
+                <span className="text-[10px] text-gray-400 w-10">h/Wo.</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input type="number" step="1" inputMode="decimal"
+                  className="input text-xs w-16 text-center px-1"
+                  value={m.urlaub_anspruch_tage ?? ''}
+                  onChange={e => setLocalStamm(m.id, { urlaub_anspruch_tage: e.target.value })}
+                  onBlur={e => saveStamm(m.id, 'urlaub_anspruch_tage', e.target.value)}
+                  placeholder="–" />
+                <span className="text-[10px] text-gray-400 w-14">Urlaubst.</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-gray-400 mt-3">Soll-Stunden pro Woche und Urlaubstage pro Jahr. Wird automatisch gespeichert.</p>
       </div>
 
       {showInvite && (

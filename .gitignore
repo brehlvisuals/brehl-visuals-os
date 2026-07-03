@@ -1,0 +1,7 @@
+# Secrets / lokale Umgebung
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
