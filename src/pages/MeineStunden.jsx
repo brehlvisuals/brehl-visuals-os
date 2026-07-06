@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { MeineSpesen } from './Spesen'
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
 
@@ -133,6 +134,9 @@ export default function MeineStunden() {
           </div>
         )}
       </div>
+
+      {/* Fahrtkosten / Umkosten */}
+      <MeineSpesen month={new Date(month.y, month.m, 1)} />
 
       <p className="text-[10px] text-gray-400 leading-relaxed">
         Deine Einträge werden mit Datum, Beginn, Ende und Dauer gespeichert (Aufzeichnung nach § 17 MiLoG) und sind rechtlich dein Stundennachweis.

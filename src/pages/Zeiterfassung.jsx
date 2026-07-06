@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { MeineSpesen, AdminSpesenUebersicht } from './Spesen'
 
 /* ═══════════════════════════════════════
    HELPERS
@@ -611,6 +612,10 @@ export function Auswertung() {
               {showReport && <textarea readOnly className="input text-xs font-mono mt-3 leading-relaxed" rows={14} value={buildReport()} onFocus={e => e.target.select()} />}
             </div>
           )}
+
+          {/* Fahrtkosten / Umkosten */}
+          <MeineSpesen month={month} />
+          {isAdmin && <AdminSpesenUebersicht month={month} />}
         </>
       )}
     </div>
