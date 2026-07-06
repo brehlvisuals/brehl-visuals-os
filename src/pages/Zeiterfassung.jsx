@@ -92,6 +92,17 @@ const fmtDate = s => new Date(s).toLocaleDateString('de-DE', { day: '2-digit', m
 /* ═══════════════════════════════════════
    ZEITERFASSUNG
 ═══════════════════════════════════════ */
+// Stunden aus Von/Bis minus Pause (Minuten); über Mitternacht wird +24h gerechnet
+function stundenAus(von, bis, pauseMin) {
+  if (!von || !bis) return 0
+  const [sh, sm] = von.split(':').map(Number)
+  const [eh, em] = bis.split(':').map(Number)
+  let min = (eh * 60 + em) - (sh * 60 + sm)
+  if (min < 0) min += 1440
+  min -= (Number(pauseMin) || 0)
+  return Math.max(0, Math.round(min / 60 * 100) / 100)
+}
+
 export function Zeiterfassung() {
   const { profile, isAdmin } = useAuth()
   const kunden = useKonten()
@@ -103,7 +114,7 @@ export function Zeiterfassung() {
   const [meineAntraege, setMeineAntraege] = useState([])
   const [adminAntraege, setAdminAntraege] = useState([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ beschreibung: '', stunden: '', konto: '' })
+  const [form, setForm] = useState({ beschreibung: '', konto: '', von: '', bis: '', pause: '' })
   const [abwForm, setAbwForm] = useState({ typ: 'urlaub', von_datum: '', bis_datum: '', halber_tag: false, grund: '' })
   const [editId, setEditId] = useState(null)
   const [changeReq, setChangeReq] = useState(null)
@@ -146,14 +157,14 @@ export function Zeiterfassung() {
   const offenerAntragFuer = id => meineAntraege.find(a => a.eintrag_id === id)
   const abwFor = dstr => abwesenheiten.find(a => dstr >= a.von_datum && dstr <= a.bis_datum) || null
 
-  function resetForm() { setForm({ beschreibung: '', stunden: '', konto: '' }); setEditId(null); setChangeReq(null) }
+  function resetForm() { setForm({ beschreibung: '', konto: '', von: '', bis: '', pause: '' }); setEditId(null); setChangeReq(null) }
   const kontoPayload = konto => konto === 'intern' ? { ist_intern: true, kunde_id: null } : { ist_intern: false, kunde_id: konto }
 
   async function save() {
-    const std = dec(form.stunden)
-    if (!form.beschreibung.trim() || std <= 0 || !form.konto) return
+    const std = stundenAus(form.von, form.bis, form.pause)
+    if (!form.beschreibung.trim() || !form.von || !form.bis || std <= 0 || !form.konto) return
     setSaving(true)
-    const base = { beschreibung: form.beschreibung.trim(), stunden: std, ...kontoPayload(form.konto) }
+    const base = { beschreibung: form.beschreibung.trim(), stunden: std, von_zeit: form.von, bis_zeit: form.bis, pause_min: Number(form.pause) || 0, ...kontoPayload(form.konto) }
     if (changeReq) {
       await supabase.from('zeit_aenderungsantraege').insert({ eintrag_id: changeReq.id, user_id: profile.id, art: 'update', neu_beschreibung: base.beschreibung, neu_stunden: base.stunden, neu_kunde_id: base.kunde_id, neu_ist_intern: base.ist_intern })
     } else if (editId) {
@@ -178,8 +189,8 @@ export function Zeiterfassung() {
     setSaving(false); setAbwForm({ typ: 'urlaub', von_datum: anchor, bis_datum: anchor, halber_tag: false, grund: '' }); fetchMonth()
   }
 
-  function startEdit(e) { setChangeReq(null); setEditId(e.id); setForm({ beschreibung: e.beschreibung || '', stunden: fmtH(e.stunden), konto: e.ist_intern ? 'intern' : (e.kunde_id || '') }) }
-  function startChangeReq(e) { setEditId(null); setChangeReq(e); setForm({ beschreibung: e.beschreibung || '', stunden: fmtH(e.stunden), konto: e.ist_intern ? 'intern' : (e.kunde_id || '') }) }
+  function startEdit(e) { setChangeReq(null); setEditId(e.id); setForm({ beschreibung: e.beschreibung || '', konto: e.ist_intern ? 'intern' : (e.kunde_id || ''), von: (e.von_zeit || '').slice(0, 5), bis: (e.bis_zeit || '').slice(0, 5), pause: e.pause_min || '' }) }
+  function startChangeReq(e) { setEditId(null); setChangeReq(e); setForm({ beschreibung: e.beschreibung || '', konto: e.ist_intern ? 'intern' : (e.kunde_id || ''), von: (e.von_zeit || '').slice(0, 5), bis: (e.bis_zeit || '').slice(0, 5), pause: e.pause_min || '' }) }
   async function remove(id) { await supabase.from('zeiteintraege').delete().eq('id', id); if (editId === id) resetForm(); fetchMonth() }
   async function reqDelete(e) { await supabase.from('zeit_aenderungsantraege').insert({ eintrag_id: e.id, user_id: profile.id, art: 'delete' }); fetchMonth() }
 
@@ -289,15 +300,20 @@ export function Zeiterfassung() {
                 {changeReq && <div className="bg-yellow-50 text-yellow-700 text-xs rounded-lg px-3 py-2">Änderungsantrag – geht nach dem Speichern an Felix zur Freigabe.</div>}
                 {!bearbeitbar && !changeReq && <div className="bg-gray-50 text-gray-500 text-xs rounded-lg px-3 py-2">Älter als 2 Tage: neue Einträge gehen direkt, Änderungen an bestehenden musst du beantragen.</div>}
                 <div><label className="label">Was hast du gemacht?</label><textarea className="input text-sm" rows={2} value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} placeholder="z.B. Schnitt Reel Bierschneider, 3 Cuts + Musik" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="label">Stunden</label><input className="input text-sm" inputMode="decimal" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} placeholder="z.B. 2,5" /></div>
-                  <div><label className="label">Konto</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div><label className="label">Von</label><input type="time" className="input text-sm" value={form.von} onChange={e => setForm(p => ({ ...p, von: e.target.value }))} /></div>
+                  <div><label className="label">Bis</label><input type="time" className="input text-sm" value={form.bis} onChange={e => setForm(p => ({ ...p, bis: e.target.value }))} /></div>
+                  <div><label className="label">Pause (Min)</label><input type="number" inputMode="numeric" className="input text-sm" value={form.pause} onChange={e => setForm(p => ({ ...p, pause: e.target.value }))} placeholder="0" /></div>
+                </div>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1"><label className="label">Konto</label>
                     <select className="input text-sm" value={form.konto} onChange={e => setForm(p => ({ ...p, konto: e.target.value }))}>
                       <option value="">Wählen…</option>
                       {kunden.map(k => <option key={k.id} value={k.id}>{kurz(k.name)}</option>)}
                       <option value="intern">Intern</option>
                     </select>
                   </div>
+                  <div className="text-sm font-semibold text-[#ff6b01] pb-2.5 whitespace-nowrap">{stundenAus(form.von, form.bis, form.pause) > 0 ? `= ${fmtH(stundenAus(form.von, form.bis, form.pause))} h` : ''}</div>
                 </div>
                 <button onClick={save} disabled={saving} className="btn-primary w-full text-sm">{saving ? 'Speichert…' : changeReq ? 'Änderung beantragen →' : editId ? 'Änderung speichern' : '+ Eintrag hinzufügen'}</button>
               </>
@@ -325,6 +341,7 @@ export function Zeiterfassung() {
           {loading ? <Spinner /> : (
             <>
               {abwFor(anchor) && <div className={`card p-3 text-sm ${ABW[abwFor(anchor).typ]?.text}`}>{ABW[abwFor(anchor).typ]?.label}{abwFor(anchor).halber_tag ? ' (halber Tag)' : ''} an diesem Tag</div>}
+              <TagesBalken entries={dayEntries} />
               {dayEntries.length > 0 ? (
                 <div className="card divide-y divide-gray-50">
                   {dayEntries.map(e => {
@@ -364,6 +381,44 @@ export function Zeiterfassung() {
         {/* Monatskalender rechts */}
         <div className="lg:w-80 flex-shrink-0">
           <MonatsKalender calMonth={calMonth} setCalMonth={setCalMonth} anchor={anchor} setAnchor={setAnchor} daySum={daySum} ftMap={ftMap} abwFor={abwFor} monatIst={monatIst} monatSoll={monatSoll} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Tagesverlauf als Balken (Von/Bis) ─── */
+function TagesBalken({ entries }) {
+  const mit = (entries || []).filter(e => e.von_zeit && e.bis_zeit)
+  if (!mit.length) return null
+  const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
+  const end = e => { let b = toMin(e.bis_zeit); if (b < toMin(e.von_zeit)) b += 1440; return b }
+  let min = Math.min(...mit.map(e => toMin(e.von_zeit)))
+  let max = Math.max(...mit.map(end))
+  min = Math.floor(min / 60) * 60; max = Math.ceil(max / 60) * 60
+  const range = Math.max(60, max - min)
+  const ticks = []; for (let h = min; h <= max; h += Math.max(60, Math.round(range / 6 / 60) * 60)) ticks.push(h)
+  return (
+    <div className="card p-4">
+      <h3 className="section-title">Tagesverlauf</h3>
+      <div className="space-y-2.5">
+        {mit.map(e => {
+          const s = toMin(e.von_zeit), en = end(e)
+          const left = (s - min) / range * 100, width = (en - s) / range * 100
+          return (
+            <div key={e.id}>
+              <div className="flex justify-between text-[11px] text-gray-500 mb-1 gap-2">
+                <span className="truncate">{kontoLabel(e)} · {e.beschreibung}</span>
+                <span className="flex-shrink-0">{e.von_zeit.slice(0, 5)}–{e.bis_zeit.slice(0, 5)}{e.pause_min ? ` · ${e.pause_min}min Pause` : ''} · {fmtH(e.stunden)}h</span>
+              </div>
+              <div className="h-3.5 bg-gray-100 rounded-full relative overflow-hidden">
+                <div className="h-full rounded-full absolute bg-[#ff6b01]" style={{ left: `${left}%`, width: `${Math.max(3, width)}%` }} />
+              </div>
+            </div>
+          )
+        })}
+        <div className="flex justify-between text-[9px] text-gray-300 pt-0.5">
+          {ticks.map(h => <span key={h}>{String(Math.floor((h % 1440) / 60)).padStart(2, '0')}:00</span>)}
         </div>
       </div>
     </div>
