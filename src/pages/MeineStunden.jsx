@@ -58,6 +58,8 @@ export default function MeineStunden({ userId }) {
     })
     setSaving(false)
     if (error) { setMsg('Fehler: ' + error.message); return }
+    // Ansicht auf den Monat des neuen Eintrags springen, damit er sofort sichtbar ist
+    const d = new Date(form.datum); setMonth({ y: d.getFullYear(), m: d.getMonth() })
     setForm({ datum: '', start_zeit: '', end_zeit: '', notiz: '' }); load()
   }
 
