@@ -30,11 +30,26 @@ const NAV = [
 ]
 
 const MOBILE_NAV = [
-  { to: '/dashboard', icon: '⊞', label: 'Home' },
-  { to: '/zeiterfassung', icon: '⏱', label: 'Zeit' },
-  { to: '/urlaub', icon: '⛱', label: 'Urlaub' },
-  { to: '/kalender', icon: '◻', label: 'Kalender' },
+  { to: '/dashboard', m: 'home', label: 'Home' },
+  { to: '/zeiterfassung', m: 'clock', label: 'Zeit' },
+  { to: '/urlaub', m: 'sun', label: 'Urlaub' },
+  { to: '/kalender', m: 'calendar', label: 'Kalender' },
 ]
+
+// Einheitliche Strich-Icons für die Mobile-Leiste (statt gemischter Emoji/Glyphen)
+const svgProps = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }
+function MIcon({ name }) {
+  const p = {
+    home: <><path d="M3 10.7 12 4l9 6.7" /><path d="M5.5 9.5V20h13V9.5" /></>,
+    clock: <><circle cx="12" cy="12" r="8.2" /><path d="M12 7.8V12l2.6 1.6" /></>,
+    sun: <><circle cx="12" cy="12" r="3.8" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6" /></>,
+    calendar: <><rect x="3.5" y="4.5" width="17" height="16" rx="2.5" /><path d="M3.5 9.2h17M8 3v3.2M16 3v3.2" /></>,
+    grid: <><rect x="3.8" y="3.8" width="6.7" height="6.7" rx="1.5" /><rect x="13.5" y="3.8" width="6.7" height="6.7" rx="1.5" /><rect x="3.8" y="13.5" width="6.7" height="6.7" rx="1.5" /><rect x="13.5" y="13.5" width="6.7" height="6.7" rx="1.5" /></>,
+    dots: <><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" /></>,
+    logout: <><path d="M14.5 4.5H18a1.8 1.8 0 0 1 1.8 1.8v11.4A1.8 1.8 0 0 1 18 19.5h-3.5" /><path d="M10 8l-4 4 4 4M6.2 12H16" /></>,
+  }
+  return <svg {...svgProps}>{p[name]}</svg>
+}
 
 export default function Sidebar() {
   const { profile, isAdmin, isExtern, canAccess, signOut } = useAuth()
@@ -117,12 +132,12 @@ export default function Sidebar() {
           {isExtern ? (
             <>
               <NavLink to="/projekte"
-                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/projekte') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
-                <span className="text-lg leading-none">▦</span>
+                className={`flex flex-col items-center gap-1 px-6 py-1 rounded-lg transition-all ${location.pathname.startsWith('/projekte') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                <MIcon name="grid" />
                 <span className="text-[10px] font-medium">Projekte</span>
               </NavLink>
-              <button onClick={signOut} className="flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg text-gray-400">
-                <span className="text-lg leading-none">⎋</span>
+              <button onClick={signOut} className="flex flex-col items-center gap-1 px-6 py-1 rounded-lg text-gray-400">
+                <MIcon name="logout" />
                 <span className="text-[10px] font-medium">Logout</span>
               </button>
             </>
@@ -132,16 +147,16 @@ export default function Sidebar() {
                 const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
                 return (
                   <NavLink key={item.to} to={item.to}
-                    className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${active ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
-                    <span className="text-lg leading-none">{item.icon}</span>
+                    className={`relative flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition-all ${active ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                    <MIcon name={item.m} />
                     {badgeFor(item.to) > 0 && <span className="absolute top-0 right-1.5 bg-red-500 text-white text-[8px] font-semibold rounded-full min-w-[14px] h-3.5 px-1 flex items-center justify-center">{badgeFor(item.to)}</span>}
                     <span className="text-[10px] font-medium">{item.label}</span>
                   </NavLink>
                 )
               })}
               <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${mobileMenuOpen ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
-                <span className="text-lg leading-none">⋯</span>
+                className={`flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition-all ${mobileMenuOpen ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                <MIcon name="dots" />
                 <span className="text-[10px] font-medium">Mehr</span>
               </button>
             </>

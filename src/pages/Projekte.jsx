@@ -219,7 +219,7 @@ export default function Projekte() {
                   <div key={st.id}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverCol !== st.id) setDragOverCol(st.id) }}
                     onDrop={() => handleDrop(st.id)}
-                    className={`w-48 md:w-52 flex-shrink-0 rounded-xl transition-colors ${dragOverCol === st.id && draggingId ? 'bg-[#ff6b01]/5 ring-1 ring-[#ff6b01]/30' : ''}`}>
+                    className={`w-full md:w-52 md:flex-shrink-0 rounded-xl transition-colors ${dragOverCol === st.id && draggingId ? 'bg-[#ff6b01]/5 ring-1 ring-[#ff6b01]/30' : ''}`}>
                     <div className="flex items-center justify-between mb-2 px-1">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full" style={{ background: st.color }} />
@@ -311,7 +311,7 @@ export default function Projekte() {
             {INTERN_STATUSES.map(st => {
               const cols = intern.filter(i => i.status === st.id)
               return (
-                <div key={st.id} className="w-48 md:w-52 flex-shrink-0">
+                <div key={st.id} className="w-full md:w-52 md:flex-shrink-0">
                   <div className="flex items-center justify-between mb-2 px-1">
                     <div className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full" style={{ background: st.color }} />

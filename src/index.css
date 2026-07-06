@@ -60,6 +60,15 @@
 }
 .kanban-scroll::-webkit-scrollbar { display: none; }
 
+/* Auf dem Handy: Kanban-Spalten vertikal stapeln (volle Breite) statt quer scrollen */
+@media (max-width: 768px) {
+  .kanban-scroll {
+    flex-direction: column;
+    overflow-x: hidden;
+    gap: 18px;
+  }
+}
+
 @media (max-width: 768px) {
   /* CRM Detail-Panel: fullscreen auf mobile */
   .crm-detail-panel {
