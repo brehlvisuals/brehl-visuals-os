@@ -70,6 +70,8 @@ export default function Projekte() {
   const [loading, setLoading] = useState(true)
   const [showAddKunde, setShowAddKunde] = useState(false)
   const [showAddDarsteller, setShowAddDarsteller] = useState(false)
+  const [draggingId, setDraggingId] = useState(null)
+  const [dragOverCol, setDragOverCol] = useState(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -103,6 +105,22 @@ export default function Projekte() {
     await supabase.from('proj_notizen').delete().eq('dreh_id', id)
     await supabase.from('proj_drehs').delete().eq('id', id)
     setSelected(null)
+    fetchAll()
+  }
+
+  // Drag & Drop: Karte auf eine andere Status-Spalte ziehen
+  async function handleDrop(status) {
+    const id = draggingId
+    setDraggingId(null); setDragOverCol(null)
+    if (!id) return
+    const dreh = drehs.find(d => d.id === id)
+    if (!dreh || dreh.status === status) return
+    if (status === 'abgeschlossen' && !istGesichert(dreh)) {
+      alert('Erst RAW und Final auf NAS sichern (beide Häkchen im Dreh öffnen), dann auf „Abgeschlossen" ziehen.')
+      return
+    }
+    setDrehs(prev => prev.map(d => d.id === id ? { ...d, status } : d))   // optimistisch
+    await supabase.from('proj_drehs').update({ status }).eq('id', id)
     fetchAll()
   }
 
@@ -147,7 +165,10 @@ export default function Projekte() {
               {STATUSES.map(st => {
                 const cols = filtered.filter(d => d.status === st.id)
                 return (
-                  <div key={st.id} className="w-48 md:w-52 flex-shrink-0">
+                  <div key={st.id}
+                    onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverCol !== st.id) setDragOverCol(st.id) }}
+                    onDrop={() => handleDrop(st.id)}
+                    className={`w-48 md:w-52 flex-shrink-0 rounded-xl transition-colors ${dragOverCol === st.id && draggingId ? 'bg-[#ff6b01]/5 ring-1 ring-[#ff6b01]/30' : ''}`}>
                     <div className="flex items-center justify-between mb-2 px-1">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full" style={{ background: st.color }} />
@@ -160,8 +181,12 @@ export default function Projekte() {
                         const ks = kundeStyle(dreh.kunde_name)
                         const gesichert = istGesichert(dreh)
                         return (
-                        <div key={dreh.id} onClick={() => setSelected(dreh)}
-                          className={`bg-white border rounded-xl p-3 cursor-pointer hover:shadow-sm hover:-translate-y-0.5 transition-all ${selected?.id === dreh.id ? 'border-[#ff6b01] shadow-sm' : 'border-gray-100'}`}>
+                        <div key={dreh.id}
+                          draggable
+                          onDragStart={e => { setDraggingId(dreh.id); e.dataTransfer.effectAllowed = 'move' }}
+                          onDragEnd={() => { setDraggingId(null); setDragOverCol(null) }}
+                          onClick={() => setSelected(dreh)}
+                          className={`bg-white border rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-sm hover:-translate-y-0.5 transition-all ${selected?.id === dreh.id ? 'border-[#ff6b01] shadow-sm' : 'border-gray-100'} ${draggingId === dreh.id ? 'opacity-40' : ''}`}>
                           <p className="text-xs font-semibold text-gray-800 mb-1">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE') : '—'}</p>
                           {kundeFilter ? (
                             <>
