@@ -553,6 +553,14 @@ function Modal({ title, children, onClose }) {
 function AddDrehForm({ kunden, darsteller, profiles, onSave, onClose }) {
   const [form, setForm] = useState({ datum: '', kunde_id: '', kunde_name: '', zustaendig_id: '', video_count: 8, status: 'planung' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  const firstSave = useRef(true)
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return }
+    const t = setTimeout(() => save(), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Datum</label><input type="date" className="input" value={form.datum} onChange={e => set('datum', e.target.value)} /></div>
@@ -585,6 +593,14 @@ function AddDrehForm({ kunden, darsteller, profiles, onSave, onClose }) {
 function AddKundeForm({ onSave, onClose }) {
   const [form, setForm] = useState({ name: '', kontakt: '', email: '' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  const firstSave = useRef(true)
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return }
+    const t = setTimeout(() => save(), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Name</label><input className="input" placeholder="Kundenname" value={form.name} onChange={e => set('name', e.target.value)} /></div>
@@ -600,6 +616,14 @@ function AddKundeForm({ onSave, onClose }) {
 function AddDarstellerForm({ onSave, onClose }) {
   const [form, setForm] = useState({ name: '', telefon: '', email: '', status: 'neu' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  const firstSave = useRef(true)
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return }
+    const t = setTimeout(() => save(), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Name</label><input className="input" placeholder="Vor- und Nachname" value={form.name} onChange={e => set('name', e.target.value)} /></div>
@@ -616,6 +640,14 @@ function AddDarstellerForm({ onSave, onClose }) {
 function AddInternForm({ profiles, onSave, onClose }) {
   const [form, setForm] = useState({ titel: '', drehtag: '', status: 'planung', zustaendig: '', video_planung: '', requisiten: '' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  const firstSave = useRef(true)
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return }
+    const t = setTimeout(() => save(), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Titel</label><input className="input" value={form.titel} onChange={e => set('titel', e.target.value)} placeholder="Konzept-Titel" /></div>
@@ -653,6 +685,14 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
   )
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  const firstSave = useRef(true)
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return }
+    const t = setTimeout(() => save(), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, videos])
 
   async function save() {
     setSaving(true)
@@ -676,7 +716,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
             <p className="text-xs text-gray-400">Intern{form.drehtag ? ' · ' + new Date(form.drehtag).toLocaleDateString('de-DE') : ''}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={save} disabled={saving} className="btn-primary text-xs py-1.5 px-3">{saving ? 'Speichert...' : 'Speichern'}</button>
+            <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
             <button onClick={() => onDelete?.()} title="Konzept löschen" className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>
             <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
           </div>
@@ -747,6 +787,14 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const [saving, setSaving] = useState(false)
   const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  const firstSave = useRef(true)
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return }
+    const t = setTimeout(() => save(), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, videos])
 
   useEffect(() => { fetchNotes() }, [dreh.id])
 
@@ -799,7 +847,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
             <p className="text-xs text-gray-400">{dreh.kunde_name}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={save} disabled={saving} className="btn-primary text-xs py-1.5 px-3">{saving ? 'Speichert...' : 'Speichern'}</button>
+            <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
             {!extern && <button onClick={() => { if (window.confirm('Diesen Dreh wirklich löschen? Das kann nicht rückgängig gemacht werden.')) onDelete?.() }}
               title="Dreh löschen"
               className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>}
