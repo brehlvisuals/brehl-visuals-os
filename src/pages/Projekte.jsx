@@ -117,14 +117,19 @@ function FileAttach({ files, onChange, prefix }) {
     setBusy(true)
     const added = []
     for (const f of list) {
-      const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`
-      const { error } = await supabase.storage.from('dreh-dateien').upload(path, f, { cacheControl: '3600', upsert: false })
-      if (!error) {
+      try {
+        const safe = (f.name || 'datei').replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`
+        // Datei als Bytes lesen (auf iOS deutlich zuverlässiger als File direkt hochladen)
+        const buf = await f.arrayBuffer()
+        const { error } = await supabase.storage.from('dreh-dateien').upload(path, buf, {
+          cacheControl: '3600', upsert: false, contentType: f.type || 'application/octet-stream',
+        })
+        if (error) { alert('Upload fehlgeschlagen: ' + error.message); continue }
         const { data } = supabase.storage.from('dreh-dateien').getPublicUrl(path)
-        added.push({ url: data.publicUrl, name: f.name, path })
-      } else {
-        alert('Upload fehlgeschlagen: ' + error.message)
+        added.push({ url: data.publicUrl, name: f.name || safe, path })
+      } catch (err) {
+        alert('Upload fehlgeschlagen: ' + (err?.message || err))
       }
     }
     setBusy(false)
@@ -714,10 +719,10 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
                     onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
-                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id) }}
+                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }}
                     placeholder="Video-Planung / Konzept..." /></div>
                   <FileAttach files={v.dateien || []} prefix={`${item.id}/${i}`}
-                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id) }} />
+                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
@@ -891,10 +896,10 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
                     onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
-                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id) }}
+                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }}
                     placeholder="Video-Planung / Konzept..." /></div>
                   <FileAttach files={v.dateien || []} prefix={`${dreh.id}/${i}`}
-                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id) }} />
+                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
