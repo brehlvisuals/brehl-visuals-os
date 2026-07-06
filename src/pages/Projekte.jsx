@@ -261,7 +261,7 @@ export default function Projekte() {
                     <span className="inline-flex text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
                     <span className="text-xs text-gray-400">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '—'}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1.5">📹 {dreh.video_count || 0} Videos</p>
+                  <p className="text-xs text-gray-500 mt-1.5">📹 {(dreh.videos?.length || dreh.video_count || 0)} Videos</p>
                 </div>
               )
             })}
@@ -346,7 +346,7 @@ export default function Projekte() {
                           ) : (
                             <span className="inline-flex text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
                           )}
-                          <p className="text-xs text-gray-400 mt-1.5">📹 {dreh.video_count || 0} Videos</p>
+                          <p className="text-xs text-gray-400 mt-1.5">📹 {(dreh.videos?.length || dreh.video_count || 0)} Videos</p>
                           {!gesichert && ['dreh','cutting','posting'].includes(dreh.status) && (
                             <div className="mt-1.5 text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-md inline-block">🔒 Sicherung fehlt</div>
                           )}
@@ -387,7 +387,7 @@ export default function Projekte() {
                       <td className="px-4 py-3 text-sm font-semibold text-gray-800">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE') : '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{dreh.kunde_name}</td>
                       <td className="px-4 py-3"><Pill status={dreh.status} /></td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{dreh.video_count || 0}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{(dreh.videos?.length || dreh.video_count || 0)}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{dreh.darsteller_name || '—'}</td>
                       <td className="px-4 py-3 text-sm">{dreh.nas_gesichert ? <span className="text-green-600">✓</span> : <span className="text-red-500">✗</span>}</td>
                     </tr>
