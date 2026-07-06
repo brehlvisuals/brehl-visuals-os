@@ -268,7 +268,7 @@ export default function Projekte() {
           </div>
         )}
         {selected && (
-          <DrehDetail dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles} extern
+          <DrehDetail key={selected.id} dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles} extern
             onClose={() => setSelected(null)}
             onStatusChange={s => updateDrehStatus(selected.id, s)}
             onRefresh={fetchAll}
@@ -484,7 +484,7 @@ export default function Projekte() {
 
       {/* Detail Panel */}
       {selected && (
-        <DrehDetail dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles}
+        <DrehDetail key={selected.id} dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles}
           onClose={() => setSelected(null)}
           onStatusChange={s => updateDrehStatus(selected.id, s)}
           onRefresh={fetchAll}
@@ -526,7 +526,7 @@ export default function Projekte() {
       )}
 
       {selectedIntern && (
-        <InternDetail item={selectedIntern} profiles={profiles}
+        <InternDetail key={selectedIntern.id} item={selectedIntern} profiles={profiles}
           onClose={() => setSelectedIntern(null)}
           onRefresh={fetchAll}
           onDelete={async () => { if (window.confirm('Konzept wirklich löschen?')) { await supabase.from('proj_intern').delete().eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() } }}
