@@ -15,8 +15,10 @@ function hoursBetween(start, end) {
   return Math.round((mins / 60) * 100) / 100
 }
 
-export default function MeineStunden() {
+export default function MeineStunden({ userId }) {
   const { user } = useAuth()
+  const uid = userId || user.id
+  const acting = !!userId   // Admin erfasst für eine andere Person (dann alle Monate bearbeitbar)
   const [month, setMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
   const [entries, setEntries] = useState([])
   const [lohn, setLohn] = useState(0)
@@ -27,18 +29,19 @@ export default function MeineStunden() {
 
   const now = new Date()
   const isCurrentMonth = now.getFullYear() === month.y && now.getMonth() === month.m
+  const canEdit = acting || isCurrentMonth   // Admin darf jeden Monat bearbeiten
 
-  useEffect(() => { load() }, [month.y, month.m])
+  useEffect(() => { load() }, [month.y, month.m, uid])
   useEffect(() => {
-    supabase.from('extern_verguetung').select('stundenlohn').eq('user_id', user.id).maybeSingle()
+    supabase.from('extern_verguetung').select('stundenlohn').eq('user_id', uid).maybeSingle()
       .then(({ data }) => setLohn(Number(data?.stundenlohn || 0)))
-  }, [])
+  }, [uid])
 
   async function load() {
     setLoading(true)
     const mm = String(month.m + 1).padStart(2, '0')
     const lastDay = new Date(month.y, month.m + 1, 0).getDate()
-    const { data } = await supabase.from('minijob_stunden').select('*')
+    const { data } = await supabase.from('minijob_stunden').select('*').eq('user_id', uid)
       .gte('datum', `${month.y}-${mm}-01`).lte('datum', `${month.y}-${mm}-${String(lastDay).padStart(2, '0')}`)
       .order('datum')
     setEntries(data || []); setLoading(false)
@@ -51,7 +54,7 @@ export default function MeineStunden() {
     if (stunden <= 0) { setMsg('„Bis" muss nach „Von" liegen.'); return }
     setSaving(true)
     const { error } = await supabase.from('minijob_stunden').insert({
-      user_id: user.id, datum: form.datum, start_zeit: form.start_zeit, end_zeit: form.end_zeit, stunden, notiz: form.notiz || null,
+      user_id: uid, datum: form.datum, start_zeit: form.start_zeit, end_zeit: form.end_zeit, stunden, notiz: form.notiz || null,
     })
     setSaving(false)
     if (error) { setMsg('Fehler: ' + error.message); return }
@@ -93,7 +96,7 @@ export default function MeineStunden() {
       {!lohn && <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Dein Stundenlohn ist noch nicht hinterlegt – melde dich bei Felix. Deine Stunden kannst du trotzdem schon eintragen.</div>}
 
       {/* Erfassen (nur laufender Monat) */}
-      {isCurrentMonth ? (
+      {canEdit ? (
         <div className="card p-4 space-y-3">
           <p className="section-title mb-0">Einsatz eintragen</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -128,7 +131,7 @@ export default function MeineStunden() {
                   <p className="text-sm text-gray-700">{e.start_zeit?.slice(0, 5)}–{e.end_zeit?.slice(0, 5)} Uhr · <span className="font-medium">{fmtH(Number(e.stunden))} Std.</span></p>
                   {e.notiz && <p className="text-xs text-gray-400 truncate">{e.notiz}</p>}
                 </div>
-                {isCurrentMonth && <button onClick={() => del(e.id)} className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">Löschen</button>}
+                {canEdit && <button onClick={() => del(e.id)} className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">Löschen</button>}
               </div>
             ))}
           </div>
@@ -136,7 +139,7 @@ export default function MeineStunden() {
       </div>
 
       {/* Fahrtkosten / Umkosten */}
-      <MeineSpesen month={new Date(month.y, month.m, 1)} />
+      <MeineSpesen month={new Date(month.y, month.m, 1)} userId={userId} />
 
       <p className="text-[10px] text-gray-400 leading-relaxed">
         Deine Einträge werden mit Datum, Beginn, Ende und Dauer gespeichert (Aufzeichnung nach § 17 MiLoG) und sind rechtlich dein Stundennachweis.

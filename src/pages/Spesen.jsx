@@ -12,17 +12,19 @@ function monthRange(d) {
   return [`${y}-${mm}-01`, `${y}-${mm}-${String(last).padStart(2, '0')}`]
 }
 
-// Eigene Fahrtkosten/Umkosten erfassen (für alle Nutzer) – auto berechnet & gespeichert
-export function MeineSpesen({ month }) {
+// Eigene Fahrtkosten/Umkosten erfassen (für alle Nutzer) – auto berechnet & gespeichert.
+// Optional userId: Admin erfasst für eine andere Person.
+export function MeineSpesen({ month, userId }) {
   const { profile } = useAuth()
+  const uid = userId || profile.id
   const [von, bis] = monthRange(month)
   const [list, setList] = useState([])
   const [form, setForm] = useState({ datum: '', art: 'fahrt', strecke: '', km: '', beschreibung: '', betrag: '' })
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { load() }, [von, bis, profile?.id])
+  useEffect(() => { load() }, [von, bis, uid])
   async function load() {
-    const { data } = await supabase.from('spesen').select('*').eq('user_id', profile.id).gte('datum', von).lte('datum', bis).order('datum')
+    const { data } = await supabase.from('spesen').select('*').eq('user_id', uid).gte('datum', von).lte('datum', bis).order('datum')
     setList(data || [])
   }
   async function add() {
@@ -30,7 +32,7 @@ export function MeineSpesen({ month }) {
     const betrag = form.art === 'fahrt' ? num(form.km) * KM_SATZ : num(form.betrag)
     setSaving(true)
     const { error } = await supabase.from('spesen').insert({
-      user_id: profile.id, datum: form.datum, art: form.art,
+      user_id: uid, datum: form.datum, art: form.art,
       strecke: form.art === 'fahrt' ? (form.strecke || null) : null,
       km: form.art === 'fahrt' ? num(form.km) : null,
       betrag, beschreibung: form.beschreibung || null,

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { MeineSpesen, PersonSpesen } from './Spesen'
+import MeineStunden from './MeineStunden'
 
 /* ═══════════════════════════════════════
    HELPERS
@@ -110,13 +111,14 @@ export function Zeiterfassung() {
   const [zielUserId, setZielUserId] = useState('')   // Admin: für wen wird erfasst ('' = ich selbst)
   const [members, setMembers] = useState([])
   const zielProfil = isAdmin && zielUserId ? (members.find(x => x.id === zielUserId) || profile) : profile
+  const zielIstExtern = isAdmin && zielUserId && zielProfil?.role === 'extern'
 
   const y = calMonth.getFullYear(), m = calMonth.getMonth()
   const ftMap = useMemo(() => feiertageNRW(y), [y])
   const monatsRange = useMemo(() => [toStr(new Date(y, m, 1)), toStr(new Date(y, m + 1, 0))], [y, m])
 
   useEffect(() => { if (profile?.id) fetchMonth() }, [profile?.id, monatsRange[0], zielUserId])
-  useEffect(() => { if (isAdmin) supabase.from('profiles').select('id, full_name, soll_stunden, soll_modus, arbeitstage, urlaub_anspruch_tage').order('created_at').then(({ data }) => setMembers(data || [])) }, [isAdmin])
+  useEffect(() => { if (isAdmin) supabase.from('profiles').select('id, full_name, role, soll_stunden, soll_modus, arbeitstage, urlaub_anspruch_tage').order('created_at').then(({ data }) => setMembers(data || [])) }, [isAdmin])
   useEffect(() => { if (!abwForm.von_datum) setAbwForm(p => ({ ...p, von_datum: anchor, bis_datum: p.bis_datum || anchor })) }, [anchor])
 
   async function fetchMonth() {
@@ -202,6 +204,28 @@ export function Zeiterfassung() {
     return t
   }, [abwForm, profile])
 
+  // Für externe Minijobler: gleiche Ansicht wie sie selbst (Von/Bis + Fahrtkosten)
+  if (zielIstExtern) {
+    return (
+      <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4">
+        <div className="page-header">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Zeiterfassung</h2>
+            <p className="text-xs text-gray-400">Minijob-Ansicht – erfasst für {zielProfil?.full_name}</p>
+          </div>
+        </div>
+        <div className="card p-3 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500">Erfassen für:</span>
+          <select className="input text-xs w-auto" value={zielUserId} onChange={e => { setZielUserId(e.target.value); resetForm() }}>
+            <option value="">Mich selbst ({profile?.full_name || 'ich'})</option>
+            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : ''}</option>)}
+          </select>
+        </div>
+        <MeineStunden userId={zielUserId} />
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-5xl">
       <div className="page-header">
@@ -216,7 +240,7 @@ export function Zeiterfassung() {
           <span className="text-xs font-semibold text-gray-500">Erfassen für:</span>
           <select className="input text-xs w-auto" value={zielUserId} onChange={e => { setZielUserId(e.target.value); resetForm() }}>
             <option value="">Mich selbst ({profile?.full_name || 'ich'})</option>
-            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}</option>)}
+            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : ''}</option>)}
           </select>
           {zielUserId && <span className="text-xs text-[#ff6b01] font-medium">Du erfasst für {zielProfil?.full_name}. Wird direkt gespeichert.</span>}
         </div>
@@ -332,6 +356,9 @@ export function Zeiterfassung() {
               )}
             </>
           )}
+
+          {/* Fahrtkosten / Umkosten (auch fuer normale Mitarbeiter) */}
+          <MeineSpesen month={calMonth} userId={zielUserId || undefined} />
         </div>
 
         {/* Monatskalender rechts */}
