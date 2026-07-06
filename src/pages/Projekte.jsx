@@ -64,7 +64,7 @@ function toHtml(v) {
 }
 
 // Rich-Text-Editor: fett/kursiv/Überschrift/Liste, wächst automatisch mit dem Inhalt
-function RichText({ value, onChange, placeholder }) {
+function RichText({ value, onChange, onCommit, placeholder }) {
   const ref = useRef(null)
   useEffect(() => {
     const el = ref.current
@@ -88,6 +88,7 @@ function RichText({ value, onChange, placeholder }) {
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning
         onInput={e => onChange(e.currentTarget.innerHTML)}
+        onBlur={e => { onChange(e.currentTarget.innerHTML); onCommit?.(e.currentTarget.innerHTML) }}
         data-ph={placeholder || ''}
         className="rt-edit text-xs text-gray-700 leading-relaxed px-2.5 py-2 outline-none min-h-[2.5rem]" />
     </div>
@@ -711,9 +712,12 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
-                  <div className="mb-2"><RichText value={v.planung || ''} onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))} placeholder="Video-Planung / Konzept..." /></div>
+                  <div className="mb-2"><RichText value={v.planung || ''}
+                    onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
+                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id) }}
+                    placeholder="Video-Planung / Konzept..." /></div>
                   <FileAttach files={v.dateien || []} prefix={`${item.id}/${i}`}
-                    onChange={arr => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
+                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id) }} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
@@ -885,9 +889,12 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
-                  <div className="mb-2"><RichText value={v.planung || ''} onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))} placeholder="Video-Planung / Konzept..." /></div>
+                  <div className="mb-2"><RichText value={v.planung || ''}
+                    onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
+                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id) }}
+                    placeholder="Video-Planung / Konzept..." /></div>
                   <FileAttach files={v.dateien || []} prefix={`${dreh.id}/${i}`}
-                    onChange={arr => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
+                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id) }} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
