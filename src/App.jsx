@@ -60,7 +60,7 @@ export default function App() {
           <Route path="/auswertung" element={<Protected><Layout><Auswertung /></Layout></Protected>} />
           <Route path="/kalender" element={<Protected><Layout><Kalender /></Layout></Protected>} />
           <Route path="/team" element={<Protected adminOnly><Layout><Team /></Layout></Protected>} />
-          <Route path="/einstellungen" element={<Protected><Layout><Einstellungen /></Layout></Protected>} />
+          <Route path="/einstellungen" element={<Protected externOk><Layout><Einstellungen /></Layout></Protected>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

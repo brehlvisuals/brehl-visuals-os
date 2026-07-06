@@ -48,6 +48,7 @@ function MIcon({ name }) {
     grid: <><rect x="3.8" y="3.8" width="6.7" height="6.7" rx="1.5" /><rect x="13.5" y="3.8" width="6.7" height="6.7" rx="1.5" /><rect x="3.8" y="13.5" width="6.7" height="6.7" rx="1.5" /><rect x="13.5" y="13.5" width="6.7" height="6.7" rx="1.5" /></>,
     dots: <><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" /></>,
     logout: <><path d="M14.5 4.5H18a1.8 1.8 0 0 1 1.8 1.8v11.4A1.8 1.8 0 0 1 18 19.5h-3.5" /><path d="M10 8l-4 4 4 4M6.2 12H16" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" /></>,
   }
   return <svg {...svgProps}>{p[name]}</svg>
 }
@@ -93,7 +94,7 @@ export default function Sidebar() {
               {group.section && <div className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest px-2 pt-3 pb-1">{group.section}</div>}
               {group.items?.map(item => {
                 if (item.externOnly && !isExtern) return null
-                if (isExtern && !item.externOnly && item.to !== '/projekte') return null
+                if (isExtern && !item.externOnly && !['/projekte', '/einstellungen'].includes(item.to)) return null
                 if (item.adminOnly && !isAdmin) return null
                 if (item.mod && !canAccess(item.mod)) return null
                 return (
@@ -142,6 +143,11 @@ export default function Sidebar() {
                 className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/meine-stunden') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
                 <MIcon name="clock" />
                 <span className="text-[10px] font-medium">Stunden</span>
+              </NavLink>
+              <NavLink to="/einstellungen"
+                className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/einstellungen') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                <MIcon name="settings" />
+                <span className="text-[10px] font-medium">Profil</span>
               </NavLink>
               <button onClick={signOut} className="flex flex-col items-center gap-1 px-4 py-1 rounded-lg text-gray-400">
                 <MIcon name="logout" />
