@@ -128,7 +128,7 @@ export default function Sidebar() {
 
       {/* Mobile Bottom Nav */}
       <nav className="mobile-nav fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 px-2 py-2 safe-area-bottom">
-        <div className="flex items-center justify-around">
+        <div className="flex items-center justify-around w-full">
           {isExtern ? (
             <>
               <NavLink to="/projekte"
