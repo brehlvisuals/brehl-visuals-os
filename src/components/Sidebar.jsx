@@ -37,11 +37,12 @@ const MOBILE_NAV = [
 ]
 
 export default function Sidebar() {
-  const { profile, isAdmin, canAccess, signOut } = useAuth()
+  const { profile, isAdmin, isExtern, canAccess, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [badges, setBadges] = useState({ urlaub: 0, zeit: 0 })
   const location = useLocation()
   const name = profile?.full_name || profile?.email?.split('@')[0] || 'User'
+  const rolle = isAdmin ? 'Admin' : isExtern ? 'Extern' : 'Mitarbeiter'
 
   useEffect(() => {
     if (!isAdmin || !profile?.id) { setBadges({ urlaub: 0, zeit: 0 }); return }
@@ -75,6 +76,7 @@ export default function Sidebar() {
               {group.divider && <div className="h-px bg-gray-100 my-2 mx-1" />}
               {group.section && <div className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest px-2 pt-3 pb-1">{group.section}</div>}
               {group.items?.map(item => {
+                if (isExtern && item.to !== '/projekte') return null
                 if (item.adminOnly && !isAdmin) return null
                 if (item.mod && !canAccess(item.mod)) return null
                 return (
@@ -112,22 +114,38 @@ export default function Sidebar() {
       {/* Mobile Bottom Nav */}
       <nav className="mobile-nav fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 px-2 py-2 safe-area-bottom">
         <div className="flex items-center justify-around">
-          {MOBILE_NAV.map(item => {
-            const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
-            return (
-              <NavLink key={item.to} to={item.to}
-                className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${active ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
-                <span className="text-lg leading-none">{item.icon}</span>
-                {badgeFor(item.to) > 0 && <span className="absolute top-0 right-1.5 bg-red-500 text-white text-[8px] font-semibold rounded-full min-w-[14px] h-3.5 px-1 flex items-center justify-center">{badgeFor(item.to)}</span>}
-                <span className="text-[10px] font-medium">{item.label}</span>
+          {isExtern ? (
+            <>
+              <NavLink to="/projekte"
+                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/projekte') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                <span className="text-lg leading-none">▦</span>
+                <span className="text-[10px] font-medium">Projekte</span>
               </NavLink>
-            )
-          })}
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${mobileMenuOpen ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
-            <span className="text-lg leading-none">⋯</span>
-            <span className="text-[10px] font-medium">Mehr</span>
-          </button>
+              <button onClick={signOut} className="flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg text-gray-400">
+                <span className="text-lg leading-none">⎋</span>
+                <span className="text-[10px] font-medium">Logout</span>
+              </button>
+            </>
+          ) : (
+            <>
+              {MOBILE_NAV.map(item => {
+                const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+                return (
+                  <NavLink key={item.to} to={item.to}
+                    className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${active ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                    <span className="text-lg leading-none">{item.icon}</span>
+                    {badgeFor(item.to) > 0 && <span className="absolute top-0 right-1.5 bg-red-500 text-white text-[8px] font-semibold rounded-full min-w-[14px] h-3.5 px-1 flex items-center justify-center">{badgeFor(item.to)}</span>}
+                    <span className="text-[10px] font-medium">{item.label}</span>
+                  </NavLink>
+                )
+              })}
+              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${mobileMenuOpen ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                <span className="text-lg leading-none">⋯</span>
+                <span className="text-[10px] font-medium">Mehr</span>
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -160,7 +178,7 @@ export default function Sidebar() {
                 </div>
                 <div>
                   <div className="text-xs font-medium text-gray-800">{name}</div>
-                  <div className="text-[10px] text-gray-400">{isAdmin ? 'Admin' : 'Mitarbeiter'}</div>
+                  <div className="text-[10px] text-gray-400">{rolle}</div>
                 </div>
               </div>
               <button onClick={signOut} className="text-xs text-red-400 font-medium">Ausloggen</button>

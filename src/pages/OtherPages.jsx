@@ -380,13 +380,14 @@ export function Kalender() {
    TEAM
 ═══════════════════════════════════════ */
 export function Team() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showInvite, setShowInvite] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteName, setInviteName] = useState('')
+  const [showAdd, setShowAdd] = useState(false)
+  const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'extern' })
+  const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
 
   const MODULES = [
     { id: 'projekte', label: 'Projekte' },
@@ -400,6 +401,44 @@ export function Team() {
     const { data } = await supabase.from('profiles').select('*').order('created_at')
     if (data) setMembers(data)
     setLoading(false)
+  }
+
+  // Zugangs-Verwaltung via Edge Function admin-users (läuft mit Service-Rolle)
+  async function callAdmin(body) {
+    const { data, error } = await supabase.functions.invoke('admin-users', { body })
+    if (error) {
+      let m = error.message
+      try { const j = await error.context.json(); if (j?.error) m = j.error } catch { /* ignore */ }
+      throw new Error(m)
+    }
+    return data
+  }
+  async function createUser() {
+    setErr(''); setMsg('')
+    if (!form.email || !form.password) { setErr('E-Mail und Passwort nötig.'); return }
+    if (form.password.length < 8) { setErr('Passwort mind. 8 Zeichen.'); return }
+    setBusy(true)
+    try {
+      await callAdmin({ action: 'create', email: form.email.trim(), password: form.password, full_name: form.full_name.trim(), role: form.role })
+      setMsg(`✓ Zugang für ${form.email.trim()} angelegt.`)
+      setForm({ full_name: '', email: '', password: '', role: 'extern' })
+      setShowAdd(false); fetchMembers()
+    } catch (e) { setErr(e.message) } finally { setBusy(false) }
+  }
+  async function changeRole(id, role) {
+    setErr(''); setMsg('')
+    try { await callAdmin({ action: 'update', id, role }); fetchMembers() } catch (e) { setErr(e.message) }
+  }
+  async function resetPw(id, email) {
+    setErr(''); setMsg('')
+    const pw = window.prompt(`Neues Passwort für ${email} (mind. 8 Zeichen):`)
+    if (!pw) return
+    try { await callAdmin({ action: 'update', id, password: pw }); setMsg(`✓ Passwort für ${email} gesetzt.`) } catch (e) { setErr(e.message) }
+  }
+  async function removeUser(id, email) {
+    setErr(''); setMsg('')
+    if (!window.confirm(`Zugang ${email} wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) return
+    try { await callAdmin({ action: 'delete', id }); setMsg(`✓ Zugang ${email} gelöscht.`); fetchMembers() } catch (e) { setErr(e.message) }
   }
 
   function setLocalStamm(id, patch) {
@@ -439,19 +478,21 @@ export function Team() {
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">{members.length} Mitglieder</p>
-        <button onClick={() => setShowInvite(true)} className="btn-primary text-xs py-1.5 px-3">+ Einladen</button>
+        <p className="text-xs text-gray-400">{members.length} Zugänge</p>
+        <button onClick={() => { setShowAdd(true); setErr(''); setMsg('') }} className="btn-primary text-xs py-1.5 px-3">+ Zugang anlegen</button>
       </div>
 
       {msg && <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl px-4 py-3">{msg}</div>}
+      {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl px-4 py-3">{err}</div>}
 
       <div className="card overflow-hidden table-scroll">
-        <table className="w-full min-w-[400px]">
+        <table className="w-full min-w-[560px]">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Mitarbeiter</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Rolle</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Person</th>
+              <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Rolle</th>
               {MODULES.map(m => <th key={m.id} className="text-center px-2 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{m.label}</th>)}
+              <th className="px-3 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -468,15 +509,21 @@ export function Team() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 hidden md:table-cell">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.role === 'admin' ? 'bg-[#ff6b01]/10 text-[#ff6b01]' : 'bg-gray-100 text-gray-600'}`}>
-                    {m.role === 'admin' ? 'Admin' : 'Mitarbeiter'}
-                  </span>
+                <td className="px-3 py-3">
+                  <select value={m.role || 'mitarbeiter'} disabled={m.id === user?.id}
+                    onChange={e => changeRole(m.id, e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white outline-none focus:border-[#ff6b01] disabled:opacity-50">
+                    <option value="admin">Admin</option>
+                    <option value="mitarbeiter">Mitarbeiter</option>
+                    <option value="extern">Extern</option>
+                  </select>
                 </td>
                 {MODULES.map(mod => (
                   <td key={mod.id} className="px-2 py-3 text-center">
                     {m.role === 'admin' ? (
                       <span className="text-[#ff6b01] text-sm">✓</span>
+                    ) : m.role === 'extern' ? (
+                      mod.id === 'projekte' ? <span className="text-green-600 text-sm">✓</span> : <span className="text-gray-300 text-sm">–</span>
                     ) : mod.id === 'tasks' ? (
                       <button
                         onClick={() => togglePermission(m.id, 'tasks', m.permissions)}
@@ -498,6 +545,10 @@ export function Team() {
                     )}
                   </td>
                 ))}
+                <td className="px-3 py-3 whitespace-nowrap text-right">
+                  <button onClick={() => resetPw(m.id, m.email)} className="text-xs text-gray-400 hover:text-gray-700 mr-3">Passwort</button>
+                  {m.id !== user?.id && <button onClick={() => removeUser(m.id, m.email)} className="text-xs text-red-400 hover:text-red-600">Löschen</button>}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -505,7 +556,7 @@ export function Team() {
       </div>
 
       <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-xs text-yellow-700">
-        * Tasks ist nur verfügbar wenn CRM-Zugriff aktiv ist.
+        * Tasks nur mit CRM-Zugriff. „Extern" (Videograf/Darsteller) sieht ausschließlich Projekte – CRM &amp; Co. sind auch technisch (DB) gesperrt.
       </div>
 
       {/* Soll-Stunden, Arbeitstage & Urlaubsanspruch */}
@@ -556,48 +607,31 @@ export function Team() {
         <p className="text-[10px] text-gray-400 mt-3">Soll-Stunden (pro Woche oder Monat) & Urlaubstage/Jahr — leer lassen = keine Vorgabe (z.B. für dich als Chef). Arbeitstage steuern Soll & Feiertagsberechnung. Wird automatisch gespeichert.</p>
       </div>
 
-      {showInvite && (
-        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowInvite(false)}>
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Mitarbeiter einladen</h3>
-              <button onClick={() => setShowInvite(false)} className="text-gray-400 text-xl">×</button>
+              <h3 className="font-semibold text-gray-900">Zugang anlegen</h3>
+              <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl">×</button>
             </div>
             <div className="space-y-3">
-              <div><label className="label">Name</label><input className="input" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Max Mustermann" /></div>
-              <div><label className="label">E-Mail</label><input className="input" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="max@brehlvisuals.de" /></div>
-              <p className="text-xs text-gray-400">Der Mitarbeiter erhält eine E-Mail mit einem Login-Link. Berechtigungen kannst du danach in der Tabelle setzen.</p>
+              <div><label className="label">Name</label><input className="input" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Max Mustermann" /></div>
+              <div><label className="label">E-Mail</label><input className="input" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="max@brehlvisuals.de" /></div>
+              <div><label className="label">Passwort</label><input className="input" type="text" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="Min. 8 Zeichen" /></div>
+              <div>
+                <label className="label">Rolle</label>
+                <select className="input" value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
+                  <option value="extern">Extern – nur Projekte (Videograf/Darsteller)</option>
+                  <option value="mitarbeiter">Mitarbeiter</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              {err && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</div>}
+              <p className="text-xs text-gray-400">Die Person meldet sich direkt mit E-Mail + Passwort an – keine Bestätigungs-Mail nötig.</p>
             </div>
             <div className="flex gap-3 mt-4">
-              <button onClick={() => setShowInvite(false)} className="btn-secondary flex-1">Abbrechen</button>
-              <button onClick={async () => {
-                if (!inviteEmail) { setMsg('Bitte E-Mail eingeben'); return }
-                setMsg('Sende Einladung...')
-                // Magic Link via signInWithOtp: erstellt User falls noch nicht vorhanden + sendet Login-Link per Mail
-                const { error } = await supabase.auth.signInWithOtp({
-                  email: inviteEmail,
-                  options: {
-                    emailRedirectTo: window.location.origin + '/dashboard',
-                    data: { full_name: inviteName || null },
-                  },
-                })
-                if (error) {
-                  setMsg('Fehler: ' + error.message)
-                  return
-                }
-                // Optional: profile-Name aktualisieren falls Name eingegeben
-                if (inviteName) {
-                  // Trigger erstellt profile automatisch nach Email-Bestätigung
-                  // Wir warten kurz und versuchen den Namen zu setzen
-                  setTimeout(async () => {
-                    await supabase.from('profiles').update({ full_name: inviteName }).eq('email', inviteEmail)
-                    fetchMembers()
-                  }, 1500)
-                }
-                setMsg(`✓ Einladungs-Link an ${inviteEmail} gesendet.`)
-                setShowInvite(false); setInviteEmail(''); setInviteName('')
-                fetchMembers()
-              }} className="btn-primary flex-1">Einladen →</button>
+              <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1">Abbrechen</button>
+              <button onClick={createUser} disabled={busy} className="btn-primary flex-1">{busy ? 'Legt an...' : 'Zugang anlegen →'}</button>
             </div>
           </div>
         </div>
@@ -626,7 +660,7 @@ export function Einstellungen() {
       <div className="card p-5">
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Mein Profil</h3>
         <div className="space-y-0.5">
-          {[['E-Mail', profile?.email], ['Rolle', profile?.role === 'admin' ? 'Administrator' : 'Mitarbeiter']].map(([l, v]) => (
+          {[['E-Mail', profile?.email], ['Rolle', profile?.role === 'admin' ? 'Administrator' : profile?.role === 'extern' ? 'Extern' : 'Mitarbeiter']].map(([l, v]) => (
             <div key={l} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
               <span className="text-xs text-gray-400 w-24">{l}</span>
               <span className="text-sm text-gray-700">{v}</span>

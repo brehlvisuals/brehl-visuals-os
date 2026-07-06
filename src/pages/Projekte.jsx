@@ -33,6 +33,27 @@ function Pill({ status, statuses = STATUSES }) {
   return <span className="inline-flex text-xs font-medium px-2 py-0.5 rounded-md" style={{ background: s.bg, color: s.text }}>{s.label}</span>
 }
 
+// Feste Farbpalette – jeder Kunde bekommt anhand seines Namens stabil eine Farbe
+const KUNDE_COLORS = [
+  { bg: 'rgba(59,130,246,0.12)',  text: '#1d4ed8' },
+  { bg: 'rgba(22,163,74,0.12)',   text: '#15803d' },
+  { bg: 'rgba(239,68,68,0.12)',   text: '#b91c1c' },
+  { bg: 'rgba(249,115,22,0.12)',  text: '#c2410c' },
+  { bg: 'rgba(139,92,246,0.12)',  text: '#6d28d9' },
+  { bg: 'rgba(14,165,233,0.12)',  text: '#0369a1' },
+  { bg: 'rgba(217,70,239,0.12)',  text: '#a21caf' },
+  { bg: 'rgba(245,158,11,0.14)',  text: '#b45309' },
+  { bg: 'rgba(20,184,166,0.12)',  text: '#0f766e' },
+  { bg: 'rgba(236,72,153,0.12)',  text: '#be185d' },
+]
+function kundeStyle(name) {
+  let h = 0
+  for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return KUNDE_COLORS[h % KUNDE_COLORS.length]
+}
+// Ein Dreh gilt als vollständig gesichert, wenn RAW UND FINAL auf NAS liegen
+const istGesichert = d => !!(d?.raw_gesichert && d?.final_gesichert)
+
 export default function Projekte() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('kunden')
@@ -71,11 +92,18 @@ export default function Projekte() {
 
   async function updateDrehStatus(id, status) {
     const dreh = drehs.find(d => d.id === id)
-    if (status === 'abgeschlossen' && !dreh?.nas_gesichert) return false
+    if (status === 'abgeschlossen' && !istGesichert(dreh)) return false
     await supabase.from('proj_drehs').update({ status }).eq('id', id)
     fetchAll()
     if (selected?.id === id) setSelected(prev => ({ ...prev, status }))
     return true
+  }
+
+  async function deleteDreh(id) {
+    await supabase.from('proj_notizen').delete().eq('dreh_id', id)
+    await supabase.from('proj_drehs').delete().eq('id', id)
+    setSelected(null)
+    fetchAll()
   }
 
   const filtered = kundeFilter ? drehs.filter(d => d.kunde_name === kundeFilter) : drehs
@@ -128,24 +156,34 @@ export default function Projekte() {
                       <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{cols.length}</span>
                     </div>
                     <div className="space-y-2 min-h-8">
-                      {cols.map(dreh => (
+                      {cols.map(dreh => {
+                        const ks = kundeStyle(dreh.kunde_name)
+                        const gesichert = istGesichert(dreh)
+                        return (
                         <div key={dreh.id} onClick={() => setSelected(dreh)}
                           className={`bg-white border rounded-xl p-3 cursor-pointer hover:shadow-sm hover:-translate-y-0.5 transition-all ${selected?.id === dreh.id ? 'border-[#ff6b01] shadow-sm' : 'border-gray-100'}`}>
-                          <p className="text-xs font-semibold text-gray-800 mb-0.5">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE') : '—'}</p>
-                          <p className="text-xs text-gray-400 mb-2">{dreh.kunde_name}</p>
-                          <Pill status={dreh.status} />
-                          <p className="text-xs text-gray-400 mt-1.5">📹 {dreh.video_count || 0} Videos{dreh.darsteller_name ? ` · ${dreh.darsteller_name}` : ''}</p>
-                          {!dreh.nas_gesichert && ['dreh','cutting','posting'].includes(dreh.status) && (
-                            <div className="mt-1.5 text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-md inline-block">🔒 Kein NAS</div>
+                          <p className="text-xs font-semibold text-gray-800 mb-1">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE') : '—'}</p>
+                          {kundeFilter ? (
+                            <>
+                              <p className="text-xs text-gray-400 mb-2">{dreh.kunde_name}</p>
+                              <Pill status={dreh.status} />
+                            </>
+                          ) : (
+                            <span className="inline-flex text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
                           )}
-                          {dreh.nas_gesichert && (
-                            <div className="mt-1.5 text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-md inline-block">✓ NAS OK</div>
+                          <p className="text-xs text-gray-400 mt-1.5">📹 {dreh.video_count || 0} Videos{dreh.darsteller_name ? ` · ${dreh.darsteller_name}` : ''}</p>
+                          {!gesichert && ['dreh','cutting','posting'].includes(dreh.status) && (
+                            <div className="mt-1.5 text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-md inline-block">🔒 Sicherung fehlt</div>
+                          )}
+                          {gesichert && (
+                            <div className="mt-1.5 text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-md inline-block">✓ Gesichert</div>
                           )}
                           {dreh.status === 'abnahme_kunde' && dreh.abnahme_bestaetigt && (
                             <div className="mt-1.5 text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md inline-block">✓ Abgenommen</div>
                           )}
                         </div>
-                      ))}
+                        )
+                      })}
                       <button onClick={() => setShowAdd(true)}
                         className="w-full border border-dashed border-gray-200 rounded-xl py-2 text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
                         + Dreh
@@ -275,6 +313,7 @@ export default function Projekte() {
           onClose={() => setSelected(null)}
           onStatusChange={s => updateDrehStatus(selected.id, s)}
           onRefresh={fetchAll}
+          onDelete={() => deleteDreh(selected.id)}
         />
       )}
 
@@ -393,7 +432,7 @@ function AddDarstellerForm({ onSave, onClose }) {
   )
 }
 
-function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChange, onRefresh }) {
+function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChange, onRefresh, onDelete }) {
   const [tab, setTab] = useState('info')
   const [form, setForm] = useState({ ...dreh })
   const [videos, setVideos] = useState(dreh.videos || [])
@@ -412,7 +451,8 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
   async function save() {
     setSaving(true)
-    await supabase.from('proj_drehs').update(cleanDreh({ ...form, videos })).eq('id', dreh.id)
+    const payload = { ...form, videos, nas_gesichert: !!(form.raw_gesichert && form.final_gesichert) }
+    await supabase.from('proj_drehs').update(cleanDreh(payload)).eq('id', dreh.id)
     setSaving(false); onRefresh()
   }
 
@@ -423,7 +463,10 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   }
 
   function handleStatusChange(status) {
-    if (status === 'abgeschlossen' && !form.nas_gesichert) { setNasWarn(true); return }
+    if (status === 'abgeschlossen' && !(form.raw_gesichert && form.final_gesichert)) {
+      // Ohne RAW+Final-Sicherung nicht abschließbar -> zurück auf Posting
+      setNasWarn(true); set('status', 'posting'); onStatusChange('posting'); return
+    }
     setNasWarn(false)
     set('status', status)
     onStatusChange(status)
@@ -443,6 +486,9 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
           </div>
           <div className="flex items-center gap-2">
             <button onClick={save} disabled={saving} className="btn-primary text-xs py-1.5 px-3">{saving ? 'Speichert...' : 'Speichern'}</button>
+            <button onClick={() => { if (window.confirm('Diesen Dreh wirklich löschen? Das kann nicht rückgängig gemacht werden.')) onDelete?.() }}
+              title="Dreh löschen"
+              className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>
             <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
           </div>
         </div>
@@ -460,7 +506,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
         {nasWarn && (
           <div className="mx-4 mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 flex-shrink-0">
-            🔒 Erst NAS-Sicherung setzen, dann auf "Abgeschlossen"!
+            🔒 Erst RAW und Final auf NAS sichern (beide Häkchen), dann „Abgeschlossen". Zurück auf Posting gesetzt.
           </div>
         )}
 
@@ -503,11 +549,17 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="label">Dauer</label><input className="input text-xs" value={form.dauer || ''} onChange={e => set('dauer', e.target.value)} placeholder="z.B. 6:00" /></div>
                 <div>
-                  <label className="label">NAS-Sicherung</label>
-                  <select className="input text-xs" value={form.nas_gesichert ? 'ja' : ''} onChange={e => { set('nas_gesichert', e.target.value === 'ja'); if (e.target.value === 'ja') setNasWarn(false) }}>
-                    <option value="">Nicht gesichert</option>
-                    <option value="ja">RAW & FINAL gesichert</option>
-                  </select>
+                  <label className="label">Sicherung</label>
+                  <div className="space-y-1 mt-1">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={!!form.raw_gesichert} onChange={e => { set('raw_gesichert', e.target.checked); if (e.target.checked && form.final_gesichert) setNasWarn(false) }} className="rounded" />
+                      RAW auf NAS gesichert
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={!!form.final_gesichert} onChange={e => { set('final_gesichert', e.target.checked); if (e.target.checked && form.raw_gesichert) setNasWarn(false) }} className="rounded" />
+                      Final auf NAS gesichert
+                    </label>
+                  </div>
                 </div>
               </div>
               {form.status === 'abnahme_kunde' && (

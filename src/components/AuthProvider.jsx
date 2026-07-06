@@ -67,14 +67,16 @@ export function AuthProvider({ children }) {
   }
 
   const isAdmin = profile?.role === 'admin'
+  const isExtern = profile?.role === 'extern'
   const canAccess = (mod) => {
+    if (isExtern) return mod === 'projekte'   // Externe: ausschließlich Projekte
     if (isAdmin) return true
     return profile?.permissions?.includes(mod) ?? false
   }
 
   return (
     <Ctx.Provider value={{
-      user, profile, isAdmin, canAccess, loading,
+      user, profile, isAdmin, isExtern, canAccess, loading,
       signIn: (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }),
       signOut: () => supabase.auth.signOut(),
     }}>
