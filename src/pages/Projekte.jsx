@@ -189,7 +189,8 @@ export default function Projekte() {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    setLoading(true)
+    // kein setLoading(true) hier: sonst würde ein Refresh nach dem Speichern den
+    // Lade-Spinner zeigen, das offene Detail-Panel abbauen und mit altem Stand neu aufbauen
     const [d, i, k, dar, p] = await Promise.all([
       supabase.from('proj_drehs').select('*').order('datum', { ascending: false }),
       supabase.from('proj_intern').select('*').order('created_at', { ascending: false }),
