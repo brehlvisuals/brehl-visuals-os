@@ -9,6 +9,7 @@ import ProzessKunde from './pages/ProzessKunde'
 import KundenJournal from './pages/KundenJournal'
 import { Tasks, Kalender, Team, Einstellungen } from './pages/OtherPages'
 import { Zeiterfassung, Urlaub, Auswertung } from './pages/Zeiterfassung'
+import MeineStunden from './pages/MeineStunden'
 
 function Layout({ children }) {
   return (
@@ -21,7 +22,7 @@ function Layout({ children }) {
   )
 }
 
-function Protected({ children, mod, adminOnly }) {
+function Protected({ children, mod, adminOnly, externOk }) {
   const { user, loading, canAccess, isAdmin, isExtern } = useAuth()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -29,8 +30,8 @@ function Protected({ children, mod, adminOnly }) {
     </div>
   )
   if (!user) return <Navigate to="/login" replace />
-  // Externe (Videograf/Darsteller) dürfen ausschließlich die Projekte-Seite
-  if (isExtern && mod !== 'projekte') return <Navigate to="/projekte" replace />
+  // Externe (Videograf/Darsteller) dürfen nur ausdrücklich freigegebene Seiten (Projekte, Meine Stunden)
+  if (isExtern && !externOk) return <Navigate to="/projekte" replace />
   if (adminOnly && !isAdmin) return (
     <div className="p-6 text-center mt-20 text-gray-400 text-sm">Kein Zugriff auf diesen Bereich.</div>
   )
@@ -48,7 +49,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Protected><Layout><Dashboard /></Layout></Protected>} />
-          <Route path="/projekte" element={<Protected mod="projekte"><Layout><Projekte /></Layout></Protected>} />
+          <Route path="/projekte" element={<Protected mod="projekte" externOk><Layout><Projekte /></Layout></Protected>} />
+          <Route path="/meine-stunden" element={<Protected externOk><Layout><MeineStunden /></Layout></Protected>} />
           <Route path="/crm" element={<Protected mod="crm"><Layout><CRM /></Layout></Protected>} />
           <Route path="/prozess-kunde" element={<Protected mod="crm"><Layout><ProzessKunde /></Layout></Protected>} />
           <Route path="/journal" element={<Protected mod="projekte"><Layout><KundenJournal /></Layout></Protected>} />

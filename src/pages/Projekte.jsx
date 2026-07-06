@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../components/AuthProvider'
 
 const STATUSES = [
   { id: 'planung',        label: 'Planung',         color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  text: '#b45309' },
@@ -107,6 +108,7 @@ function AutoTextarea({ className = '', value, onChange, ...rest }) {
 
 export default function Projekte() {
   const navigate = useNavigate()
+  const { isExtern } = useAuth()
   const [tab, setTab] = useState('kunden')
   const [view, setView] = useState('kanban')
   const [drehs, setDrehs] = useState([])
@@ -178,6 +180,42 @@ export default function Projekte() {
   const filtered = kundeFilter ? drehs.filter(d => d.kunde_name === kundeFilter) : drehs
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
+
+  // Externe (Videograf/Darsteller): aufgeräumte Liste ihrer anstehenden Drehs (Status "Dreh")
+  if (isExtern) {
+    return (
+      <div className="p-4 md:p-6 space-y-3 max-w-2xl mx-auto">
+        <h2 className="text-base font-semibold text-gray-900">Deine Drehs</h2>
+        <p className="text-xs text-gray-400">Anstehende Drehs (Status „Dreh") deiner Kunden. Tippe einen Dreh für Details & Video-Planung.</p>
+        {drehs.length === 0 ? (
+          <div className="card p-10 text-center text-sm text-gray-400">Aktuell keine Drehs für dich.</div>
+        ) : (
+          <div className="space-y-2">
+            {drehs.map(dreh => {
+              const ks = kundeStyle(dreh.kunde_name)
+              return (
+                <div key={dreh.id} onClick={() => setSelected(dreh)}
+                  className="bg-white border border-gray-100 rounded-xl p-3.5 cursor-pointer hover:shadow-sm transition-all">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
+                    <span className="text-xs text-gray-400">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '—'}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">📹 {dreh.video_count || 0} Videos</p>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {selected && (
+          <DrehDetail dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles} extern
+            onClose={() => setSelected(null)}
+            onStatusChange={s => updateDrehStatus(selected.id, s)}
+            onRefresh={fetchAll}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -498,7 +536,7 @@ function AddDarstellerForm({ onSave, onClose }) {
   )
 }
 
-function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChange, onRefresh, onDelete }) {
+function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChange, onRefresh, onDelete, extern }) {
   const [tab, setTab] = useState('info')
   const [form, setForm] = useState({ ...dreh })
   const [videos, setVideos] = useState(dreh.videos || [])
@@ -561,14 +599,15 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
           </div>
           <div className="flex items-center gap-2">
             <button onClick={save} disabled={saving} className="btn-primary text-xs py-1.5 px-3">{saving ? 'Speichert...' : 'Speichern'}</button>
-            <button onClick={() => { if (window.confirm('Diesen Dreh wirklich löschen? Das kann nicht rückgängig gemacht werden.')) onDelete?.() }}
+            {!extern && <button onClick={() => { if (window.confirm('Diesen Dreh wirklich löschen? Das kann nicht rückgängig gemacht werden.')) onDelete?.() }}
               title="Dreh löschen"
-              className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>
+              className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>}
             <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
           </div>
         </div>
 
-        {/* Status row */}
+        {/* Status row (für Externe ausgeblendet) */}
+        {!extern && (
         <div className="px-4 py-2.5 border-b border-gray-100 flex gap-1.5 flex-wrap flex-shrink-0">
           {STATUSES.map(s => (
             <button key={s.id} onClick={() => handleStatusChange(s.id)}
@@ -578,6 +617,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
             </button>
           ))}
         </div>
+        )}
 
         {nasWarn && (
           <div className="mx-4 mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 flex-shrink-0">

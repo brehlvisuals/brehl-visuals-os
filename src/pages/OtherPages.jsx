@@ -388,6 +388,10 @@ export function Team() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
+  const [kundenList, setKundenList] = useState([])
+  const [lohnMap, setLohnMap] = useState({})       // user_id -> Stundenlohn
+  const [zuordnung, setZuordnung] = useState({})   // user_id -> Set(kunde_id)
+  const [stundenMap, setStundenMap] = useState({}) // user_id -> Stunden diesen Monat
 
   const MODULES = [
     { id: 'projekte', label: 'Projekte' },
@@ -395,7 +399,37 @@ export function Team() {
     { id: 'tasks', label: 'Tasks *' },
   ]
 
-  useEffect(() => { if (isAdmin) fetchMembers() }, [isAdmin])
+  useEffect(() => { if (isAdmin) { fetchMembers(); fetchExternData() } }, [isAdmin])
+
+  async function fetchExternData() {
+    const now = new Date()
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const first = `${now.getFullYear()}-${mm}-01`
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const last = `${now.getFullYear()}-${mm}-${String(lastDay).padStart(2, '0')}`
+    const [k, v, z, s] = await Promise.all([
+      supabase.from('proj_kunden').select('id, name').order('name'),
+      supabase.from('extern_verguetung').select('*'),
+      supabase.from('extern_kunden').select('*'),
+      supabase.from('minijob_stunden').select('user_id, stunden').gte('datum', first).lte('datum', last),
+    ])
+    setKundenList(k.data || [])
+    setLohnMap(Object.fromEntries((v.data || []).map(r => [r.user_id, Number(r.stundenlohn)])))
+    const zmap = {}; (z.data || []).forEach(r => { (zmap[r.user_id] ||= new Set()).add(r.kunde_id) }); setZuordnung(zmap)
+    const smap = {}; (s.data || []).forEach(r => { smap[r.user_id] = (smap[r.user_id] || 0) + Number(r.stunden || 0) }); setStundenMap(smap)
+  }
+
+  async function saveLohn(uid, val) {
+    const n = parseFloat(String(val).replace(',', '.')) || 0
+    setLohnMap(p => ({ ...p, [uid]: n }))
+    await supabase.from('extern_verguetung').upsert({ user_id: uid, stundenlohn: n, updated_at: new Date().toISOString() })
+  }
+  async function toggleKunde(uid, kid) {
+    const has = zuordnung[uid]?.has(kid)
+    setZuordnung(p => { const s = new Set(p[uid] || []); has ? s.delete(kid) : s.add(kid); return { ...p, [uid]: s } })
+    if (has) await supabase.from('extern_kunden').delete().eq('user_id', uid).eq('kunde_id', kid)
+    else await supabase.from('extern_kunden').insert({ user_id: uid, kunde_id: kid })
+  }
 
   async function fetchMembers() {
     const { data } = await supabase.from('profiles').select('*').order('created_at')
@@ -605,6 +639,55 @@ export function Team() {
           })}
         </div>
         <p className="text-[10px] text-gray-400 mt-3">Soll-Stunden (pro Woche oder Monat) & Urlaubstage/Jahr — leer lassen = keine Vorgabe (z.B. für dich als Chef). Arbeitstage steuern Soll & Feiertagsberechnung. Wird automatisch gespeichert.</p>
+      </div>
+
+      {/* Externe / Minijob: Stundenlohn & Kundenzuordnung */}
+      <div className="card p-4">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Externe / Minijob – Stundenlohn & Kunden</h3>
+        {members.filter(m => m.role === 'extern').length === 0 ? (
+          <p className="text-xs text-gray-400">Noch keine externen Zugänge (Rolle „Extern").</p>
+        ) : (
+          <div className="space-y-4">
+            {members.filter(m => m.role === 'extern').map(m => {
+              const h = stundenMap[m.id] || 0
+              const lohn = Number(lohnMap[m.id]) || 0
+              return (
+                <div key={m.id} className="py-2 border-b border-gray-50 last:border-0 space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex-1 min-w-[120px]">
+                      <p className="text-sm font-medium text-gray-800 truncate">{m.full_name || '—'}</p>
+                      <p className="text-xs text-gray-400 truncate">{m.email}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input type="number" step="0.5" inputMode="decimal" className="input text-xs w-20 text-center px-1"
+                        value={lohnMap[m.id] ?? ''} onChange={e => setLohnMap(p => ({ ...p, [m.id]: e.target.value }))}
+                        onBlur={e => saveLohn(m.id, e.target.value)} placeholder="€/h" />
+                      <span className="text-[10px] text-gray-400">€/Std.</span>
+                    </div>
+                    <div className="text-xs text-gray-500 whitespace-nowrap">
+                      {new Date().toLocaleDateString('de-DE', { month: 'long' })}: <span className="font-semibold text-gray-800">{(Math.round(h * 100) / 100).toLocaleString('de-DE')} Std.</span>
+                      {' · '}<span className="font-semibold text-[#c2410c]">{(h * lohn).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-1 self-center">Kunden</span>
+                    {kundenList.map(k => {
+                      const on = zuordnung[m.id]?.has(k.id)
+                      return (
+                        <button key={k.id} onClick={() => toggleKunde(m.id, k.id)}
+                          className={`text-xs px-2 py-1 rounded-md transition-all ${on ? 'bg-[#ff6b01] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                          {k.name}
+                        </button>
+                      )
+                    })}
+                    {kundenList.length === 0 && <span className="text-xs text-gray-400">Keine Kunden angelegt.</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <p className="text-[10px] text-gray-400 mt-3">Stundenlohn wird automatisch gespeichert (nur du & die Person sehen ihn). Zugeordnete Kunden bestimmen, welche Drehs (Status „Dreh") der/die Externe sieht. „Stunden" = laufender Monat.</p>
       </div>
 
       {showAdd && (

@@ -13,6 +13,7 @@ const NAV = [
     { to: '/tasks', icon: '◷', label: 'Tasks', mod: 'crm', sub: true },
     { to: '/prozess-kunde', icon: '◳', label: 'Prozess Kunde', mod: 'crm', sub: true },
     { to: '/journal', icon: '✎', label: 'Kunden-Journal', mod: 'projekte', sub: true },
+    { to: '/meine-stunden', icon: '⏱', label: 'Meine Stunden', externOnly: true },
   ]},
   { section: 'Zeit', items: [
     { to: '/zeiterfassung', icon: '⏱', label: 'Zeiterfassung' },
@@ -91,7 +92,8 @@ export default function Sidebar() {
               {group.divider && <div className="h-px bg-gray-100 my-2 mx-1" />}
               {group.section && <div className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest px-2 pt-3 pb-1">{group.section}</div>}
               {group.items?.map(item => {
-                if (isExtern && item.to !== '/projekte') return null
+                if (item.externOnly && !isExtern) return null
+                if (isExtern && !item.externOnly && item.to !== '/projekte') return null
                 if (item.adminOnly && !isAdmin) return null
                 if (item.mod && !canAccess(item.mod)) return null
                 return (
@@ -132,11 +134,16 @@ export default function Sidebar() {
           {isExtern ? (
             <>
               <NavLink to="/projekte"
-                className={`flex flex-col items-center gap-1 px-6 py-1 rounded-lg transition-all ${location.pathname.startsWith('/projekte') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/projekte') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
                 <MIcon name="grid" />
-                <span className="text-[10px] font-medium">Projekte</span>
+                <span className="text-[10px] font-medium">Drehs</span>
               </NavLink>
-              <button onClick={signOut} className="flex flex-col items-center gap-1 px-6 py-1 rounded-lg text-gray-400">
+              <NavLink to="/meine-stunden"
+                className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/meine-stunden') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                <MIcon name="clock" />
+                <span className="text-[10px] font-medium">Stunden</span>
+              </NavLink>
+              <button onClick={signOut} className="flex flex-col items-center gap-1 px-4 py-1 rounded-lg text-gray-400">
                 <MIcon name="logout" />
                 <span className="text-[10px] font-medium">Logout</span>
               </button>
