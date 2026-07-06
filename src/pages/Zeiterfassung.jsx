@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
-import { MeineSpesen, AdminSpesenUebersicht } from './Spesen'
+import { MeineSpesen, PersonSpesen } from './Spesen'
 
 /* ═══════════════════════════════════════
    HELPERS
@@ -613,9 +613,9 @@ export function Auswertung() {
             </div>
           )}
 
-          {/* Fahrtkosten / Umkosten */}
-          <MeineSpesen month={month} />
-          {isAdmin && <AdminSpesenUebersicht month={month} />}
+          {/* Fahrtkosten / Umkosten – eigene (MA) bzw. ausgewählte Person (Admin) */}
+          {!isAdmin && <MeineSpesen month={month} />}
+          {isAdmin && einzel && <PersonSpesen month={month} userId={selUser} name={aktProfil?.full_name} />}
         </>
       )}
     </div>

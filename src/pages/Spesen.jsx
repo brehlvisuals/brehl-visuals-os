@@ -93,42 +93,34 @@ export function MeineSpesen({ month }) {
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const hhmm = t => (t || '').slice(0, 5)
 
-// Admin-Übersicht: Kalender (wer hat wann was eingetragen) + Entgelt-Summary
-export function AdminSpesenUebersicht({ month }) {
+// Auswertung EINER ausgewählten Person (Admin): Stunden/Entgelt/Fahrtkosten + Kalender mit Klick auf den Tag
+export function PersonSpesen({ month, userId, name }) {
   const [von, bis] = monthRange(month)
   const y = month.getFullYear(), mo = month.getMonth()
-  const [nameMap, setNameMap] = useState({})
-  const [lohnMap, setLohnMap] = useState({})
+  const [lohn, setLohn] = useState(0)
   const [stunden, setStunden] = useState([])
   const [spesen, setSpesen] = useState([])
   const [tag, setTag] = useState(null)
 
-  useEffect(() => { load(); setTag(null) }, [von, bis])
+  useEffect(() => { if (userId) load(); setTag(null) }, [von, bis, userId])
   async function load() {
-    const [profs, verg, std, sp] = await Promise.all([
-      supabase.from('profiles').select('id, full_name'),
-      supabase.from('extern_verguetung').select('*'),
-      supabase.from('minijob_stunden').select('*').gte('datum', von).lte('datum', bis),
-      supabase.from('spesen').select('*').gte('datum', von).lte('datum', bis),
+    const [v, std, sp] = await Promise.all([
+      supabase.from('extern_verguetung').select('stundenlohn').eq('user_id', userId).maybeSingle(),
+      supabase.from('minijob_stunden').select('*').eq('user_id', userId).gte('datum', von).lte('datum', bis).order('datum'),
+      supabase.from('spesen').select('*').eq('user_id', userId).gte('datum', von).lte('datum', bis).order('datum'),
     ])
-    setNameMap(Object.fromEntries((profs.data || []).map(p => [p.id, p.full_name])))
-    setLohnMap(Object.fromEntries((verg.data || []).map(r => [r.user_id, Number(r.stundenlohn)])))
-    setStunden(std.data || [])
-    setSpesen(sp.data || [])
+    setLohn(Number(v.data?.stundenlohn || 0)); setStunden(std.data || []); setSpesen(sp.data || [])
   }
 
-  // Entgelt je Person (aus Minijob-Stunden × Stundenlohn)
-  const entgelt = {}
-  stunden.forEach(s => { entgelt[s.user_id] = (entgelt[s.user_id] || 0) + Number(s.stunden || 0) })
-  const spesenSum = spesen.reduce((s, x) => s + Number(x.betrag || 0), 0)
+  const hSum = stunden.reduce((s, x) => s + Number(x.stunden || 0), 0)
+  const sSum = spesen.reduce((s, x) => s + Number(x.betrag || 0), 0)
+  const hatMinijob = stunden.length > 0 || lohn > 0
 
-  // Kalender: pro Tag alle Einträge (Stunden + Spesen)
   const byDay = {}
   const push = (d, item) => { (byDay[d] = byDay[d] || []).push(item) }
   stunden.forEach(s => push(s.datum, { kind: 'std', ...s }))
   spesen.forEach(s => push(s.datum, { kind: 'spesen', ...s }))
 
-  // Grid aufbauen
   const first = new Date(y, mo, 1)
   const startPad = (first.getDay() + 6) % 7
   const daysInMonth = new Date(y, mo + 1, 0).getDate()
@@ -139,26 +131,16 @@ export function AdminSpesenUebersicht({ month }) {
 
   return (
     <>
-      <div className="card p-4">
-        <h3 className="section-title">Externe – Stunden & Entgelt (Monat)</h3>
-        {Object.keys(entgelt).length === 0 ? <p className="text-sm text-gray-400 py-2 text-center">Keine Stunden in diesem Monat.</p> : (
-          <div className="space-y-1">
-            {Object.entries(entgelt).map(([uid, h]) => (
-              <div key={uid} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                <span className="text-sm text-gray-700">{nameMap[uid] || '—'}</span>
-                <span className="text-xs text-gray-500">{fmtDe(h)} Std × {eur(lohnMap[uid] || 0)} = <span className="font-semibold text-[#c2410c] text-sm">{eur(h * (lohnMap[uid] || 0))}</span></span>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Kennzahlen der Person */}
+      <div className="grid grid-cols-3 gap-3">
+        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Stunden</p><p className="text-lg font-bold text-gray-900">{fmtDe(hSum)}</p></div>}
+        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Entgelt ({eur(lohn)}/h)</p><p className="text-lg font-bold text-[#c2410c]">{eur(hSum * lohn)}</p></div>}
+        <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Fahrtkosten</p><p className="text-lg font-bold text-[#c2410c]">{eur(sSum)}</p></div>
       </div>
 
-      {/* Kalender: wer hat wann was eingetragen */}
+      {/* Kalender: wann hat {name} was eingetragen */}
       <div className="card p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="section-title mb-0">Eintragungen im Monat</h3>
-          <span className="text-xs text-gray-400">Fahrtkosten gesamt: <span className="font-semibold text-[#c2410c]">{eur(spesenSum)}</span></span>
-        </div>
+        <h3 className="section-title">Eintragungen {name ? `– ${name}` : ''} (Tag antippen)</h3>
         <div className="grid grid-cols-7 gap-1 mb-1">
           {WD.map(d => <div key={d} className="text-center text-[10px] font-semibold text-gray-300 py-1">{d}</div>)}
         </div>
@@ -166,15 +148,15 @@ export function AdminSpesenUebersicht({ month }) {
           {cells.map((ds, i) => {
             if (!ds) return <div key={i} className="min-h-[46px] rounded-md" />
             const items = byDay[ds] || []
-            const hSum = items.filter(x => x.kind === 'std').reduce((s, x) => s + Number(x.stunden || 0), 0)
-            const eSum = items.filter(x => x.kind === 'spesen').reduce((s, x) => s + Number(x.betrag || 0), 0)
+            const dh = items.filter(x => x.kind === 'std').reduce((s, x) => s + Number(x.stunden || 0), 0)
+            const de = items.filter(x => x.kind === 'spesen').reduce((s, x) => s + Number(x.betrag || 0), 0)
             const active = tag === ds
             return (
               <button key={i} onClick={() => setTag(active ? null : ds)}
                 className={`min-h-[46px] rounded-md p-1 text-left border transition-all ${active ? 'border-[#ff6b01] bg-[#ff6b01]/5' : items.length ? 'border-gray-100 bg-gray-50 hover:border-[#ff6b01]/40' : 'border-transparent'}`}>
                 <div className="text-[10px] text-gray-500">{parseInt(ds.slice(-2))}</div>
-                {hSum > 0 && <div className="text-[9px] font-semibold text-[#ff6b01] leading-tight">{fmtDe(hSum)} Std</div>}
-                {eSum > 0 && <div className="text-[9px] font-semibold text-[#c2410c] leading-tight">{eur(eSum)}</div>}
+                {dh > 0 && <div className="text-[9px] font-semibold text-[#ff6b01] leading-tight">{fmtDe(dh)} Std</div>}
+                {de > 0 && <div className="text-[9px] font-semibold text-[#c2410c] leading-tight">{eur(de)}</div>}
               </button>
             )
           })}
@@ -187,11 +169,10 @@ export function AdminSpesenUebersicht({ month }) {
               <div className="space-y-1.5">
                 {(byDay[tag] || []).map((it, k) => (
                   <div key={k} className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
-                    <span className="w-24 text-gray-700 truncate flex-shrink-0">{nameMap[it.user_id] || '—'}</span>
                     {it.kind === 'std' ? (
-                      <span className="flex-1 text-gray-500 text-xs">🕒 {hhmm(it.start_zeit)}–{hhmm(it.end_zeit)} Uhr{it.notiz ? ` · ${it.notiz}` : ''}</span>
+                      <span className="flex-1 text-gray-600 text-xs">🕒 {hhmm(it.start_zeit)}–{hhmm(it.end_zeit)} Uhr{it.notiz ? ` · ${it.notiz}` : ''}</span>
                     ) : (
-                      <span className="flex-1 text-gray-500 text-xs">{it.art === 'fahrt' ? `🚗 ${it.strecke || ''} · ${fmtDe(it.km)} km` : `• ${it.beschreibung || 'Umkosten'}`}</span>
+                      <span className="flex-1 text-gray-600 text-xs">{it.art === 'fahrt' ? `🚗 ${it.strecke || ''} · ${fmtDe(it.km)} km` : `• ${it.beschreibung || 'Umkosten'}`}</span>
                     )}
                     <span className="font-medium text-gray-800 flex-shrink-0">{it.kind === 'std' ? `${fmtDe(it.stunden)} Std` : eur(it.betrag)}</span>
                   </div>
@@ -200,6 +181,7 @@ export function AdminSpesenUebersicht({ month }) {
             )}
           </div>
         )}
+        {stunden.length === 0 && spesen.length === 0 && <p className="text-sm text-gray-400 py-2 text-center">Keine Einträge in diesem Monat.</p>}
       </div>
     </>
   )
