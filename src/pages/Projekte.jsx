@@ -106,6 +106,59 @@ function AutoTextarea({ className = '', value, onChange, ...rest }) {
   )
 }
 
+// Bilder/Dateien pro Video: Upload in Supabase Storage, Anzeige als Thumbnail/Link
+function FileAttach({ files, onChange, prefix }) {
+  const [busy, setBusy] = useState(false)
+  const isImg = n => /\.(png|jpe?g|gif|webp|heic|heif|avif|bmp)$/i.test(n || '')
+  async function upload(e) {
+    const list = Array.from(e.target.files || [])
+    if (!list.length) return
+    setBusy(true)
+    const added = []
+    for (const f of list) {
+      const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`
+      const { error } = await supabase.storage.from('dreh-dateien').upload(path, f, { cacheControl: '3600', upsert: false })
+      if (!error) {
+        const { data } = supabase.storage.from('dreh-dateien').getPublicUrl(path)
+        added.push({ url: data.publicUrl, name: f.name, path })
+      } else {
+        alert('Upload fehlgeschlagen: ' + error.message)
+      }
+    }
+    setBusy(false)
+    e.target.value = ''
+    if (added.length) onChange([...(files || []), ...added])
+  }
+  async function remove(i) {
+    const f = files[i]
+    if (f?.path) await supabase.storage.from('dreh-dateien').remove([f.path])
+    onChange(files.filter((_, idx) => idx !== i))
+  }
+  return (
+    <div className="space-y-2">
+      {files?.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {files.map((f, i) => (
+            <div key={i} className="relative">
+              {isImg(f.name) ? (
+                <a href={f.url} target="_blank" rel="noreferrer"><img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-lg border border-gray-200" /></a>
+              ) : (
+                <a href={f.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-[#ff6b01] bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5 max-w-[9rem] truncate">📄 {f.name}</a>
+              )}
+              <button onClick={() => remove(i)} title="Entfernen" className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] leading-none flex items-center justify-center">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <label className="block border border-dashed border-gray-300 rounded-lg py-2 text-center text-xs text-gray-400 cursor-pointer hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
+        {busy ? 'Lädt hoch...' : '📎 Bild / Datei hinzufügen'}
+        <input type="file" multiple className="hidden" onChange={upload} />
+      </label>
+    </div>
+  )
+}
+
 export default function Projekte() {
   const navigate = useNavigate()
   const { isExtern } = useAuth()
@@ -659,6 +712,8 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''} onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))} placeholder="Video-Planung / Konzept..." /></div>
+                  <FileAttach files={v.dateien || []} prefix={`${item.id}/${i}`}
+                    onChange={arr => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
@@ -831,15 +886,8 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''} onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))} placeholder="Video-Planung / Konzept..." /></div>
-                  {v.datei_name ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-green-600 font-medium">▶ {v.datei_name}</span>
-                    </div>
-                  ) : (
-                    <div className="border border-dashed border-gray-300 rounded-lg py-3 text-center text-xs text-gray-400">
-                      📁 Datei hochladen (nach Deployment verfügbar)
-                    </div>
-                  )}
+                  <FileAttach files={v.dateien || []} prefix={`${dreh.id}/${i}`}
+                    onChange={arr => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
