@@ -90,58 +90,114 @@ export function MeineSpesen({ month }) {
   )
 }
 
-// Admin-Übersicht: Externe (Stunden × Stundenlohn) + alle Spesen im Monat
+const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+const hhmm = t => (t || '').slice(0, 5)
+
+// Admin-Übersicht: Kalender (wer hat wann was eingetragen) + Entgelt-Summary
 export function AdminSpesenUebersicht({ month }) {
   const [von, bis] = monthRange(month)
-  const [externe, setExterne] = useState([])
-  const [alle, setAlle] = useState([])
+  const y = month.getFullYear(), mo = month.getMonth()
+  const [nameMap, setNameMap] = useState({})
+  const [lohnMap, setLohnMap] = useState({})
+  const [stunden, setStunden] = useState([])
+  const [spesen, setSpesen] = useState([])
+  const [tag, setTag] = useState(null)
 
-  useEffect(() => { load() }, [von, bis])
+  useEffect(() => { load(); setTag(null) }, [von, bis])
   async function load() {
     const [profs, verg, std, sp] = await Promise.all([
-      supabase.from('profiles').select('id, full_name').eq('role', 'extern'),
+      supabase.from('profiles').select('id, full_name'),
       supabase.from('extern_verguetung').select('*'),
-      supabase.from('minijob_stunden').select('user_id, stunden').gte('datum', von).lte('datum', bis),
-      supabase.from('spesen').select('*, profiles(full_name)').gte('datum', von).lte('datum', bis).order('datum'),
+      supabase.from('minijob_stunden').select('*').gte('datum', von).lte('datum', bis),
+      supabase.from('spesen').select('*').gte('datum', von).lte('datum', bis),
     ])
-    const lohn = Object.fromEntries((verg.data || []).map(r => [r.user_id, Number(r.stundenlohn)]))
-    const hrs = {}; (std.data || []).forEach(r => { hrs[r.user_id] = (hrs[r.user_id] || 0) + Number(r.stunden || 0) })
-    setExterne((profs.data || []).map(p => ({ id: p.id, name: p.full_name, stunden: hrs[p.id] || 0, lohn: lohn[p.id] || 0 })))
-    setAlle(sp.data || [])
+    setNameMap(Object.fromEntries((profs.data || []).map(p => [p.id, p.full_name])))
+    setLohnMap(Object.fromEntries((verg.data || []).map(r => [r.user_id, Number(r.stundenlohn)])))
+    setStunden(std.data || [])
+    setSpesen(sp.data || [])
   }
-  const spesenSum = alle.reduce((s, x) => s + Number(x.betrag || 0), 0)
+
+  // Entgelt je Person (aus Minijob-Stunden × Stundenlohn)
+  const entgelt = {}
+  stunden.forEach(s => { entgelt[s.user_id] = (entgelt[s.user_id] || 0) + Number(s.stunden || 0) })
+  const spesenSum = spesen.reduce((s, x) => s + Number(x.betrag || 0), 0)
+
+  // Kalender: pro Tag alle Einträge (Stunden + Spesen)
+  const byDay = {}
+  const push = (d, item) => { (byDay[d] = byDay[d] || []).push(item) }
+  stunden.forEach(s => push(s.datum, { kind: 'std', ...s }))
+  spesen.forEach(s => push(s.datum, { kind: 'spesen', ...s }))
+
+  // Grid aufbauen
+  const first = new Date(y, mo, 1)
+  const startPad = (first.getDay() + 6) % 7
+  const daysInMonth = new Date(y, mo + 1, 0).getDate()
+  const cells = []
+  for (let i = 0; i < startPad; i++) cells.push(null)
+  for (let t = 1; t <= daysInMonth; t++) cells.push(`${y}-${String(mo + 1).padStart(2, '0')}-${String(t).padStart(2, '0')}`)
+  while (cells.length % 7) cells.push(null)
 
   return (
     <>
       <div className="card p-4">
         <h3 className="section-title">Externe – Stunden & Entgelt (Monat)</h3>
-        {externe.length === 0 ? <p className="text-sm text-gray-400 py-2 text-center">Keine externen Zugänge.</p> : (
+        {Object.keys(entgelt).length === 0 ? <p className="text-sm text-gray-400 py-2 text-center">Keine Stunden in diesem Monat.</p> : (
           <div className="space-y-1">
-            {externe.map(e => (
-              <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                <span className="text-sm text-gray-700">{e.name}</span>
-                <span className="text-xs text-gray-500">{fmtDe(e.stunden)} Std × {eur(e.lohn)} = <span className="font-semibold text-[#c2410c] text-sm">{eur(e.stunden * e.lohn)}</span></span>
+            {Object.entries(entgelt).map(([uid, h]) => (
+              <div key={uid} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                <span className="text-sm text-gray-700">{nameMap[uid] || '—'}</span>
+                <span className="text-xs text-gray-500">{fmtDe(h)} Std × {eur(lohnMap[uid] || 0)} = <span className="font-semibold text-[#c2410c] text-sm">{eur(h * (lohnMap[uid] || 0))}</span></span>
               </div>
             ))}
           </div>
         )}
       </div>
 
+      {/* Kalender: wer hat wann was eingetragen */}
       <div className="card p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="section-title mb-0">Fahrtkosten & Umkosten – Team (Monat)</h3>
-          <span className="text-sm font-semibold text-[#c2410c]">{eur(spesenSum)}</span>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="section-title mb-0">Eintragungen im Monat</h3>
+          <span className="text-xs text-gray-400">Fahrtkosten gesamt: <span className="font-semibold text-[#c2410c]">{eur(spesenSum)}</span></span>
         </div>
-        {alle.length === 0 ? <p className="text-sm text-gray-400 py-2 text-center">Keine Spesen in diesem Monat.</p> : (
-          <div className="divide-y divide-gray-50">
-            {alle.map(s => (
-              <div key={s.id} className="flex items-center gap-2 py-2 text-sm">
-                <span className="w-12 text-gray-500 text-xs flex-shrink-0">{new Date(s.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
-                <span className="w-24 text-gray-700 truncate flex-shrink-0">{s.profiles?.full_name || '—'}</span>
-                <span className="flex-1 text-gray-500 truncate text-xs">{s.art === 'fahrt' ? `🚗 ${s.strecke || ''} · ${fmtDe(s.km)} km` : (s.beschreibung || 'Umkosten')}</span>
-                <span className="font-medium text-gray-800 flex-shrink-0">{eur(s.betrag)}</span>
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {WD.map(d => <div key={d} className="text-center text-[10px] font-semibold text-gray-300 py-1">{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((ds, i) => {
+            if (!ds) return <div key={i} className="min-h-[46px] rounded-md" />
+            const items = byDay[ds] || []
+            const hSum = items.filter(x => x.kind === 'std').reduce((s, x) => s + Number(x.stunden || 0), 0)
+            const eSum = items.filter(x => x.kind === 'spesen').reduce((s, x) => s + Number(x.betrag || 0), 0)
+            const active = tag === ds
+            return (
+              <button key={i} onClick={() => setTag(active ? null : ds)}
+                className={`min-h-[46px] rounded-md p-1 text-left border transition-all ${active ? 'border-[#ff6b01] bg-[#ff6b01]/5' : items.length ? 'border-gray-100 bg-gray-50 hover:border-[#ff6b01]/40' : 'border-transparent'}`}>
+                <div className="text-[10px] text-gray-500">{parseInt(ds.slice(-2))}</div>
+                {hSum > 0 && <div className="text-[9px] font-semibold text-[#ff6b01] leading-tight">{fmtDe(hSum)} Std</div>}
+                {eSum > 0 && <div className="text-[9px] font-semibold text-[#c2410c] leading-tight">{eur(eSum)}</div>}
+              </button>
+            )
+          })}
+        </div>
+
+        {tag && (
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-600 mb-2">{new Date(tag).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
+            {(byDay[tag] || []).length === 0 ? <p className="text-xs text-gray-400">Nichts eingetragen.</p> : (
+              <div className="space-y-1.5">
+                {(byDay[tag] || []).map((it, k) => (
+                  <div key={k} className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="w-24 text-gray-700 truncate flex-shrink-0">{nameMap[it.user_id] || '—'}</span>
+                    {it.kind === 'std' ? (
+                      <span className="flex-1 text-gray-500 text-xs">🕒 {hhmm(it.start_zeit)}–{hhmm(it.end_zeit)} Uhr{it.notiz ? ` · ${it.notiz}` : ''}</span>
+                    ) : (
+                      <span className="flex-1 text-gray-500 text-xs">{it.art === 'fahrt' ? `🚗 ${it.strecke || ''} · ${fmtDe(it.km)} km` : `• ${it.beschreibung || 'Umkosten'}`}</span>
+                    )}
+                    <span className="font-medium text-gray-800 flex-shrink-0">{it.kind === 'std' ? `${fmtDe(it.stunden)} Std` : eur(it.betrag)}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
