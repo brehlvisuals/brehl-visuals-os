@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -53,6 +53,57 @@ function kundeStyle(name) {
 }
 // Ein Dreh gilt als vollständig gesichert, wenn RAW UND FINAL auf NAS liegen
 const istGesichert = d => !!(d?.raw_gesichert && d?.final_gesichert)
+
+// Plaintext (z.B. aus Airtable-Migration) sicher in HTML wandeln, sonst HTML unverändert lassen
+function toHtml(v) {
+  if (v == null || v === '') return ''
+  const s = String(v)
+  if (/<[a-z][\s\S]*>/i.test(s)) return s
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+}
+
+// Rich-Text-Editor: fett/kursiv/Überschrift/Liste, wächst automatisch mit dem Inhalt
+function RichText({ value, onChange, placeholder }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current
+    if (el) el.innerHTML = toHtml(value)
+    // nur beim Mount setzen, sonst springt der Cursor
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const exec = (cmd, arg) => {
+    document.execCommand(cmd, false, arg)
+    if (ref.current) onChange(ref.current.innerHTML)
+  }
+  const B = 'w-7 h-7 rounded text-xs text-gray-600 hover:bg-gray-100 flex items-center justify-center'
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:border-[#ff6b01]">
+      <div className="flex items-center gap-0.5 border-b border-gray-100 bg-gray-50 px-1 py-1">
+        <button type="button" title="Fett" onMouseDown={e => { e.preventDefault(); exec('bold') }} className={B} style={{ fontWeight: 700 }}>B</button>
+        <button type="button" title="Kursiv" onMouseDown={e => { e.preventDefault(); exec('italic') }} className={B} style={{ fontStyle: 'italic' }}>I</button>
+        <button type="button" title="Überschrift" onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'H3') }} className={B + ' font-bold'}>H</button>
+        <button type="button" title="Liste" onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList') }} className={B}>•</button>
+        <button type="button" title="Formatierung entfernen" onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'DIV'); exec('removeFormat') }} className={B}>⌫</button>
+      </div>
+      <div ref={ref} contentEditable suppressContentEditableWarning
+        onInput={e => onChange(e.currentTarget.innerHTML)}
+        data-ph={placeholder || ''}
+        className="rt-edit text-xs text-gray-700 leading-relaxed px-2.5 py-2 outline-none min-h-[2.5rem]" />
+    </div>
+  )
+}
+
+// Textarea, die automatisch so hoch wird wie ihr Inhalt
+function AutoTextarea({ className = '', value, onChange, ...rest }) {
+  const ref = useRef(null)
+  const fit = el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }
+  useEffect(() => { fit(ref.current) }, [value])
+  return (
+    <textarea ref={ref} rows={1} value={value}
+      onChange={e => { fit(e.target); onChange?.(e) }}
+      className={className + ' resize-none overflow-hidden'} {...rest} />
+  )
+}
 
 export default function Projekte() {
   const navigate = useNavigate()
@@ -196,7 +247,7 @@ export default function Projekte() {
                           ) : (
                             <span className="inline-flex text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
                           )}
-                          <p className="text-xs text-gray-400 mt-1.5">📹 {dreh.video_count || 0} Videos{dreh.darsteller_name ? ` · ${dreh.darsteller_name}` : ''}</p>
+                          <p className="text-xs text-gray-400 mt-1.5">📹 {dreh.video_count || 0} Videos</p>
                           {!gesichert && ['dreh','cutting','posting'].includes(dreh.status) && (
                             <div className="mt-1.5 text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-md inline-block">🔒 Sicherung fehlt</div>
                           )}
@@ -385,7 +436,7 @@ function Modal({ title, children, onClose }) {
 }
 
 function AddDrehForm({ kunden, darsteller, profiles, onSave, onClose }) {
-  const [form, setForm] = useState({ datum: '', kunde_id: '', kunde_name: '', zustaendig_id: '', darsteller_id: '', darsteller_name: '', video_count: 8, status: 'planung' })
+  const [form, setForm] = useState({ datum: '', kunde_id: '', kunde_name: '', zustaendig_id: '', video_count: 8, status: 'planung' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   return (
     <div className="space-y-3">
@@ -401,20 +452,10 @@ function AddDrehForm({ kunden, darsteller, profiles, onSave, onClose }) {
         </select>
       </div>
       <div>
-        <label className="label">Zuständig</label>
+        <label className="label">Videograph</label>
         <select className="input" value={form.zustaendig_id} onChange={e => set('zustaendig_id', e.target.value)}>
           <option value="">Person wählen</option>
           {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
-        </select>
-      </div>
-      <div>
-        <label className="label">Darsteller</label>
-        <select className="input" value={form.darsteller_id} onChange={e => {
-          const d = darsteller.find(d => d.id === e.target.value)
-          setForm(p => ({ ...p, darsteller_id: e.target.value, darsteller_name: d?.name || '' }))
-        }}>
-          <option value="">Kein Darsteller</option>
-          {darsteller.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>
       <div><label className="label">Geplante Videos</label><input type="number" className="input" value={form.video_count} onChange={e => set('video_count', parseInt(e.target.value) || 0)} min={1} /></div>
@@ -465,6 +506,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const [noteText, setNoteText] = useState('')
   const [nasWarn, setNasWarn] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
   useEffect(() => { fetchNotes() }, [dreh.id])
@@ -495,6 +537,14 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     setNasWarn(false)
     set('status', status)
     onStatusChange(status)
+  }
+
+  // Sicherung umschalten; wird ein Häkchen entfernt und der Dreh war "Abgeschlossen" -> zurück auf Posting
+  function toggleSicherung(field, val) {
+    const beide = field === 'raw_gesichert' ? (val && !!form.final_gesichert) : (!!form.raw_gesichert && val)
+    set(field, val)
+    if (beide) setNasWarn(false)
+    else if (form.status === 'abgeschlossen') { set('status', 'posting'); onStatusChange('posting'); setNasWarn(true) }
   }
 
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
@@ -557,34 +607,23 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                 </div>
                 <div><label className="label">Datum</label><input type="date" className="input text-xs" value={form.datum || ''} onChange={e => set('datum', e.target.value)} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Zuständig</label>
-                  <select className="input text-xs" value={form.zustaendig_id || ''} onChange={e => set('zustaendig_id', e.target.value)}>
-                    <option value="">—</option>
-                    {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
-                  </select>
-                </div>
-                <div><label className="label">Darsteller</label>
-                  <select className="input text-xs" value={form.darsteller_id || ''} onChange={e => { const d = darsteller.find(d => d.id === e.target.value); setForm(p => ({ ...p, darsteller_id: e.target.value, darsteller_name: d?.name || '' })) }}>
-                    <option value="">—</option>
-                    {darsteller.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
+              <div><label className="label">Videograph</label>
+                <select className="input text-xs" value={form.zustaendig_id || ''} onChange={e => set('zustaendig_id', e.target.value)}>
+                  <option value="">—</option>
+                  {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
+                </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Dauer</label><input className="input text-xs" value={form.dauer || ''} onChange={e => set('dauer', e.target.value)} placeholder="z.B. 6:00" /></div>
-                <div>
-                  <label className="label">Sicherung</label>
-                  <div className="space-y-1 mt-1">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={!!form.raw_gesichert} onChange={e => { set('raw_gesichert', e.target.checked); if (e.target.checked && form.final_gesichert) setNasWarn(false) }} className="rounded" />
-                      RAW auf NAS gesichert
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={!!form.final_gesichert} onChange={e => { set('final_gesichert', e.target.checked); if (e.target.checked && form.raw_gesichert) setNasWarn(false) }} className="rounded" />
-                      Final auf NAS gesichert
-                    </label>
-                  </div>
+              <div>
+                <label className="label">Sicherung</label>
+                <div className="space-y-1 mt-1">
+                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                    <input type="checkbox" checked={!!form.raw_gesichert} onChange={e => toggleSicherung('raw_gesichert', e.target.checked)} className="rounded" />
+                    RAW auf NAS gesichert
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                    <input type="checkbox" checked={!!form.final_gesichert} onChange={e => toggleSicherung('final_gesichert', e.target.checked)} className="rounded" />
+                    Final auf NAS gesichert
+                  </label>
                 </div>
               </div>
               {form.status === 'abnahme_kunde' && (
@@ -601,9 +640,8 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   </div>
                 </div>
               )}
-              <div><label className="label">Erläuterungen Cutter</label><textarea className="input text-xs" rows={2} value={form.erlaeuterungen_cutter || ''} onChange={e => set('erlaeuterungen_cutter', e.target.value)} placeholder="Hinweise für den Cutter..." /></div>
-              <div><label className="label">Requisiten</label><textarea className="input text-xs" rows={2} value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigte Requisiten..." /></div>
-              <div><label className="label">Recruiting</label><textarea className="input text-xs" rows={2} value={form.recruiting || ''} onChange={e => set('recruiting', e.target.value)} placeholder="Recruiting-Notizen..." /></div>
+              <div><label className="label">Erläuterungen Cutter</label><AutoTextarea className="input text-xs" value={form.erlaeuterungen_cutter || ''} onChange={e => set('erlaeuterungen_cutter', e.target.value)} placeholder="Hinweise für den Cutter..." /></div>
+              <div><label className="label">Requisiten</label><AutoTextarea className="input text-xs" value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigte Requisiten..." /></div>
             </>
           )}
 
@@ -616,7 +654,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
-                  <textarea className="input text-xs mb-2" rows={4} value={v.planung || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: e.target.value } : vid))} placeholder="Video-Planung / Konzept..." />
+                  <div className="mb-2"><RichText value={v.planung || ''} onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))} placeholder="Video-Planung / Konzept..." /></div>
                   {v.datei_name ? (
                     <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between">
                       <span className="text-xs text-green-600 font-medium">▶ {v.datei_name}</span>
@@ -631,6 +669,20 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
                 + Video hinzufügen
               </button>
+
+              {recruitingOn ? (
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Recruiting</span>
+                    <button onClick={() => { setRecruitingOn(false); set('recruiting', '') }} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
+                  </div>
+                  <RichText value={form.recruiting || ''} onChange={val => set('recruiting', val)} placeholder="Recruiting / Casting-Bedarf..." />
+                </div>
+              ) : (
+                <button onClick={() => setRecruitingOn(true)} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
+                  + Recruiting-Bereich
+                </button>
+              )}
             </>
           )}
 
