@@ -466,12 +466,11 @@ export default function Projekte() {
       )}
 
       {selectedIntern && (
-        <Modal title="Konzept bearbeiten" onClose={() => setSelectedIntern(null)}>
-          <EditInternForm item={selectedIntern} profiles={profiles}
-            onSave={async data => { await supabase.from('proj_intern').update(data).eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() }}
-            onDelete={async () => { if (window.confirm('Konzept wirklich löschen?')) { await supabase.from('proj_intern').delete().eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() } }}
-            onClose={() => setSelectedIntern(null)} />
-        </Modal>
+        <InternDetail item={selectedIntern} profiles={profiles}
+          onClose={() => setSelectedIntern(null)}
+          onRefresh={fetchAll}
+          onDelete={async () => { if (window.confirm('Konzept wirklich löschen?')) { await supabase.from('proj_intern').delete().eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() } }}
+        />
       )}
     </div>
   )
@@ -584,35 +583,90 @@ function AddInternForm({ profiles, onSave, onClose }) {
   )
 }
 
-function EditInternForm({ item, profiles, onSave, onDelete, onClose }) {
-  const [form, setForm] = useState({
-    titel: item.titel || '', drehtag: item.drehtag || '', status: item.status || 'planung',
-    zustaendig: item.zustaendig || '', video_planung: item.video_planung || '', requisiten: item.requisiten || '',
-  })
+function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
+  const [tab, setTab] = useState('info')
+  const [form, setForm] = useState({ ...item })
+  const [videos, setVideos] = useState(
+    (item.videos && item.videos.length) ? item.videos
+      : (item.video_planung && String(item.video_planung).trim()
+        ? [{ titel: 'Video 1', planung: item.video_planung, datei_url: '', datei_name: '' }] : [])
+  )
+  const [saving, setSaving] = useState(false)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  async function save() {
+    setSaving(true)
+    const payload = {
+      titel: form.titel || null, drehtag: form.drehtag || null, status: form.status || 'planung',
+      zustaendig: form.zustaendig || null, requisiten: form.requisiten || null, drehort: form.drehort || null,
+      video_planung: null, videos,
+    }
+    await supabase.from('proj_intern').update(payload).eq('id', item.id)
+    setSaving(false); onRefresh()
+  }
+  function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
+  function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
+
   return (
-    <div className="space-y-3">
-      <div><label className="label">Titel</label><input className="input" value={form.titel} onChange={e => set('titel', e.target.value)} placeholder="Konzept-Titel" /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><label className="label">Drehtag</label><input type="date" className="input" value={form.drehtag || ''} onChange={e => set('drehtag', e.target.value)} /></div>
-        <div><label className="label">Status</label>
-          <select className="input" value={form.status} onChange={e => set('status', e.target.value)}>
-            {INTERN_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-          </select>
+    <div className="fixed inset-0 bg-black/10 z-[60] flex" onClick={onClose}>
+      <div className="ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <p className="font-bold text-gray-900">{form.titel || 'Konzept'}</p>
+            <p className="text-xs text-gray-400">Intern{form.drehtag ? ' · ' + new Date(form.drehtag).toLocaleDateString('de-DE') : ''}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={save} disabled={saving} className="btn-primary text-xs py-1.5 px-3">{saving ? 'Speichert...' : 'Speichern'}</button>
+            <button onClick={() => onDelete?.()} title="Konzept löschen" className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>
+            <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
+          </div>
         </div>
-      </div>
-      <div><label className="label">Zuständig</label>
-        <select className="input" value={form.zustaendig || ''} onChange={e => set('zustaendig', e.target.value)}>
-          <option value="">—</option>
-          {profiles.map(p => <option key={p.id} value={p.full_name || p.email}>{p.full_name || p.email}</option>)}
-        </select>
-      </div>
-      <div><label className="label">Video-Planung</label><AutoTextarea className="input" value={form.video_planung || ''} onChange={e => set('video_planung', e.target.value)} placeholder="Idee / Konzept..." /></div>
-      <div><label className="label">Requisiten</label><AutoTextarea className="input" value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigtes Material..." /></div>
-      <div className="flex items-center gap-3 pt-2">
-        <button onClick={onDelete} className="text-xs text-red-500 hover:text-red-700 mr-auto">Löschen</button>
-        <button onClick={onClose} className="btn-secondary">Abbrechen</button>
-        <button onClick={() => { if (form.titel.trim()) onSave({ ...form, drehtag: form.drehtag || null, zustaendig: form.zustaendig || null }) }} className="btn-primary">Speichern →</button>
+        <div className="flex border-b border-gray-100 flex-shrink-0">
+          {['Info', 'Videos'].map(t => (
+            <button key={t} onClick={() => setTab(t.toLowerCase())}
+              className={`flex-1 py-2.5 text-xs font-medium transition-all border-b-2 ${tab === t.toLowerCase() ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>{t}</button>
+          ))}
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {tab === 'info' && (
+            <>
+              <div><label className="label">Titel</label><input className="input text-xs" value={form.titel || ''} onChange={e => set('titel', e.target.value)} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label">Drehtag</label><input type="date" className="input text-xs" value={form.drehtag || ''} onChange={e => set('drehtag', e.target.value)} /></div>
+                <div><label className="label">Status</label>
+                  <select className="input text-xs" value={form.status || 'planung'} onChange={e => set('status', e.target.value)}>
+                    {INTERN_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div><label className="label">Zuständig</label>
+                <select className="input text-xs" value={form.zustaendig || ''} onChange={e => set('zustaendig', e.target.value)}>
+                  <option value="">—</option>
+                  {profiles.map(p => <option key={p.id} value={p.full_name || p.email}>{p.full_name || p.email}</option>)}
+                </select>
+              </div>
+              <div><label className="label">Drehort</label><AutoTextarea className="input text-xs" value={form.drehort || ''} onChange={e => set('drehort', e.target.value)} placeholder="Wo wird gedreht?" /></div>
+              <div><label className="label">Requisiten</label><AutoTextarea className="input text-xs" value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigtes Material..." /></div>
+            </>
+          )}
+          {tab === 'videos' && (
+            <>
+              {videos.map((v, i) => (
+                <div key={i} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Video {i + 1}</span>
+                    <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
+                  </div>
+                  <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
+                  <div className="mb-2"><RichText value={v.planung || ''} onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))} placeholder="Video-Planung / Konzept..." /></div>
+                </div>
+              ))}
+              <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
+                + Video hinzufügen
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
