@@ -48,7 +48,7 @@ function sollTage(y, m, at, ftMap) {
 function monatsSoll(profile, y, m, ftMap) {
   const soll = Number(profile?.soll_stunden || 0)
   if (soll <= 0) return 0
-  const at = arbeitstageOf(profile)
+  const at = arbeitstageOf(zielProfil)
   const { brutto, netto } = sollTage(y, m, at, ftMap)
   if (profile?.soll_modus === 'monat') return brutto ? soll * (netto / brutto) : soll
   return (soll / at.length) * netto
@@ -56,7 +56,7 @@ function monatsSoll(profile, y, m, ftMap) {
 function tagesSoll(profile, y, m, ftMap) {
   const soll = Number(profile?.soll_stunden || 0)
   if (soll <= 0) return 0
-  const at = arbeitstageOf(profile)
+  const at = arbeitstageOf(zielProfil)
   if (profile?.soll_modus === 'monat') { const { netto } = sollTage(y, m, at, ftMap); return netto ? monatsSoll(profile, y, m, ftMap) / netto : 0 }
   return soll / at.length
 }
@@ -107,20 +107,24 @@ export function Zeiterfassung() {
   const [editId, setEditId] = useState(null)
   const [changeReq, setChangeReq] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [zielUserId, setZielUserId] = useState('')   // Admin: für wen wird erfasst ('' = ich selbst)
+  const [members, setMembers] = useState([])
+  const zielProfil = isAdmin && zielUserId ? (members.find(x => x.id === zielUserId) || profile) : profile
 
   const y = calMonth.getFullYear(), m = calMonth.getMonth()
   const ftMap = useMemo(() => feiertageNRW(y), [y])
   const monatsRange = useMemo(() => [toStr(new Date(y, m, 1)), toStr(new Date(y, m + 1, 0))], [y, m])
 
-  useEffect(() => { if (profile?.id) fetchMonth() }, [profile?.id, monatsRange[0]])
+  useEffect(() => { if (profile?.id) fetchMonth() }, [profile?.id, monatsRange[0], zielUserId])
+  useEffect(() => { if (isAdmin) supabase.from('profiles').select('id, full_name, soll_stunden, soll_modus, arbeitstage, urlaub_anspruch_tage').order('created_at').then(({ data }) => setMembers(data || [])) }, [isAdmin])
   useEffect(() => { if (!abwForm.von_datum) setAbwForm(p => ({ ...p, von_datum: anchor, bis_datum: p.bis_datum || anchor })) }, [anchor])
 
   async function fetchMonth() {
     setLoading(true)
     const [eintraege, abw, antr] = await Promise.all([
-      supabase.from('zeiteintraege').select('*, proj_kunden(name)').eq('user_id', profile.id)
+      supabase.from('zeiteintraege').select('*, proj_kunden(name)').eq('user_id', zielProfil.id)
         .gte('datum', monatsRange[0]).lte('datum', monatsRange[1]).order('created_at'),
-      supabase.from('urlaubsantraege').select('typ, von_datum, bis_datum, halber_tag, status').eq('user_id', profile.id)
+      supabase.from('urlaubsantraege').select('typ, von_datum, bis_datum, halber_tag, status').eq('user_id', zielProfil.id)
         .eq('status', 'genehmigt').lte('von_datum', monatsRange[1]).gte('bis_datum', monatsRange[0]),
       supabase.from('zeit_aenderungsantraege').select('*, proj_kunden:neu_kunde_id(name), zeiteintraege(beschreibung, stunden, datum, ist_intern, kunde_id, proj_kunden(name)), profiles(full_name)').eq('status', 'offen'),
     ])
@@ -135,7 +139,7 @@ export function Zeiterfassung() {
   const dayEntries = monthEntries.filter(e => e.datum === anchor)
   const daySum = k => monthEntries.filter(e => e.datum === k).reduce((s, e) => s + Number(e.stunden || 0), 0)
   const monatIst = monthEntries.reduce((s, e) => s + Number(e.stunden || 0), 0)
-  const monatSoll = monatsSoll(profile, y, m, ftMap)
+  const monatSoll = monatsSoll(zielProfil, y, m, ftMap)
   const bearbeitbar = anchor >= grenzeStr()
   const offenerAntragFuer = id => meineAntraege.find(a => a.eintrag_id === id)
   const abwFor = dstr => abwesenheiten.find(a => dstr >= a.von_datum && dstr <= a.bis_datum) || null
@@ -153,7 +157,7 @@ export function Zeiterfassung() {
     } else if (editId) {
       await supabase.from('zeiteintraege').update(base).eq('id', editId)
     } else {
-      await supabase.from('zeiteintraege').insert({ ...base, datum: anchor, user_id: profile.id })
+      await supabase.from('zeiteintraege').insert({ ...base, datum: anchor, user_id: zielProfil.id })
     }
     setSaving(false); resetForm(); fetchMonth()
   }
@@ -164,9 +168,9 @@ export function Zeiterfassung() {
     if (!von) return
     setSaving(true)
     const ftAll = { ...feiertageNRW(parse(von).getFullYear()), ...feiertageNRW(parse(bis).getFullYear()) }
-    let tage = arbeitstageImRange(von, bis, arbeitstageOf(profile), ftAll)
+    let tage = arbeitstageImRange(von, bis, arbeitstageOf(zielProfil), ftAll)
     if (halber_tag && von === bis) tage = 0.5
-    const row = { user_id: profile.id, typ, von_datum: von, bis_datum: bis, halber_tag, tage, grund: grund || null }
+    const row = { user_id: zielProfil.id, typ, von_datum: von, bis_datum: bis, halber_tag, tage, grund: grund || null }
     if (isAdmin) { row.status = 'genehmigt'; row.entschieden_von = profile.id; row.entschieden_am = new Date().toISOString() }
     await supabase.from('urlaubsantraege').insert(row)
     setSaving(false); setAbwForm({ typ: 'urlaub', von_datum: anchor, bis_datum: anchor, halber_tag: false, grund: '' }); fetchMonth()
@@ -193,7 +197,7 @@ export function Zeiterfassung() {
     const von = abwForm.von_datum, bis = abwForm.bis_datum || abwForm.von_datum
     if (!von) return 0
     const ftAll = { ...feiertageNRW(parse(von).getFullYear()), ...feiertageNRW(parse(bis).getFullYear()) }
-    let t = arbeitstageImRange(von, bis, arbeitstageOf(profile), ftAll)
+    let t = arbeitstageImRange(von, bis, arbeitstageOf(zielProfil), ftAll)
     if (abwForm.halber_tag && von === bis) t = 0.5
     return t
   }, [abwForm, profile])
@@ -206,6 +210,17 @@ export function Zeiterfassung() {
           <p className="text-xs text-gray-400">Stunden & Abwesenheiten erfassen</p>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="card p-3 mb-4 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500">Erfassen für:</span>
+          <select className="input text-xs w-auto" value={zielUserId} onChange={e => { setZielUserId(e.target.value); resetForm() }}>
+            <option value="">Mich selbst ({profile?.full_name || 'ich'})</option>
+            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}</option>)}
+          </select>
+          {zielUserId && <span className="text-xs text-[#ff6b01] font-medium">Du erfasst für {zielProfil?.full_name}. Wird direkt gespeichert.</span>}
+        </div>
+      )}
 
       {isAdmin && adminAntraege.length > 0 && (
         <div className="card p-4 mb-4 border-yellow-200">
