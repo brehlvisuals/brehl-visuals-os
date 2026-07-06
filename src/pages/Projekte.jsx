@@ -364,7 +364,7 @@ export default function Projekte() {
                         <p className="text-xs text-gray-400">{item.drehtag ? new Date(item.drehtag).toLocaleDateString('de-DE') : 'Kein Drehtag'}{item.zustaendig ? ` · ${item.zustaendig}` : ''}</p>
                       </div>
                     ))}
-                    <button className="w-full border border-dashed border-gray-200 rounded-xl py-2 text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
+                    <button onClick={() => setShowAddIntern(true)} className="w-full border border-dashed border-gray-200 rounded-xl py-2 text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
                       + Konzept
                     </button>
                   </div>
@@ -455,6 +455,14 @@ export default function Projekte() {
           <AddDarstellerForm onSave={async data => { await supabase.from('crm_darsteller').insert(data); setShowAddDarsteller(false); fetchAll() }} onClose={() => setShowAddDarsteller(false)} />
         </Modal>
       )}
+
+      {showAddIntern && (
+        <Modal title="Neues Konzept (Intern)" onClose={() => setShowAddIntern(false)}>
+          <AddInternForm profiles={profiles}
+            onSave={async data => { await supabase.from('proj_intern').insert(data); setShowAddIntern(false); fetchAll() }}
+            onClose={() => setShowAddIntern(false)} />
+        </Modal>
+      )}
     </div>
   )
 }
@@ -531,6 +539,36 @@ function AddDarstellerForm({ onSave, onClose }) {
       <div className="flex gap-3 pt-2">
         <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
         <button onClick={() => { if (form.name) onSave(form) }} className="btn-primary flex-1">Hinzufügen →</button>
+      </div>
+    </div>
+  )
+}
+
+function AddInternForm({ profiles, onSave, onClose }) {
+  const [form, setForm] = useState({ titel: '', drehtag: '', status: 'planung', zustaendig: '', video_planung: '', requisiten: '' })
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  return (
+    <div className="space-y-3">
+      <div><label className="label">Titel</label><input className="input" value={form.titel} onChange={e => set('titel', e.target.value)} placeholder="Konzept-Titel" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="label">Drehtag</label><input type="date" className="input" value={form.drehtag} onChange={e => set('drehtag', e.target.value)} /></div>
+        <div><label className="label">Status</label>
+          <select className="input" value={form.status} onChange={e => set('status', e.target.value)}>
+            {INTERN_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </div>
+      </div>
+      <div><label className="label">Zuständig</label>
+        <select className="input" value={form.zustaendig} onChange={e => set('zustaendig', e.target.value)}>
+          <option value="">—</option>
+          {profiles.map(p => <option key={p.id} value={p.full_name || p.email}>{p.full_name || p.email}</option>)}
+        </select>
+      </div>
+      <div><label className="label">Video-Planung</label><textarea className="input" rows={3} value={form.video_planung} onChange={e => set('video_planung', e.target.value)} placeholder="Idee / Konzept..." /></div>
+      <div><label className="label">Requisiten</label><textarea className="input" rows={2} value={form.requisiten} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigtes Material..." /></div>
+      <div className="flex gap-3 pt-2">
+        <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
+        <button onClick={() => { if (form.titel.trim()) onSave({ ...form, drehtag: form.drehtag || null, zustaendig: form.zustaendig || null }) }} className="btn-primary flex-1">Anlegen →</button>
       </div>
     </div>
   )
