@@ -125,6 +125,7 @@ export default function Projekte() {
   const [showAddDarsteller, setShowAddDarsteller] = useState(false)
   const [draggingId, setDraggingId] = useState(null)
   const [dragOverCol, setDragOverCol] = useState(null)
+  const [selectedIntern, setSelectedIntern] = useState(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -359,7 +360,7 @@ export default function Projekte() {
                   </div>
                   <div className="space-y-2 min-h-8">
                     {cols.map(item => (
-                      <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-3 cursor-pointer hover:border-orange-200 hover:shadow-sm transition-all">
+                      <div key={item.id} onClick={() => setSelectedIntern(item)} className="bg-white border border-gray-100 rounded-xl p-3 cursor-pointer hover:border-orange-200 hover:shadow-sm transition-all">
                         <p className="text-xs font-semibold text-gray-800 mb-1">{item.titel}</p>
                         <p className="text-xs text-gray-400">{item.drehtag ? new Date(item.drehtag).toLocaleDateString('de-DE') : 'Kein Drehtag'}{item.zustaendig ? ` · ${item.zustaendig}` : ''}</p>
                       </div>
@@ -461,6 +462,15 @@ export default function Projekte() {
           <AddInternForm profiles={profiles}
             onSave={async data => { await supabase.from('proj_intern').insert(data); setShowAddIntern(false); fetchAll() }}
             onClose={() => setShowAddIntern(false)} />
+        </Modal>
+      )}
+
+      {selectedIntern && (
+        <Modal title="Konzept bearbeiten" onClose={() => setSelectedIntern(null)}>
+          <EditInternForm item={selectedIntern} profiles={profiles}
+            onSave={async data => { await supabase.from('proj_intern').update(data).eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() }}
+            onDelete={async () => { if (window.confirm('Konzept wirklich löschen?')) { await supabase.from('proj_intern').delete().eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() } }}
+            onClose={() => setSelectedIntern(null)} />
         </Modal>
       )}
     </div>
@@ -569,6 +579,40 @@ function AddInternForm({ profiles, onSave, onClose }) {
       <div className="flex gap-3 pt-2">
         <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
         <button onClick={() => { if (form.titel.trim()) onSave({ ...form, drehtag: form.drehtag || null, zustaendig: form.zustaendig || null }) }} className="btn-primary flex-1">Anlegen →</button>
+      </div>
+    </div>
+  )
+}
+
+function EditInternForm({ item, profiles, onSave, onDelete, onClose }) {
+  const [form, setForm] = useState({
+    titel: item.titel || '', drehtag: item.drehtag || '', status: item.status || 'planung',
+    zustaendig: item.zustaendig || '', video_planung: item.video_planung || '', requisiten: item.requisiten || '',
+  })
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  return (
+    <div className="space-y-3">
+      <div><label className="label">Titel</label><input className="input" value={form.titel} onChange={e => set('titel', e.target.value)} placeholder="Konzept-Titel" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="label">Drehtag</label><input type="date" className="input" value={form.drehtag || ''} onChange={e => set('drehtag', e.target.value)} /></div>
+        <div><label className="label">Status</label>
+          <select className="input" value={form.status} onChange={e => set('status', e.target.value)}>
+            {INTERN_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </div>
+      </div>
+      <div><label className="label">Zuständig</label>
+        <select className="input" value={form.zustaendig || ''} onChange={e => set('zustaendig', e.target.value)}>
+          <option value="">—</option>
+          {profiles.map(p => <option key={p.id} value={p.full_name || p.email}>{p.full_name || p.email}</option>)}
+        </select>
+      </div>
+      <div><label className="label">Video-Planung</label><AutoTextarea className="input" value={form.video_planung || ''} onChange={e => set('video_planung', e.target.value)} placeholder="Idee / Konzept..." /></div>
+      <div><label className="label">Requisiten</label><AutoTextarea className="input" value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigtes Material..." /></div>
+      <div className="flex items-center gap-3 pt-2">
+        <button onClick={onDelete} className="text-xs text-red-500 hover:text-red-700 mr-auto">Löschen</button>
+        <button onClick={onClose} className="btn-secondary">Abbrechen</button>
+        <button onClick={() => { if (form.titel.trim()) onSave({ ...form, drehtag: form.drehtag || null, zustaendig: form.zustaendig || null }) }} className="btn-primary">Speichern →</button>
       </div>
     </div>
   )
