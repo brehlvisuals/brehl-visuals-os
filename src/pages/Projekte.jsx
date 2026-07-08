@@ -110,7 +110,9 @@ function AutoTextarea({ className = '', value, onChange, ...rest }) {
 // Bilder/Dateien pro Video: Upload in Supabase Storage, Anzeige als Thumbnail/Link
 function FileAttach({ files, onChange, prefix }) {
   const [busy, setBusy] = useState(false)
+  const [preview, setPreview] = useState(null)
   const isImg = n => /\.(png|jpe?g|gif|webp|heic|heif|avif|bmp)$/i.test(n || '')
+  const isPdf = n => /\.pdf$/i.test(n || '')
   async function upload(e) {
     const list = Array.from(e.target.files || [])
     if (!list.length) return
@@ -148,9 +150,9 @@ function FileAttach({ files, onChange, prefix }) {
           {files.map((f, i) => (
             <div key={i} className="relative">
               {isImg(f.name) ? (
-                <a href={f.url} target="_blank" rel="noreferrer"><img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-lg border border-gray-200" /></a>
+                <button type="button" onClick={() => setPreview(f)}><img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-lg border border-gray-200" /></button>
               ) : (
-                <a href={f.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-[#ff6b01] bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5 max-w-[9rem] truncate">📄 {f.name}</a>
+                <button type="button" onClick={() => setPreview(f)} className="flex items-center gap-1 text-xs text-[#ff6b01] bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5 max-w-[9rem] truncate">📄 {f.name}</button>
               )}
               <button onClick={() => remove(i)} title="Entfernen" className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] leading-none flex items-center justify-center">×</button>
             </div>
@@ -161,6 +163,31 @@ function FileAttach({ files, onChange, prefix }) {
         {busy ? 'Lädt hoch...' : '📎 Bild / Datei hinzufügen'}
         <input type="file" multiple className="hidden" onChange={upload} />
       </label>
+
+      {/* In-App-Vorschau (öffnet sich in der App, nicht im Browser) */}
+      {preview && (
+        <div className="fixed inset-0 z-[80] bg-black/90 flex flex-col" onClick={() => setPreview(null)}>
+          <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <span className="text-sm text-white/90 truncate mr-3">{preview.name}</span>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <a href={preview.url} target="_blank" rel="noreferrer" className="text-xs text-white/70 underline">Im Browser</a>
+              <button onClick={() => setPreview(null)} className="w-8 h-8 rounded-full bg-white/15 text-white text-lg flex items-center justify-center">×</button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center justify-center p-2" onClick={e => e.stopPropagation()}>
+            {isImg(preview.name) ? (
+              <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain" />
+            ) : isPdf(preview.name) ? (
+              <iframe src={preview.url} title={preview.name} className="w-full h-full bg-white rounded-lg" />
+            ) : (
+              <div className="text-center text-white/80 text-sm px-6">
+                <p className="mb-4">Für diesen Dateityp gibt es keine Vorschau.</p>
+                <a href={preview.url} target="_blank" rel="noreferrer" className="btn-primary inline-block">Datei öffnen</a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -764,7 +791,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
                     </label>
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
-                  <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
+                  <AutoTextarea className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
                     onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
                     onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }}
@@ -956,7 +983,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                     </label>
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
-                  <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
+                  <AutoTextarea className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
                     onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
                     onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }}
