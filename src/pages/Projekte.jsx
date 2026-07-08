@@ -706,6 +706,10 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
   }
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
+  function toggleVideoDone(i) {
+    const nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
+    setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh)
+  }
 
   return (
     <div className="fixed inset-0 bg-black/10 z-[60] flex" onClick={onClose}>
@@ -751,10 +755,13 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
           )}
           {tab === 'videos' && (
             <>
-              {videos.map((v, i) => (
-                <div key={i} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+              {videos.map((v, i) => ({ v, i })).sort((a, b) => (a.v.erledigt ? 1 : 0) - (b.v.erledigt ? 1 : 0)).map(({ v, i }) => (
+                <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Video {i + 1}</span>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${i + 1}`}</span>
+                    </label>
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
@@ -836,6 +843,10 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
+  function toggleVideoDone(i) {
+    const nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
+    setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh)
+  }
 
   return (
     <div className="fixed inset-0 bg-black/10 z-[60] flex" onClick={onClose}>
@@ -936,10 +947,13 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
           {tab === 'videos' && (
             <>
-              {videos.map((v, i) => (
-                <div key={i} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+              {videos.map((v, i) => ({ v, i })).sort((a, b) => (a.v.erledigt ? 1 : 0) - (b.v.erledigt ? 1 : 0)).map(({ v, i }) => (
+                <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Video {i + 1}</span>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${i + 1}`}</span>
+                    </label>
                     <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
                   <input className="input text-xs mb-2" value={v.titel} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
