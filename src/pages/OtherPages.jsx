@@ -549,14 +549,15 @@ export function Team() {
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white outline-none focus:border-[#ff6b01] disabled:opacity-50">
                     <option value="admin">Admin</option>
                     <option value="mitarbeiter">Mitarbeiter</option>
-                    <option value="extern">Extern</option>
+                    <option value="videograph">Videograph</option>
+                    <option value="extern">Extern/Darsteller</option>
                   </select>
                 </td>
                 {MODULES.map(mod => (
                   <td key={mod.id} className="px-2 py-3 text-center">
                     {m.role === 'admin' ? (
                       <span className="text-[#ff6b01] text-sm">✓</span>
-                    ) : m.role === 'extern' ? (
+                    ) : ['extern', 'videograph'].includes(m.role) ? (
                       mod.id === 'projekte' ? <span className="text-green-600 text-sm">✓</span> : <span className="text-gray-300 text-sm">–</span>
                     ) : mod.id === 'tasks' ? (
                       <button
@@ -644,11 +645,11 @@ export function Team() {
       {/* Externe / Minijob: Stundenlohn & Kundenzuordnung */}
       <div className="card p-4">
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Externe / Minijob – Stundenlohn & Kunden</h3>
-        {members.filter(m => m.role === 'extern').length === 0 ? (
-          <p className="text-xs text-gray-400">Noch keine externen Zugänge (Rolle „Extern").</p>
+        {members.filter(m => ['extern', 'videograph'].includes(m.role)).length === 0 ? (
+          <p className="text-xs text-gray-400">Noch keine Zugänge mit Rolle „Extern" oder „Videograph".</p>
         ) : (
           <div className="space-y-4">
-            {members.filter(m => m.role === 'extern').map(m => {
+            {members.filter(m => ['extern', 'videograph'].includes(m.role)).map(m => {
               const h = stundenMap[m.id] || 0
               const lohn = Number(lohnMap[m.id]) || 0
               return (
@@ -669,19 +670,23 @@ export function Team() {
                       {' · '}<span className="font-semibold text-[#c2410c]">{(h * lohn).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-1 self-center">Kunden</span>
-                    {kundenList.map(k => {
-                      const on = zuordnung[m.id]?.has(k.id)
-                      return (
-                        <button key={k.id} onClick={() => toggleKunde(m.id, k.id)}
-                          className={`text-xs px-2 py-1 rounded-md transition-all ${on ? 'bg-[#ff6b01] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                          {k.name}
-                        </button>
-                      )
-                    })}
-                    {kundenList.length === 0 && <span className="text-xs text-gray-400">Keine Kunden angelegt.</span>}
-                  </div>
+                  {m.role === 'videograph' ? (
+                    <p className="text-[10px] text-gray-400">Videograph – sieht alle Drehs außer „Abgeschlossen" (keine Kundenzuordnung nötig).</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-1 self-center">Kunden</span>
+                      {kundenList.map(k => {
+                        const on = zuordnung[m.id]?.has(k.id)
+                        return (
+                          <button key={k.id} onClick={() => toggleKunde(m.id, k.id)}
+                            className={`text-xs px-2 py-1 rounded-md transition-all ${on ? 'bg-[#ff6b01] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                            {k.name}
+                          </button>
+                        )
+                      })}
+                      {kundenList.length === 0 && <span className="text-xs text-gray-400">Keine Kunden angelegt.</span>}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -704,7 +709,8 @@ export function Team() {
               <div>
                 <label className="label">Rolle</label>
                 <select className="input" value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
-                  <option value="extern">Extern – nur Projekte (Videograf/Darsteller)</option>
+                  <option value="videograph">Videograph – Projekte (alles außer Abgeschlossen)</option>
+                  <option value="extern">Extern/Darsteller – nur eigene Drehs (Status „Dreh")</option>
                   <option value="mitarbeiter">Mitarbeiter</option>
                   <option value="admin">Admin</option>
                 </select>
@@ -743,7 +749,7 @@ export function Einstellungen() {
       <div className="card p-5">
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Mein Profil</h3>
         <div className="space-y-0.5">
-          {[['E-Mail', profile?.email], ['Rolle', profile?.role === 'admin' ? 'Administrator' : profile?.role === 'extern' ? 'Extern' : 'Mitarbeiter']].map(([l, v]) => (
+          {[['E-Mail', profile?.email], ['Rolle', profile?.role === 'admin' ? 'Administrator' : profile?.role === 'videograph' ? 'Videograph' : profile?.role === 'extern' ? 'Extern' : 'Mitarbeiter']].map(([l, v]) => (
             <div key={l} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
               <span className="text-xs text-gray-400 w-24">{l}</span>
               <span className="text-sm text-gray-700">{v}</span>

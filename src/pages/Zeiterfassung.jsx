@@ -122,7 +122,8 @@ export function Zeiterfassung() {
   const [zielUserId, setZielUserId] = useState('')   // Admin: für wen wird erfasst ('' = ich selbst)
   const [members, setMembers] = useState([])
   const zielProfil = isAdmin && zielUserId ? (members.find(x => x.id === zielUserId) || profile) : profile
-  const zielIstExtern = isAdmin && zielUserId && zielProfil?.role === 'extern'
+  // Extern UND Videograph sind Minijobler -> gleiche Minijob-Ansicht (Von/Bis + Fahrtkosten)
+  const zielIstExtern = isAdmin && zielUserId && ['extern', 'videograph'].includes(zielProfil?.role)
 
   const y = calMonth.getFullYear(), m = calMonth.getMonth()
   const ftMap = useMemo(() => feiertageNRW(y), [y])
@@ -229,7 +230,7 @@ export function Zeiterfassung() {
           <span className="text-xs font-semibold text-gray-500">Erfassen für:</span>
           <select className="input text-xs w-auto" value={zielUserId} onChange={e => { setZielUserId(e.target.value); resetForm() }}>
             <option value="">Mich selbst ({profile?.full_name || 'ich'})</option>
-            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : ''}</option>)}
+            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : mb.role === 'videograph' ? ' (Videograph)' : ''}</option>)}
           </select>
         </div>
         <MeineStunden userId={zielUserId} />
@@ -251,7 +252,7 @@ export function Zeiterfassung() {
           <span className="text-xs font-semibold text-gray-500">Erfassen für:</span>
           <select className="input text-xs w-auto" value={zielUserId} onChange={e => { setZielUserId(e.target.value); resetForm() }}>
             <option value="">Mich selbst ({profile?.full_name || 'ich'})</option>
-            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : ''}</option>)}
+            {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : mb.role === 'videograph' ? ' (Videograph)' : ''}</option>)}
           </select>
           {zielUserId && <span className="text-xs text-[#ff6b01] font-medium">Du erfasst für {zielProfil?.full_name}. Wird direkt gespeichert.</span>}
         </div>

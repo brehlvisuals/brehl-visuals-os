@@ -68,15 +68,18 @@ export function AuthProvider({ children }) {
 
   const isAdmin = profile?.role === 'admin'
   const isExtern = profile?.role === 'extern'
+  const isVideograph = profile?.role === 'videograph'
+  // Eingeschränkte Rollen (Extern/Videograph): ausschließlich der Projekte-Bereich
+  const isRestricted = isExtern || isVideograph
   const canAccess = (mod) => {
-    if (isExtern) return mod === 'projekte'   // Externe: ausschließlich Projekte
+    if (isRestricted) return mod === 'projekte'
     if (isAdmin) return true
     return profile?.permissions?.includes(mod) ?? false
   }
 
   return (
     <Ctx.Provider value={{
-      user, profile, isAdmin, isExtern, canAccess, loading,
+      user, profile, isAdmin, isExtern, isVideograph, isRestricted, canAccess, loading,
       signIn: (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }),
       signOut: () => supabase.auth.signOut(),
     }}>

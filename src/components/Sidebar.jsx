@@ -54,12 +54,12 @@ function MIcon({ name }) {
 }
 
 export default function Sidebar() {
-  const { profile, isAdmin, isExtern, canAccess, signOut } = useAuth()
+  const { profile, isAdmin, isExtern, isVideograph, isRestricted, canAccess, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [badges, setBadges] = useState({ urlaub: 0, zeit: 0 })
   const location = useLocation()
   const name = profile?.full_name || profile?.email?.split('@')[0] || 'User'
-  const rolle = isAdmin ? 'Admin' : isExtern ? 'Extern' : 'Mitarbeiter'
+  const rolle = isAdmin ? 'Admin' : isVideograph ? 'Videograph' : isExtern ? 'Extern' : 'Mitarbeiter'
 
   useEffect(() => {
     if (!isAdmin || !profile?.id) { setBadges({ urlaub: 0, zeit: 0 }); return }
@@ -93,8 +93,8 @@ export default function Sidebar() {
               {group.divider && <div className="h-px bg-gray-100 my-2 mx-1" />}
               {group.section && <div className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest px-2 pt-3 pb-1">{group.section}</div>}
               {group.items?.map(item => {
-                if (item.externOnly && !isExtern) return null
-                if (isExtern && !item.externOnly && !['/projekte', '/einstellungen'].includes(item.to)) return null
+                if (item.externOnly && !isRestricted) return null
+                if (isRestricted && !item.externOnly && !['/projekte', '/einstellungen'].includes(item.to)) return null
                 if (item.adminOnly && !isAdmin) return null
                 if (item.mod && !canAccess(item.mod)) return null
                 return (
@@ -122,7 +122,7 @@ export default function Sidebar() {
             </div>
             <div className="min-w-0">
               <div className="text-xs font-medium text-gray-800 truncate">{name}</div>
-              <div className="text-[10px] text-gray-400">{isAdmin ? 'Admin' : 'Mitarbeiter'}</div>
+              <div className="text-[10px] text-gray-400">{rolle}</div>
             </div>
           </div>
           <button onClick={signOut} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Ausloggen</button>
@@ -132,7 +132,7 @@ export default function Sidebar() {
       {/* Mobile Bottom Nav */}
       <nav className="mobile-nav fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 px-2 py-2 safe-area-bottom">
         <div className="flex items-center justify-around w-full">
-          {isExtern ? (
+          {isRestricted ? (
             <>
               <NavLink to="/projekte"
                 className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/projekte') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>

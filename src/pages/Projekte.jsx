@@ -194,7 +194,7 @@ function FileAttach({ files, onChange, prefix }) {
 
 export default function Projekte() {
   const navigate = useNavigate()
-  const { isExtern } = useAuth()
+  const { isExtern, isVideograph } = useAuth()
   const [tab, setTab] = useState('kunden')
   const [view, setView] = useState('kanban')
   const [drehs, setDrehs] = useState([])
@@ -265,7 +265,11 @@ export default function Projekte() {
     fetchAll()
   }
 
-  const filtered = kundeFilter ? drehs.filter(d => d.kunde_name === kundeFilter) : drehs
+  // Videograph sieht keine abgeschlossenen Drehs (zusätzlich zur RLS-Sperre)
+  const sichtbar = isVideograph ? drehs.filter(d => d.status !== 'abgeschlossen') : drehs
+  const filtered = kundeFilter ? sichtbar.filter(d => d.kunde_name === kundeFilter) : sichtbar
+  // Statusspalten/-buttons: Videograph ohne "Abgeschlossen"
+  const visStatuses = isVideograph ? STATUSES.filter(s => s.id !== 'abgeschlossen') : STATUSES
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
 
@@ -309,7 +313,7 @@ export default function Projekte() {
     <div className="p-4 md:p-6 space-y-4">
       {/* Tabs */}
       <div className="flex bg-gray-100 rounded-lg p-1 w-fit gap-0.5 overflow-x-auto">
-        {[['kunden','Kunden-Drehs'],['intern','Intern'],['verwalten','Verwalten']].map(([id,label]) => (
+        {[['kunden','Kunden-Drehs'],['intern','Intern'],['verwalten','Verwalten']].filter(([id]) => !(isVideograph && id === 'verwalten')).map(([id,label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${tab === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
             {label}
@@ -339,7 +343,7 @@ export default function Projekte() {
 
           {view === 'kanban' && (
             <div className="kanban-scroll">
-              {STATUSES.map(st => {
+              {visStatuses.map(st => {
                 const cols = filtered.filter(d => d.status === st.id)
                 return (
                   <div key={st.id}
@@ -511,7 +515,7 @@ export default function Projekte() {
 
       {/* Detail Panel */}
       {selected && (
-        <DrehDetail key={selected.id} dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles}
+        <DrehDetail key={selected.id} dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles} videograph={isVideograph}
           onClose={() => setSelected(null)}
           onStatusChange={s => updateDrehStatus(selected.id, s)}
           onRefresh={fetchAll}
@@ -553,7 +557,7 @@ export default function Projekte() {
       )}
 
       {selectedIntern && (
-        <InternDetail key={selectedIntern.id} item={selectedIntern} profiles={profiles}
+        <InternDetail key={selectedIntern.id} item={selectedIntern} profiles={profiles} videograph={isVideograph}
           onClose={() => setSelectedIntern(null)}
           onRefresh={fetchAll}
           onDelete={async () => { if (window.confirm('Konzept wirklich löschen?')) { await supabase.from('proj_intern').delete().eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() } }}
@@ -702,7 +706,7 @@ function AddInternForm({ profiles, onSave, onClose }) {
   )
 }
 
-function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
+function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph }) {
   const [tab, setTab] = useState('info')
   const [form, setForm] = useState({ ...item })
   const [videos, setVideos] = useState(
@@ -748,7 +752,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
-            <button onClick={() => onDelete?.()} title="Konzept löschen" className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>
+            {!videograph && <button onClick={() => onDelete?.()} title="Konzept löschen" className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>}
             <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
           </div>
         </div>
@@ -811,7 +815,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete }) {
   )
 }
 
-function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChange, onRefresh, onDelete, extern }) {
+function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChange, onRefresh, onDelete, extern, videograph }) {
   const [tab, setTab] = useState('info')
   const [form, setForm] = useState({ ...dreh })
   const [videos, setVideos] = useState(dreh.videos || [])
@@ -886,17 +890,17 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
-            {!extern && <button onClick={() => { if (window.confirm('Diesen Dreh wirklich löschen? Das kann nicht rückgängig gemacht werden.')) onDelete?.() }}
+            {!extern && !videograph && <button onClick={() => { if (window.confirm('Diesen Dreh wirklich löschen? Das kann nicht rückgängig gemacht werden.')) onDelete?.() }}
               title="Dreh löschen"
               className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>}
             <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
           </div>
         </div>
 
-        {/* Status row (für Externe ausgeblendet) */}
+        {/* Status row (für Externe/Darsteller ausgeblendet; Videograph ohne "Abgeschlossen") */}
         {!extern && (
         <div className="px-4 py-2.5 border-b border-gray-100 flex gap-1.5 flex-wrap flex-shrink-0">
-          {STATUSES.map(s => (
+          {(videograph ? STATUSES.filter(s => s.id !== 'abgeschlossen') : STATUSES).map(s => (
             <button key={s.id} onClick={() => handleStatusChange(s.id)}
               className={`text-xs font-medium px-2.5 py-1 rounded-full transition-all border ${form.status === s.id ? 'border-current shadow-sm' : 'border-transparent opacity-50 hover:opacity-80'}`}
               style={{ background: s.bg, color: s.text, borderColor: form.status === s.id ? s.color : 'transparent' }}>

@@ -23,15 +23,15 @@ function Layout({ children }) {
 }
 
 function Protected({ children, mod, adminOnly, externOk }) {
-  const { user, loading, canAccess, isAdmin, isExtern } = useAuth()
+  const { user, loading, canAccess, isAdmin, isRestricted } = useAuth()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-8 h-8 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" />
     </div>
   )
   if (!user) return <Navigate to="/login" replace />
-  // Externe (Videograf/Darsteller) dürfen nur ausdrücklich freigegebene Seiten (Projekte, Meine Stunden)
-  if (isExtern && !externOk) return <Navigate to="/projekte" replace />
+  // Eingeschränkte Rollen (Videograf/Darsteller) dürfen nur ausdrücklich freigegebene Seiten (Projekte, Meine Stunden, Einstellungen)
+  if (isRestricted && !externOk) return <Navigate to="/projekte" replace />
   if (adminOnly && !isAdmin) return (
     <div className="p-6 text-center mt-20 text-gray-400 text-sm">Kein Zugriff auf diesen Bereich.</div>
   )

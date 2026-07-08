@@ -4,7 +4,7 @@ import { useAuth } from '../components/AuthProvider'
 import { supabase } from '../lib/supabase'
 
 export default function Login() {
-  const { signIn, user, isExtern } = useAuth()
+  const { signIn, user, isRestricted } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -16,7 +16,7 @@ export default function Login() {
   const [magicSent, setMagicSent] = useState(false)
 
   useEffect(() => {
-    if (user) navigate(isExtern ? '/projekte' : '/dashboard')
+    if (user) navigate(isRestricted ? '/projekte' : '/dashboard')
     const hash = window.location.hash
     if (hash.includes('type=recovery') || hash.includes('access_token')) setMode('set-password')
   }, [user])
