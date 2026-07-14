@@ -56,22 +56,23 @@ function MIcon({ name }) {
 export default function Sidebar() {
   const { profile, isAdmin, isExtern, isVideograph, isRestricted, canAccess, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [badges, setBadges] = useState({ urlaub: 0, zeit: 0 })
+  const [badges, setBadges] = useState({ urlaub: 0, zeit: 0, minijob: 0 })
   const location = useLocation()
   const name = profile?.full_name || profile?.email?.split('@')[0] || 'User'
   const rolle = isAdmin ? 'Admin' : isVideograph ? 'Videograph' : isExtern ? 'Extern' : 'Mitarbeiter'
 
   useEffect(() => {
-    if (!isAdmin || !profile?.id) { setBadges({ urlaub: 0, zeit: 0 }); return }
+    if (!isAdmin || !profile?.id) { setBadges({ urlaub: 0, zeit: 0, minijob: 0 }); return }
     let alive = true
     Promise.all([
       supabase.from('urlaubsantraege').select('id', { count: 'exact', head: true }).eq('status', 'offen').neq('user_id', profile.id),
       supabase.from('zeit_aenderungsantraege').select('id', { count: 'exact', head: true }).eq('status', 'offen'),
-    ]).then(([u, z]) => { if (alive) setBadges({ urlaub: u.count || 0, zeit: z.count || 0 }) })
+      supabase.from('minijob_stunden').select('id', { count: 'exact', head: true }).eq('status', 'offen'),
+    ]).then(([u, z, m]) => { if (alive) setBadges({ urlaub: u.count || 0, zeit: z.count || 0, minijob: m.count || 0 }) })
     return () => { alive = false }
   }, [isAdmin, profile?.id, location.pathname])
 
-  const badgeFor = to => to === '/urlaub' ? badges.urlaub : to === '/zeiterfassung' ? badges.zeit : 0
+  const badgeFor = to => to === '/urlaub' ? badges.urlaub : to === '/zeiterfassung' ? badges.zeit : to === '/auswertung' ? badges.minijob : 0
 
   return (
     <>

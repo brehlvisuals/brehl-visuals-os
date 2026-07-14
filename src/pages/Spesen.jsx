@@ -114,7 +114,8 @@ export function PersonSpesen({ month, userId, name }) {
     setLohn(Number(v.data?.stundenlohn || 0)); setStunden(std.data || []); setSpesen(sp.data || [])
   }
 
-  const hSum = stunden.reduce((s, x) => s + Number(x.stunden || 0), 0)
+  const hSum = stunden.filter(x => x.status === 'genehmigt').reduce((s, x) => s + Number(x.stunden || 0), 0)
+  const offenH = stunden.filter(x => (x.status || 'offen') === 'offen').reduce((s, x) => s + Number(x.stunden || 0), 0)
   const sSum = spesen.reduce((s, x) => s + Number(x.betrag || 0), 0)
   const hatMinijob = stunden.length > 0 || lohn > 0
 
@@ -135,7 +136,7 @@ export function PersonSpesen({ month, userId, name }) {
     <>
       {/* Kennzahlen der Person */}
       <div className="grid grid-cols-3 gap-3">
-        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Stunden</p><p className="text-lg font-bold text-gray-900">{fmtDe(hSum)}</p></div>}
+        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Stunden (genehmigt)</p><p className="text-lg font-bold text-gray-900">{fmtDe(hSum)}</p>{offenH > 0 && <p className="text-[10px] text-yellow-600 mt-0.5">+ {fmtDe(offenH)} offen</p>}</div>}
         {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Entgelt ({eur(lohn)}/h)</p><p className="text-lg font-bold text-[#c2410c]">{eur(hSum * lohn)}</p></div>}
         <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Fahrtkosten</p><p className="text-lg font-bold text-[#c2410c]">{eur(sSum)}</p></div>
       </div>

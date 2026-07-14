@@ -581,6 +581,7 @@ export function Auswertung() {
   const [selUser, setSelUser] = useState(null) // null = wird gesetzt
   const [loading, setLoading] = useState(true)
   const [showReport, setShowReport] = useState(false)
+  const [pending, setPending] = useState([])   // offene Minijob-Stunden (alle Personen)
 
   const y = month.getFullYear(), mo = month.getMonth()
   const von = toStr(new Date(y, mo, 1)), bis = toStr(new Date(y, mo + 1, 0))
@@ -606,6 +607,18 @@ export function Auswertung() {
     ])
     setEntries(e.data || []); setAbwesenheiten(a.data || []); setLoading(false)
   }
+
+  // Offene Minijob-Stunden aller Externen/Videographen (rückwirkend möglich -> alle Monate)
+  useEffect(() => { if (isAdmin) loadPending() }, [isAdmin])
+  async function loadPending() {
+    const { data } = await supabase.from('minijob_stunden').select('*').eq('status', 'offen').order('datum')
+    setPending(data || [])
+  }
+  async function decideMj(id, status) {
+    await supabase.from('minijob_stunden').update({ status, entschieden_von: profile.id, entschieden_am: new Date().toISOString() }).eq('id', id)
+    loadPending()
+  }
+  const memberName = uid => members.find(m => m.id === uid)?.full_name || 'Unbekannt'
 
   const einzel = selUser && selUser !== 'alle'
   const aktProfil = useMemo(() => einzel ? (isAdmin ? members.find(x => x.id === selUser) : profile) : null, [einzel, isAdmin, members, selUser, profile])
@@ -669,6 +682,25 @@ export function Auswertung() {
           </select>
         )}
       </div>
+
+      {/* Minijob-Stunden (Externe/Videographen) zu genehmigen – über alle Monate */}
+      {isAdmin && pending.length > 0 && (
+        <div className="card p-4 border-yellow-200 bg-yellow-50/40">
+          <h3 className="section-title text-yellow-700">Minijob-Stunden zu genehmigen ({pending.length})</h3>
+          <div className="divide-y divide-yellow-100/70">
+            {pending.map(e => (
+              <div key={e.id} className="flex items-center gap-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 truncate"><span className="font-medium">{memberName(e.user_id)}</span> · {new Date(e.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })}</p>
+                  <p className="text-xs text-gray-500 truncate">{e.start_zeit?.slice(0, 5)}–{e.end_zeit?.slice(0, 5)} Uhr · {fmtH(Number(e.stunden))} Std.{e.notiz ? ` · ${e.notiz}` : ''}</p>
+                </div>
+                <button onClick={() => decideMj(e.id, 'genehmigt')} title="Genehmigen" className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-md font-medium hover:bg-green-200 flex-shrink-0">✓</button>
+                <button onClick={() => decideMj(e.id, 'abgelehnt')} title="Ablehnen" className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-md font-medium hover:bg-red-200 flex-shrink-0">✗</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? <Spinner /> : (
         <>

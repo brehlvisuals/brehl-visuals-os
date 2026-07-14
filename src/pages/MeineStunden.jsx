@@ -27,9 +27,6 @@ export default function MeineStunden({ userId }) {
   const [msg, setMsg] = useState('')
   const [form, setForm] = useState({ datum: '', start_zeit: '', end_zeit: '', notiz: '' })
 
-  const now = new Date()
-  const isCurrentMonth = now.getFullYear() === month.y && now.getMonth() === month.m
-  const canEdit = acting || isCurrentMonth   // Admin darf jeden Monat bearbeiten
 
   useEffect(() => { load() }, [month.y, month.m, uid])
   useEffect(() => {
@@ -53,8 +50,11 @@ export default function MeineStunden({ userId }) {
     const stunden = hoursBetween(form.start_zeit, form.end_zeit)
     if (stunden <= 0) { setMsg('„Bis" muss nach „Von" liegen.'); return }
     setSaving(true)
+    // Admin (acting) trägt direkt genehmigt ein; Minijobler-Einträge gehen als "offen" in die Genehmigung
     const { error } = await supabase.from('minijob_stunden').insert({
       user_id: uid, datum: form.datum, start_zeit: form.start_zeit, end_zeit: form.end_zeit, stunden, notiz: form.notiz || null,
+      status: acting ? 'genehmigt' : 'offen',
+      ...(acting ? { entschieden_von: user.id, entschieden_am: new Date().toISOString() } : {}),
     })
     setSaving(false)
     if (error) { setMsg('Fehler: ' + error.message); return }
@@ -68,12 +68,21 @@ export default function MeineStunden({ userId }) {
     await supabase.from('minijob_stunden').delete().eq('id', id); load()
   }
 
+  // Admin (acting): Eintrag genehmigen / ablehnen
+  async function decide(id, status) {
+    await supabase.from('minijob_stunden').update({ status, entschieden_von: user.id, entschieden_am: new Date().toISOString() }).eq('id', id)
+    load()
+  }
+  const STATUS_PILL = { offen: 'bg-yellow-100 text-yellow-700', genehmigt: 'bg-green-100 text-green-700', abgelehnt: 'bg-red-100 text-red-600' }
+  const STATUS_LABEL = { offen: 'Offen', genehmigt: 'Genehmigt', abgelehnt: 'Abgelehnt' }
+
   function shiftMonth(delta) {
     setMonth(p => { const d = new Date(p.y, p.m + delta, 1); return { y: d.getFullYear(), m: d.getMonth() } })
   }
 
-  const totalH = entries.reduce((s, e) => s + Number(e.stunden || 0), 0)
-  const betrag = totalH * lohn
+  const genehmigtH = entries.filter(e => e.status === 'genehmigt').reduce((s, e) => s + Number(e.stunden || 0), 0)
+  const offenH = entries.filter(e => (e.status || 'offen') === 'offen').reduce((s, e) => s + Number(e.stunden || 0), 0)
+  const betrag = genehmigtH * lohn   // nur genehmigte Stunden werden vergütet
   const fmtH = h => (Math.round(h * 100) / 100).toLocaleString('de-DE')
   const eur = n => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
   const preview = hoursBetween(form.start_zeit, form.end_zeit)
@@ -91,29 +100,27 @@ export default function MeineStunden({ userId }) {
 
       {/* Zusammenfassung */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Stunden</p><p className="text-lg font-bold text-gray-900">{fmtH(totalH)}</p></div>
+        <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Genehmigt</p><p className="text-lg font-bold text-gray-900">{fmtH(genehmigtH)} <span className="text-xs font-normal text-gray-400">Std.</span></p></div>
         <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Stundenlohn</p><p className="text-lg font-bold text-gray-900">{lohn ? eur(lohn) : '—'}</p></div>
         <div className="card p-4 bg-[#ff6b01]/5 border-[#ff6b01]/20"><p className="text-[10px] uppercase tracking-wider text-[#c2410c] mb-1">Betrag</p><p className="text-lg font-bold text-[#c2410c]">{eur(betrag)}</p></div>
       </div>
+      {offenH > 0 && <div className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">⏳ {fmtH(offenH)} Std. warten noch auf Felix' Genehmigung – erst danach werden sie vergütet.</div>}
       {!lohn && <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Dein Stundenlohn ist noch nicht hinterlegt – melde dich bei Felix. Deine Stunden kannst du trotzdem schon eintragen.</div>}
 
-      {/* Erfassen (nur laufender Monat) */}
-      {canEdit ? (
-        <div className="card p-4 space-y-3">
-          <p className="section-title mb-0">Einsatz eintragen</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div className="col-span-2 md:col-span-1"><label className="label">Datum</label><input type="date" className="input text-sm" value={form.datum} onChange={e => setForm(p => ({ ...p, datum: e.target.value }))} /></div>
-            <div><label className="label">Von</label><input type="time" className="input text-sm" value={form.start_zeit} onChange={e => setForm(p => ({ ...p, start_zeit: e.target.value }))} /></div>
-            <div><label className="label">Bis</label><input type="time" className="input text-sm" value={form.end_zeit} onChange={e => setForm(p => ({ ...p, end_zeit: e.target.value }))} /></div>
-            <div className="flex items-end"><div className="text-xs text-gray-500 pb-2.5">{preview > 0 ? `= ${fmtH(preview)} Std.` : ''}</div></div>
-          </div>
-          <div><label className="label">Notiz (optional)</label><input className="input text-sm" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} placeholder="z.B. Dreh Autohaus Müller" /></div>
-          {msg && <p className="text-xs text-red-600">{msg}</p>}
-          <button onClick={addEntry} disabled={saving} className="btn-primary text-sm w-full">{saving ? 'Speichert...' : '+ Stunden eintragen'}</button>
+      {/* Erfassen – auch rückwirkend möglich (Datum frei wählbar) */}
+      <div className="card p-4 space-y-3">
+        <p className="section-title mb-0">Einsatz eintragen</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="col-span-2 md:col-span-1"><label className="label">Datum</label><input type="date" className="input text-sm" value={form.datum} onChange={e => setForm(p => ({ ...p, datum: e.target.value }))} /></div>
+          <div><label className="label">Von</label><input type="time" className="input text-sm" value={form.start_zeit} onChange={e => setForm(p => ({ ...p, start_zeit: e.target.value }))} /></div>
+          <div><label className="label">Bis</label><input type="time" className="input text-sm" value={form.end_zeit} onChange={e => setForm(p => ({ ...p, end_zeit: e.target.value }))} /></div>
+          <div className="flex items-end"><div className="text-xs text-gray-500 pb-2.5">{preview > 0 ? `= ${fmtH(preview)} Std.` : ''}</div></div>
         </div>
-      ) : (
-        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">Abgeschlossener Monat – nur Ansicht. Änderungen bitte über Felix.</div>
-      )}
+        <div><label className="label">Notiz (optional)</label><input className="input text-sm" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} placeholder="z.B. Dreh Autohaus Müller" /></div>
+        {msg && <p className="text-xs text-red-600">{msg}</p>}
+        <button onClick={addEntry} disabled={saving} className="btn-primary text-sm w-full">{saving ? 'Speichert...' : '+ Stunden eintragen'}</button>
+        {!acting && <p className="text-[10px] text-gray-400">Du kannst auch vergangene Tage nachtragen. Jeder Eintrag wird erst nach Felix' Genehmigung vergütet.</p>}
+      </div>
 
       {/* Liste */}
       <div className="card overflow-hidden">
@@ -123,7 +130,9 @@ export default function MeineStunden({ userId }) {
           <p className="text-sm text-gray-400 text-center py-8">Noch keine Stunden in diesem Monat.</p>
         ) : (
           <div className="divide-y divide-gray-50">
-            {entries.map(e => (
+            {entries.map(e => {
+              const st = e.status || 'offen'
+              return (
               <div key={e.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="w-14 flex-shrink-0">
                   <p className="text-sm font-semibold text-gray-800">{new Date(e.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</p>
@@ -133,9 +142,17 @@ export default function MeineStunden({ userId }) {
                   <p className="text-sm text-gray-700">{e.start_zeit?.slice(0, 5)}–{e.end_zeit?.slice(0, 5)} Uhr · <span className="font-medium">{fmtH(Number(e.stunden))} Std.</span></p>
                   {e.notiz && <p className="text-xs text-gray-400 truncate">{e.notiz}</p>}
                 </div>
-                {canEdit && <button onClick={() => del(e.id)} className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">Löschen</button>}
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_PILL[st]}`}>{STATUS_LABEL[st]}</span>
+                {acting && st === 'offen' && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => decide(e.id, 'genehmigt')} title="Genehmigen" className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-md font-medium hover:bg-green-200">✓</button>
+                    <button onClick={() => decide(e.id, 'abgelehnt')} title="Ablehnen" className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-md font-medium hover:bg-red-200">✗</button>
+                  </div>
+                )}
+                {(acting || st === 'offen') && <button onClick={() => del(e.id)} className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">Löschen</button>}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -145,7 +162,7 @@ export default function MeineStunden({ userId }) {
 
       <p className="text-[10px] text-gray-400 leading-relaxed">
         Deine Einträge werden mit Datum, Beginn, Ende und Dauer gespeichert (Aufzeichnung nach § 17 MiLoG) und sind rechtlich dein Stundennachweis.
-        Trage deine Zeiten zeitnah ein. Abgeschlossene Monate sind gesperrt – Korrekturen macht Felix.
+        Trage deine Zeiten zeitnah ein – auch Nachträge sind möglich. Jeder Eintrag muss von Felix genehmigt werden; solange er „Offen" ist, kannst du ihn noch ändern oder löschen.
       </p>
     </div>
   )
