@@ -584,14 +584,6 @@ function Modal({ title, children, onClose }) {
 function AddDrehForm({ kunden, darsteller, profiles, onSave, onClose }) {
   const [form, setForm] = useState({ datum: '', kunde_id: '', kunde_name: '', zustaendig_id: '', video_count: 8, status: 'planung' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
-  const firstSave = useRef(true)
-  useEffect(() => {
-    if (firstSave.current) { firstSave.current = false; return }
-    const t = setTimeout(() => save(), 700)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Datum</label><input type="date" className="input" value={form.datum} onChange={e => set('datum', e.target.value)} /></div>
@@ -624,14 +616,6 @@ function AddDrehForm({ kunden, darsteller, profiles, onSave, onClose }) {
 function AddKundeForm({ onSave, onClose }) {
   const [form, setForm] = useState({ name: '', kontakt: '', email: '' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
-  const firstSave = useRef(true)
-  useEffect(() => {
-    if (firstSave.current) { firstSave.current = false; return }
-    const t = setTimeout(() => save(), 700)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Name</label><input className="input" placeholder="Kundenname" value={form.name} onChange={e => set('name', e.target.value)} /></div>
@@ -647,14 +631,6 @@ function AddKundeForm({ onSave, onClose }) {
 function AddDarstellerForm({ onSave, onClose }) {
   const [form, setForm] = useState({ name: '', telefon: '', email: '', status: 'neu' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
-  const firstSave = useRef(true)
-  useEffect(() => {
-    if (firstSave.current) { firstSave.current = false; return }
-    const t = setTimeout(() => save(), 700)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Name</label><input className="input" placeholder="Vor- und Nachname" value={form.name} onChange={e => set('name', e.target.value)} /></div>
@@ -671,14 +647,6 @@ function AddDarstellerForm({ onSave, onClose }) {
 function AddInternForm({ profiles, onSave, onClose }) {
   const [form, setForm] = useState({ titel: '', drehtag: '', status: 'planung', zustaendig: '', video_planung: '', requisiten: '' })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
-  const firstSave = useRef(true)
-  useEffect(() => {
-    if (firstSave.current) { firstSave.current = false; return }
-    const t = setTimeout(() => save(), 700)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, videos])
   return (
     <div className="space-y-3">
       <div><label className="label">Titel</label><input className="input" value={form.titel} onChange={e => set('titel', e.target.value)} placeholder="Konzept-Titel" /></div>
