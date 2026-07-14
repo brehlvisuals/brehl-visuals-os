@@ -684,25 +684,50 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
   )
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  // Auto-Speichern (verzögert ~0,7s) + Sofort-Sicherung beim Verlassen,
+  // damit eine noch nicht abgelaufene Eingabe nicht verloren geht.
   const firstSave = useRef(true)
+  const dirty = useRef(false)
+  const dataRef = useRef({ form, videos })
+  dataRef.current = { form, videos }
   useEffect(() => {
     if (firstSave.current) { firstSave.current = false; return }
-    const t = setTimeout(() => save(), 700)
+    dirty.current = true
+    const t = setTimeout(() => { save(); dirty.current = false }, 700)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, videos])
 
+  function buildPayload(f, v) {
+    return {
+      titel: f.titel || null, drehtag: f.drehtag || null, status: f.status || 'planung',
+      zustaendig: f.zustaendig || null, requisiten: f.requisiten || null, drehort: f.drehort || null,
+      video_planung: null, videos: v,
+    }
+  }
   async function save() {
     setSaving(true)
-    const payload = {
-      titel: form.titel || null, drehtag: form.drehtag || null, status: form.status || 'planung',
-      zustaendig: form.zustaendig || null, requisiten: form.requisiten || null, drehort: form.drehort || null,
-      video_planung: null, videos,
-    }
-    await supabase.from('proj_intern').update(payload).eq('id', item.id)
+    await supabase.from('proj_intern').update(buildPayload(form, videos)).eq('id', item.id)
     setSaving(false); onRefresh()
   }
+  // Panel schließen / App in den Hintergrund -> ausstehende Änderung sofort schreiben
+  useEffect(() => {
+    const flush = () => {
+      if (!dirty.current) return
+      const { form: f, videos: v } = dataRef.current
+      supabase.from('proj_intern').update(buildPayload(f, v)).eq('id', item.id)
+      dirty.current = false
+    }
+    const onHide = () => { if (document.visibilityState === 'hidden') flush() }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
@@ -793,14 +818,37 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const [saving, setSaving] = useState(false)
   const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern: jede Änderung wird ~0,7s nach der letzten Eingabe automatisch gesichert
+  // Auto-Speichern (verzögert ~0,7s) + Sofort-Sicherung beim Verlassen,
+  // damit eine noch nicht abgelaufene Eingabe nicht verloren geht.
   const firstSave = useRef(true)
+  const dirty = useRef(false)
+  const dataRef = useRef({ form, videos })
+  dataRef.current = { form, videos }
   useEffect(() => {
     if (firstSave.current) { firstSave.current = false; return }
-    const t = setTimeout(() => save(), 700)
+    dirty.current = true
+    const t = setTimeout(() => { save(); dirty.current = false }, 700)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, videos])
+  // Panel schließen / App in den Hintergrund -> ausstehende Änderung sofort schreiben
+  useEffect(() => {
+    const flush = () => {
+      if (!dirty.current) return
+      const { form: f, videos: v } = dataRef.current
+      supabase.from('proj_drehs').update(cleanDreh({ ...f, videos: v, nas_gesichert: !!(f.raw_gesichert && f.final_gesichert) })).eq('id', dreh.id)
+      dirty.current = false
+    }
+    const onHide = () => { if (document.visibilityState === 'hidden') flush() }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => { fetchNotes() }, [dreh.id])
 
