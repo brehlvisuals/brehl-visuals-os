@@ -49,7 +49,7 @@ function sollTage(y, m, at, ftMap) {
 function monatsSoll(profile, y, m, ftMap) {
   const soll = Number(profile?.soll_stunden || 0)
   if (soll <= 0) return 0
-  const at = arbeitstageOf(zielProfil)
+  const at = arbeitstageOf(profile)
   const { brutto, netto } = sollTage(y, m, at, ftMap)
   if (profile?.soll_modus === 'monat') return brutto ? soll * (netto / brutto) : soll
   return (soll / at.length) * netto
@@ -57,7 +57,7 @@ function monatsSoll(profile, y, m, ftMap) {
 function tagesSoll(profile, y, m, ftMap) {
   const soll = Number(profile?.soll_stunden || 0)
   if (soll <= 0) return 0
-  const at = arbeitstageOf(zielProfil)
+  const at = arbeitstageOf(profile)
   if (profile?.soll_modus === 'monat') { const { netto } = sollTage(y, m, at, ftMap); return netto ? monatsSoll(profile, y, m, ftMap) / netto : 0 }
   return soll / at.length
 }
