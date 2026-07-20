@@ -143,6 +143,24 @@ function FileAttach({ files, onChange, prefix }) {
     if (f?.path) await supabase.storage.from('dreh-dateien').remove([f.path])
     onChange(files.filter((_, idx) => idx !== i))
   }
+  // Datei herunterladen: als Blob laden und mit richtigem Namen speichern (klappt auch cross-origin / iOS)
+  async function download(f) {
+    try {
+      if (f.path) {
+        const { data, error } = await supabase.storage.from('dreh-dateien').download(f.path)
+        if (error || !data) throw error || new Error('leer')
+        const url = URL.createObjectURL(data)
+        const a = document.createElement('a')
+        a.href = url; a.download = f.name || 'datei'
+        document.body.appendChild(a); a.click(); a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 4000)
+      } else {
+        window.open(f.url, '_blank')
+      }
+    } catch {
+      window.open(f.url, '_blank')   // Fallback
+    }
+  }
   return (
     <div className="space-y-2">
       {files?.length > 0 && (
@@ -152,8 +170,9 @@ function FileAttach({ files, onChange, prefix }) {
               {isImg(f.name) ? (
                 <button type="button" onClick={() => setPreview(f)}><img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-lg border border-gray-200" /></button>
               ) : (
-                <button type="button" onClick={() => setPreview(f)} className="flex items-center gap-1 text-xs text-[#ff6b01] bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5 max-w-[9rem] truncate">📄 {f.name}</button>
+                <button type="button" onClick={() => setPreview(f)} className="flex items-center gap-1 text-xs text-[#ff6b01] bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5 pr-6 max-w-[9rem] truncate">📄 {f.name}</button>
               )}
+              <button onClick={() => download(f)} title="Herunterladen" className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-gray-200 text-gray-600 rounded-full text-[9px] leading-none flex items-center justify-center shadow-sm hover:bg-gray-50">⬇</button>
               <button onClick={() => remove(i)} title="Entfernen" className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] leading-none flex items-center justify-center">×</button>
             </div>
           ))}
@@ -169,7 +188,8 @@ function FileAttach({ files, onChange, prefix }) {
         <div className="fixed inset-0 z-[80] bg-black/90 flex flex-col" onClick={() => setPreview(null)}>
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
             <span className="text-sm text-white/90 truncate mr-3">{preview.name}</span>
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => download(preview)} className="text-xs bg-white/15 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/25">⬇ Herunterladen</button>
               <a href={preview.url} target="_blank" rel="noreferrer" className="text-xs text-white/70 underline">Im Browser</a>
               <button onClick={() => setPreview(null)} className="w-8 h-8 rounded-full bg-white/15 text-white text-lg flex items-center justify-center">×</button>
             </div>
@@ -688,6 +708,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
   // damit eine noch nicht abgelaufene Eingabe nicht verloren geht.
   const firstSave = useRef(true)
   const dirty = useRef(false)
+  const backdropDown = useRef(false)   // nur schließen, wenn der Klick auch auf dem Hintergrund begann (Textauswahl-Fix)
   const dataRef = useRef({ form, videos })
   dataRef.current = { form, videos }
   useEffect(() => {
@@ -736,7 +757,9 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
   }
 
   return (
-    <div className="fixed inset-0 bg-black/10 z-[60] flex" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/10 z-[60] flex"
+      onMouseDown={e => { backdropDown.current = e.target === e.currentTarget }}
+      onClick={e => { if (e.target === e.currentTarget && backdropDown.current) onClose() }}>
       <div className="ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div>
@@ -822,6 +845,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   // damit eine noch nicht abgelaufene Eingabe nicht verloren geht.
   const firstSave = useRef(true)
   const dirty = useRef(false)
+  const backdropDown = useRef(false)   // nur schließen, wenn der Klick auch auf dem Hintergrund begann (Textauswahl-Fix)
   const dataRef = useRef({ form, videos })
   dataRef.current = { form, videos }
   useEffect(() => {
@@ -896,7 +920,9 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   }
 
   return (
-    <div className="fixed inset-0 bg-black/10 z-[60] flex" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/10 z-[60] flex"
+      onMouseDown={e => { backdropDown.current = e.target === e.currentTarget }}
+      onClick={e => { if (e.target === e.currentTarget && backdropDown.current) onClose() }}>
       <div className="ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
