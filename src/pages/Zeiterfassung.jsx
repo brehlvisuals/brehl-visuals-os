@@ -86,7 +86,7 @@ function useKonten() {
   return kunden
 }
 const kontoLabel = e => e.ist_intern ? 'Intern' : (e.proj_kunden?.name ? kurz(e.proj_kunden.name) : '—')
-const grenzeStr = () => toStr(addDays(new Date(), -2))
+const grenzeStr = () => toStr(addDays(new Date(), -7))
 const fmtDate = s => new Date(s).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 /* ═══════════════════════════════════════
@@ -154,7 +154,7 @@ export function Zeiterfassung() {
   const daySum = k => monthEntries.filter(e => e.datum === k).reduce((s, e) => s + Number(e.stunden || 0), 0)
   const monatIst = monthEntries.reduce((s, e) => s + Number(e.stunden || 0), 0)
   const monatSoll = monatsSoll(zielProfil, y, m, ftMap)
-  const bearbeitbar = true // MA dürfen eigene Einträge jederzeit direkt ändern/löschen
+  const bearbeitbar = isAdmin || anchor >= grenzeStr() // 7 Tage rückwirkend frei, älter -> Antrag
   const offenerAntragFuer = id => meineAntraege.find(a => a.eintrag_id === id)
   const abwFor = dstr => abwesenheiten.find(a => dstr >= a.von_datum && dstr <= a.bis_datum) || null
 
@@ -299,7 +299,7 @@ export function Zeiterfassung() {
                 </div>
                 {anchorFeiertag && <div className="bg-blue-50 text-blue-700 text-xs rounded-lg px-3 py-2">🎌 Feiertag: {anchorFeiertag}</div>}
                 {changeReq && <div className="bg-yellow-50 text-yellow-700 text-xs rounded-lg px-3 py-2">Änderungsantrag – geht nach dem Speichern an Felix zur Freigabe.</div>}
-                {!bearbeitbar && !changeReq && <div className="bg-gray-50 text-gray-500 text-xs rounded-lg px-3 py-2">Älter als 2 Tage: neue Einträge gehen direkt, Änderungen an bestehenden musst du beantragen.</div>}
+                {!bearbeitbar && !changeReq && <div className="bg-gray-50 text-gray-500 text-xs rounded-lg px-3 py-2">Älter als 7 Tage: neue Einträge gehen direkt, Änderungen an bestehenden musst du beantragen.</div>}
                 <div><label className="label">Was hast du gemacht?</label><textarea className="input text-sm" rows={2} value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} placeholder="z.B. Schnitt Reel Bierschneider, 3 Cuts + Musik" /></div>
                 <div className="grid grid-cols-3 gap-2">
                   <div><label className="label">Von</label><input type="time" className="input text-sm" value={form.von} onChange={e => setForm(p => ({ ...p, von: e.target.value }))} /></div>
