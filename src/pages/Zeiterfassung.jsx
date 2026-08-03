@@ -154,7 +154,7 @@ export function Zeiterfassung() {
   const daySum = k => monthEntries.filter(e => e.datum === k).reduce((s, e) => s + Number(e.stunden || 0), 0)
   const monatIst = monthEntries.reduce((s, e) => s + Number(e.stunden || 0), 0)
   const monatSoll = monatsSoll(zielProfil, y, m, ftMap)
-  const bearbeitbar = anchor >= grenzeStr()
+  const bearbeitbar = true // MA dürfen eigene Einträge jederzeit direkt ändern/löschen
   const offenerAntragFuer = id => meineAntraege.find(a => a.eintrag_id === id)
   const abwFor = dstr => abwesenheiten.find(a => dstr >= a.von_datum && dstr <= a.bis_datum) || null
 
