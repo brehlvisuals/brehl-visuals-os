@@ -83,7 +83,7 @@ function RichText({ value, onChange, onCommit, placeholder }) {
         <button type="button" title="Fett" onMouseDown={e => { e.preventDefault(); exec('bold') }} className={B} style={{ fontWeight: 700 }}>B</button>
         <button type="button" title="Kursiv" onMouseDown={e => { e.preventDefault(); exec('italic') }} className={B} style={{ fontStyle: 'italic' }}>I</button>
         <button type="button" title="Unterstreichen" onMouseDown={e => { e.preventDefault(); exec('underline') }} className={B} style={{ textDecoration: 'underline' }}>U</button>
-        <button type="button" title="Überschrift" onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'H3') }} className={B + ' font-bold'}>H</button>
+        <button type="button" title="Überschrift an/aus" onMouseDown={e => { e.preventDefault(); const cur = (document.queryCommandValue('formatBlock') || '').replace(/[<>]/g, '').toLowerCase(); exec('formatBlock', cur === 'h3' ? 'div' : 'H3') }} className={B + ' font-bold'}>H</button>
         <button type="button" title="Liste" onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList') }} className={B}>•</button>
         <button type="button" title="Formatierung entfernen" onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'DIV'); exec('removeFormat') }} className={B}>⌫</button>
       </div>
