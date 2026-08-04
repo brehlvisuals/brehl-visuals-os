@@ -82,6 +82,7 @@ function RichText({ value, onChange, onCommit, placeholder }) {
       <div className="flex items-center gap-0.5 border-b border-gray-100 bg-gray-50 px-1 py-1">
         <button type="button" title="Fett" onMouseDown={e => { e.preventDefault(); exec('bold') }} className={B} style={{ fontWeight: 700 }}>B</button>
         <button type="button" title="Kursiv" onMouseDown={e => { e.preventDefault(); exec('italic') }} className={B} style={{ fontStyle: 'italic' }}>I</button>
+        <button type="button" title="Unterstreichen" onMouseDown={e => { e.preventDefault(); exec('underline') }} className={B} style={{ textDecoration: 'underline' }}>U</button>
         <button type="button" title="Überschrift" onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'H3') }} className={B + ' font-bold'}>H</button>
         <button type="button" title="Liste" onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList') }} className={B}>•</button>
         <button type="button" title="Formatierung entfernen" onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'DIV'); exec('removeFormat') }} className={B}>⌫</button>
@@ -807,8 +808,8 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
                   {profiles.map(p => <option key={p.id} value={p.full_name || p.email}>{p.full_name || p.email}</option>)}
                 </select>
               </div>
-              <div><label className="label">Drehort</label><AutoTextarea className="input text-xs" value={form.drehort || ''} onChange={e => set('drehort', e.target.value)} placeholder="Wo wird gedreht?" /></div>
-              <div><label className="label">Requisiten</label><AutoTextarea className="input text-xs" value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigtes Material..." /></div>
+              <div><label className="label">Drehort</label><RichText value={form.drehort || ''} onChange={val => set('drehort', val)} placeholder="Wo wird gedreht?" /></div>
+              <div><label className="label">Requisiten</label><RichText value={form.requisiten || ''} onChange={val => set('requisiten', val)} placeholder="Benötigtes Material..." /></div>
             </>
           )}
           {tab === 'videos' && (
@@ -1024,9 +1025,9 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   </div>
                 </div>
               )}
-              <div><label className="label">Erläuterungen Videograph / Darsteller</label><AutoTextarea className="input text-xs" value={form.erlaeuterungen_videograph || ''} onChange={e => set('erlaeuterungen_videograph', e.target.value)} placeholder="Hinweise für Videograph / Darsteller..." /></div>
-              <div><label className="label">Erläuterungen Cutter</label><AutoTextarea className="input text-xs" value={form.erlaeuterungen_cutter || ''} onChange={e => set('erlaeuterungen_cutter', e.target.value)} placeholder="Hinweise für den Cutter..." /></div>
-              <div><label className="label">Requisiten</label><AutoTextarea className="input text-xs" value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigte Requisiten..." /></div>
+              <div><label className="label">Erläuterungen Videograph / Darsteller</label><RichText value={form.erlaeuterungen_videograph || ''} onChange={val => set('erlaeuterungen_videograph', val)} placeholder="Hinweise für Videograph / Darsteller..." /></div>
+              <div><label className="label">Erläuterungen Cutter</label><RichText value={form.erlaeuterungen_cutter || ''} onChange={val => set('erlaeuterungen_cutter', val)} placeholder="Hinweise für den Cutter..." /></div>
+              <div><label className="label">Requisiten</label><RichText value={form.requisiten || ''} onChange={val => set('requisiten', val)} placeholder="Benötigte Requisiten..." /></div>
             </>
           )}
 
