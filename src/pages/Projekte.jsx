@@ -95,10 +95,18 @@ function RichText({ value, onChange, onCommit, placeholder }) {
   )
 }
 
-// Textarea, die automatisch so hoch wird wie ihr Inhalt
+// Textarea, die automatisch so hoch wird wie ihr Inhalt.
+// Beim Anpassen der Höhe wird die Scroll-Position des Panels erhalten (sonst springt es beim Tippen nach unten).
 function AutoTextarea({ className = '', value, onChange, ...rest }) {
   const ref = useRef(null)
-  const fit = el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }
+  const fit = el => {
+    if (!el) return
+    const sc = el.closest('.overflow-y-auto')
+    const top = sc ? sc.scrollTop : null
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+    if (sc && top != null) sc.scrollTop = top
+  }
   useEffect(() => { fit(ref.current) }, [value])
   return (
     <textarea ref={ref} rows={1} value={value}
@@ -548,7 +556,10 @@ export default function Projekte() {
         <Modal title="Neuer Dreh" onClose={() => setShowAdd(false)}>
           <AddDrehForm kunden={kunden} darsteller={darsteller} profiles={profiles}
             onSave={async data => {
-              await supabase.from('proj_drehs').insert(cleanDreh(data))
+              // Angegebene Videoanzahl direkt als leere Video-Slots anlegen (max. 100 als Sicherung)
+              const anzahl = Math.min(Math.max(parseInt(data.video_count) || 0, 0), 100)
+              const videos = Array.from({ length: anzahl }, () => ({ titel: '', planung: '', datei_url: '', datei_name: '', dateien: [] }))
+              await supabase.from('proj_drehs').insert(cleanDreh({ ...data, videos }))
               setShowAdd(false); fetchAll()
             }}
             onClose={() => setShowAdd(false)}
@@ -1013,6 +1024,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   </div>
                 </div>
               )}
+              <div><label className="label">Erläuterungen Videograph / Darsteller</label><AutoTextarea className="input text-xs" value={form.erlaeuterungen_videograph || ''} onChange={e => set('erlaeuterungen_videograph', e.target.value)} placeholder="Hinweise für Videograph / Darsteller..." /></div>
               <div><label className="label">Erläuterungen Cutter</label><AutoTextarea className="input text-xs" value={form.erlaeuterungen_cutter || ''} onChange={e => set('erlaeuterungen_cutter', e.target.value)} placeholder="Hinweise für den Cutter..." /></div>
               <div><label className="label">Requisiten</label><AutoTextarea className="input text-xs" value={form.requisiten || ''} onChange={e => set('requisiten', e.target.value)} placeholder="Benötigte Requisiten..." /></div>
             </>
