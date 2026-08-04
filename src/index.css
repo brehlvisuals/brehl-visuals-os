@@ -101,6 +101,9 @@
 .rt-edit { word-break: break-word; white-space: pre-wrap; }
 .rt-edit:focus { outline: none; }
 .rt-edit h3 { font-size: 0.95rem; font-weight: 700; margin: 0.35rem 0 0.15rem; color: #374151; }
+/* Schrift im Editor klein & einheitlich halten – überschreibt auch eingefügte (große) Schriftgrößen */
+.rt-edit, .rt-edit * { font-size: 0.75rem !important; }
+.rt-edit h1, .rt-edit h2, .rt-edit h3 { font-size: 0.95rem !important; }
 .rt-edit b, .rt-edit strong { font-weight: 700; }
 .rt-edit ul { list-style: disc; padding-left: 1.15rem; margin: 0.2rem 0; }
 .rt-edit ol { list-style: decimal; padding-left: 1.15rem; margin: 0.2rem 0; }

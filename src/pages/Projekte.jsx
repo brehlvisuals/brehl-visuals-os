@@ -76,6 +76,22 @@ function RichText({ value, onChange, onCommit, placeholder }) {
     document.execCommand(cmd, false, arg)
     if (ref.current) onChange(ref.current.innerHTML)
   }
+  // Eingefügten Text bereinigen: Schriftgrößen/Farben/Fonts raus, nur einfache Struktur (fett/kursiv/Listen) bleibt
+  const handlePaste = e => {
+    e.preventDefault()
+    const html = e.clipboardData?.getData('text/html')
+    const plain = e.clipboardData?.getData('text/plain') || ''
+    let out
+    if (html) {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      doc.querySelectorAll('*').forEach(el => ['style', 'class', 'size', 'color', 'face', 'width', 'height'].forEach(a => el.removeAttribute(a)))
+      out = doc.body.innerHTML
+    } else {
+      out = plain.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+    }
+    document.execCommand('insertHTML', false, out)
+    if (ref.current) onChange(ref.current.innerHTML)
+  }
   const B = 'w-7 h-7 rounded text-xs text-gray-600 hover:bg-gray-100 flex items-center justify-center'
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:border-[#ff6b01]">
@@ -89,6 +105,7 @@ function RichText({ value, onChange, onCommit, placeholder }) {
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning
         onInput={e => onChange(e.currentTarget.innerHTML)}
+        onPaste={handlePaste}
         onBlur={e => { onChange(e.currentTarget.innerHTML); onCommit?.(e.currentTarget.innerHTML) }}
         data-ph={placeholder || ''}
         className="rt-edit text-xs text-gray-700 leading-relaxed px-2.5 py-2 outline-none min-h-[2.5rem]" />
