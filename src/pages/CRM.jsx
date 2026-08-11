@@ -220,6 +220,7 @@ export default function CRM() {
                         </div>
                       </div>
                       {item.telefon && <p className="text-[10px] text-gray-400 mb-1">📞 {item.telefon}</p>}
+                      {isLead && item.utm_content && <p className="text-[10px] text-[#c2410c] mb-1 truncate" title={item.utm_content}>🎬 {item.utm_content}</p>}
                       {itemTasks.length > 0 && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${hasOverdue ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
                           {hasOverdue ? '⚠' : '◷'} {itemTasks.length} Task{itemTasks.length > 1 ? 's' : ''}
@@ -572,6 +573,8 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
                   ['quelle', 'Quelle', item.quelle, 'text'],
                   ['utm_source', 'UTM Source', item.utm_source, 'text'],
                   ['utm_medium', 'UTM Medium', item.utm_medium, 'text'],
+                  ['utm_content', 'Video (UTM Content)', item.utm_content, 'text'],
+                  ['utm_campaign', 'Kampagne (UTM)', item.utm_campaign, 'text'],
                 ['empfehler_name', 'Empfehler', item.empfehler_name, 'text'], 
                 ['empfehler_email', 'Empfehler-Mail', item.empfehler_email, 'email'],
                 ]
