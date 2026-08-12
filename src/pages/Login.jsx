@@ -6,20 +6,26 @@ import { supabase } from '../lib/supabase'
 export default function Login() {
   const { signIn, user, isRestricted } = useAuth()
   const navigate = useNavigate()
+  // Recovery-Link erkennen (einmalig beim Mount, bevor Supabase den Hash aus der URL entfernt)
+  const [recovery] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const h = window.location.hash || '', q = window.location.search || ''
+    return h.includes('type=recovery') || h.includes('access_token') || new URLSearchParams(q).has('code')
+  })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [newPw, setNewPw] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [mode, setMode] = useState('login')
+  const [mode, setMode] = useState(recovery ? 'set-password' : 'login')
   const [sent, setSent] = useState(false)
   const [magicSent, setMagicSent] = useState(false)
 
   useEffect(() => {
+    // Im Reset-Modus NICHT automatisch in die App springen – Pia soll erst ein neues Passwort setzen
+    if (recovery) return
     if (user) navigate(isRestricted ? '/projekte' : '/dashboard')
-    const hash = window.location.hash
-    if (hash.includes('type=recovery') || hash.includes('access_token')) setMode('set-password')
-  }, [user])
+  }, [user, recovery])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -56,7 +62,7 @@ export default function Login() {
     setLoading(true); setError('')
     const { error } = await supabase.auth.updateUser({ password: newPw })
     if (error) { setError('Fehler: ' + error.message); setLoading(false) }
-    else navigate('/dashboard')
+    else navigate(isRestricted ? '/projekte' : '/dashboard')
   }
 
   return (
