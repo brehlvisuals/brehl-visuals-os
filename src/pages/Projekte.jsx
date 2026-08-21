@@ -832,8 +832,8 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     if (data) { baseRef.current = buildPayload(data, data.videos || []); skipAutosave.current = true; setForm(f => ({ ...f, ...data })); setVideos(data.videos || []); setExtChanged(false) }
   }
   function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
-  function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
-  function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
+  function addVideo() { saveVideos([...videos, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
+  function removeVideo(i) { saveVideos(videos.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
     let nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
     if (!videos[i].erledigt) { const [d] = nv.splice(i, 1); nv = [...nv, d] }   // beim Abhaken ans Ende
@@ -1051,8 +1051,8 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   }
 
   function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
-  function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
-  function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
+  function addVideo() { saveVideos([...videos, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
+  function removeVideo(i) { saveVideos(videos.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
     let nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
     if (!videos[i].erledigt) { const [d] = nv.splice(i, 1); nv = [...nv, d] }   // beim Abhaken ans Ende
