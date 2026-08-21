@@ -66,12 +66,24 @@ function toHtml(v) {
 // Rich-Text-Editor: fett/kursiv/Überschrift/Liste, wächst automatisch mit dem Inhalt
 function RichText({ value, onChange, onCommit, placeholder }) {
   const ref = useRef(null)
+  const cbRef = useRef({ onChange, onCommit })
+  cbRef.current = { onChange, onCommit }
   useEffect(() => {
     const el = ref.current
     // Beim Mount UND bei externen Änderungen (z.B. Umsortieren) setzen – aber nicht während des Tippens (fokussiert), sonst springt der Cursor
     if (el && document.activeElement !== el) el.innerHTML = toHtml(value)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
+  // Sicherung: schließt/wechselt man die App während des Tippens (ohne aus dem Feld zu klicken),
+  // wird der aktuelle Inhalt sofort übernommen & gespeichert (v.a. iOS).
+  useEffect(() => {
+    const commit = () => { const el = ref.current; if (el) { cbRef.current.onChange?.(el.innerHTML); cbRef.current.onCommit?.(el.innerHTML) } }
+    const onVis = () => { if (document.visibilityState === 'hidden') commit() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('pagehide', commit)
+    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', commit) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const exec = (cmd, arg) => {
     document.execCommand(cmd, false, arg)
     if (ref.current) onChange(ref.current.innerHTML)
@@ -765,11 +777,13 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     for (const k of Object.keys(cur)) { if (JSON.stringify(cur[k]) !== JSON.stringify(base[k])) patch[k] = cur[k] }
     return patch
   }
+  const lastWriteAt = useRef(0)
   async function persist(patch) {
     if (!patch || Object.keys(patch).length === 0) return
     setSaving(true)
+    lastWriteAt.current = Date.now()
     await supabase.from('proj_intern').update(patch).eq('id', item.id)
-    baseRef.current = { ...baseRef.current, ...patch }
+    baseRef.current = { ...baseRef.current, ...patch }; lastWriteAt.current = Date.now()
     setSaving(false); onRefresh()
   }
   async function save() { await persist(patchOf(form, videos)) }
@@ -779,27 +793,16 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, videos])
-  // Live-Sync für dieses Konzept
+  // Live-Sync: NUR Hinweis, wenn jemand anderes ändert. Kein automatisches Überschreiben des offenen Panels.
   useEffect(() => {
     const ch = supabase.channel(`intern-${item.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proj_intern', filter: `id=eq.${item.id}` }, ({ new: fresh }) => {
         if (!fresh) return
+        if (Date.now() - lastWriteAt.current < 5000) return
         const base = baseRef.current || {}
-        const cur = buildPayload(dataRef.current.form, dataRef.current.videos)
         const freshP = buildPayload(fresh, fresh.videos || [])
-        const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
-        const keys = Object.keys(cur)   // Payload-Spalten
-        const isPending = k => !eq(cur[k], base[k])
-        const conflict = keys.some(k => !eq(freshP[k], base[k]) && isPending(k) && !eq(freshP[k], cur[k]))
-        if (conflict) { setExtChanged(true); return }
-        baseRef.current = freshP
-        const applyForm = {}; let applyVideos = false
-        keys.forEach(k => { if (!eq(freshP[k], base[k]) && !isPending(k)) { if (k === 'videos') applyVideos = true; else if (k !== 'video_planung') applyForm[k] = fresh[k] } })
-        if (Object.keys(applyForm).length || applyVideos) {
-          skipAutosave.current = true
-          if (Object.keys(applyForm).length) setForm(f => ({ ...f, ...applyForm }))
-          if (applyVideos) setVideos(fresh.videos || [])
-        }
+        const externAnders = Object.keys(freshP).some(k => JSON.stringify(freshP[k]) !== JSON.stringify(base[k]))
+        if (externAnders) setExtChanged(true)
       })
       .subscribe()
     return () => supabase.removeChannel(ch)
@@ -810,6 +813,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     const flush = () => {
       const patch = patchOf(dataRef.current.form, dataRef.current.videos)
       if (Object.keys(patch).length === 0) return
+      lastWriteAt.current = Date.now()
       supabase.from('proj_intern').update(patch).eq('id', item.id)
       baseRef.current = { ...baseRef.current, ...patch }
     }
@@ -827,7 +831,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     const { data } = await supabase.from('proj_intern').select('*').eq('id', item.id).single()
     if (data) { baseRef.current = buildPayload(data, data.videos || []); skipAutosave.current = true; setForm(f => ({ ...f, ...data })); setVideos(data.videos || []); setExtChanged(false) }
   }
-  function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
+  function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
@@ -887,8 +891,8 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
                   {profiles.map(p => <option key={p.id} value={p.full_name || p.email}>{p.full_name || p.email}</option>)}
                 </select>
               </div>
-              <div><label className="label">Drehort</label><RichText value={form.drehort || ''} onChange={val => set('drehort', val)} placeholder="Wo wird gedreht?" /></div>
-              <div><label className="label">Requisiten</label><RichText value={form.requisiten || ''} onChange={val => set('requisiten', val)} placeholder="Benötigtes Material..." /></div>
+              <div><label className="label">Drehort</label><RichText value={form.drehort || ''} onChange={val => set('drehort', val)} onCommit={val => persist({ drehort: val })} placeholder="Wo wird gedreht?" /></div>
+              <div><label className="label">Requisiten</label><RichText value={form.requisiten || ''} onChange={val => set('requisiten', val)} onCommit={val => persist({ requisiten: val })} placeholder="Benötigtes Material..." /></div>
             </>
           )}
           {tab === 'videos' && (
@@ -958,11 +962,13 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     }
     return patch
   }
+  const lastWriteAt = useRef(0)   // Zeitpunkt unseres letzten eigenen Schreibvorgangs (um eigene Echos zu ignorieren)
   async function persist(patch) {
     if (!patch || Object.keys(patch).length === 0) return
     setSaving(true)
+    lastWriteAt.current = Date.now()
     await supabase.from('proj_drehs').update(cleanDreh(patch)).eq('id', dreh.id)
-    baseRef.current = { ...baseRef.current, ...patch }
+    baseRef.current = { ...baseRef.current, ...patch }; lastWriteAt.current = Date.now()
     setSaving(false); onRefresh()
   }
   // Auto-Speichern (verzögert ~0,7s) – schreibt nur geänderte Felder
@@ -972,29 +978,16 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, videos])
-  // Live-Sync: ändert jemand anderes diesen Dreh, wird das offene Panel aktualisiert –
-  // aber nur, wenn keine eigenen ungespeicherten Änderungen offen sind (sonst nur Hinweis).
+  // Live-Sync: NUR Hinweis, wenn jemand anderes diesen Dreh ändert. Das offene Panel wird bewusst
+  // NICHT automatisch überschrieben – so kann kein verzögertes Echo eigene neuere Eingaben zurücksetzen.
   useEffect(() => {
     const ch = supabase.channel(`dreh-${dreh.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proj_drehs', filter: `id=eq.${dreh.id}` }, ({ new: fresh }) => {
         if (!fresh) return
+        if (Date.now() - lastWriteAt.current < 5000) return   // kurz nach eigenem Speichern: eigenes Echo -> ignorieren
         const base = baseRef.current || {}
-        const f0 = dataRef.current.form, v0 = dataRef.current.videos
-        const cur = { ...f0, videos: v0, nas_gesichert: !!(f0.raw_gesichert && f0.final_gesichert) }
-        const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
-        const keys = Object.keys(fresh).filter(k => k !== 'id' && k !== 'created_at')
-        const isPending = k => !eq(cur[k], base[k])
-        // Echter Konflikt: das andere Gerät hat ein Feld geändert, das WIR auch (anders) offen haben
-        const conflict = keys.some(k => !eq(fresh[k], base[k]) && isPending(k) && !eq(fresh[k], cur[k]))
-        if (conflict) { setExtChanged(true); return }
-        baseRef.current = { ...base, ...fresh }
-        const applyForm = {}; let applyVideos = false
-        keys.forEach(k => { if (!eq(fresh[k], base[k]) && !isPending(k)) { if (k === 'videos') applyVideos = true; else applyForm[k] = fresh[k] } })
-        if (Object.keys(applyForm).length || applyVideos) {
-          skipAutosave.current = true
-          if (Object.keys(applyForm).length) setForm(f => ({ ...f, ...applyForm }))
-          if (applyVideos) setVideos(fresh.videos || [])
-        }
+        const externAnders = Object.keys(fresh).some(k => k !== 'id' && k !== 'created_at' && JSON.stringify(fresh[k]) !== JSON.stringify(base[k]))
+        if (externAnders) setExtChanged(true)
       })
       .subscribe()
     return () => supabase.removeChannel(ch)
@@ -1005,6 +998,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     const flush = () => {
       const patch = patchOf(dataRef.current.form, dataRef.current.videos)
       if (Object.keys(patch).length === 0) return
+      lastWriteAt.current = Date.now()
       supabase.from('proj_drehs').update(cleanDreh(patch)).eq('id', dreh.id)
       baseRef.current = { ...baseRef.current, ...patch }
     }
@@ -1056,7 +1050,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     else if (form.status === 'abgeschlossen') { set('status', 'posting'); onStatusChange('posting'); setNasWarn(true) }
   }
 
-  function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
+  function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
@@ -1170,9 +1164,9 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   </div>
                 </div>
               )}
-              <div><label className="label">Erläuterungen Videograph / Darsteller</label><RichText value={form.erlaeuterungen_videograph || ''} onChange={val => set('erlaeuterungen_videograph', val)} placeholder="Hinweise für Videograph / Darsteller..." /></div>
-              <div><label className="label">Erläuterungen Cutter</label><RichText value={form.erlaeuterungen_cutter || ''} onChange={val => set('erlaeuterungen_cutter', val)} placeholder="Hinweise für den Cutter..." /></div>
-              <div><label className="label">Requisiten</label><RichText value={form.requisiten || ''} onChange={val => set('requisiten', val)} placeholder="Benötigte Requisiten..." /></div>
+              <div><label className="label">Erläuterungen Videograph / Darsteller</label><RichText value={form.erlaeuterungen_videograph || ''} onChange={val => set('erlaeuterungen_videograph', val)} onCommit={val => persist({ erlaeuterungen_videograph: val })} placeholder="Hinweise für Videograph / Darsteller..." /></div>
+              <div><label className="label">Erläuterungen Cutter</label><RichText value={form.erlaeuterungen_cutter || ''} onChange={val => set('erlaeuterungen_cutter', val)} onCommit={val => persist({ erlaeuterungen_cutter: val })} placeholder="Hinweise für den Cutter..." /></div>
+              <div><label className="label">Requisiten</label><RichText value={form.requisiten || ''} onChange={val => set('requisiten', val)} onCommit={val => persist({ requisiten: val })} placeholder="Benötigte Requisiten..." /></div>
             </>
           )}
 
@@ -1213,7 +1207,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                     <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Recruiting</span>
                     <button onClick={() => { setRecruitingOn(false); set('recruiting', '') }} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
                   </div>
-                  <RichText value={form.recruiting || ''} onChange={val => set('recruiting', val)} placeholder="Recruiting / Casting-Bedarf..." />
+                  <RichText value={form.recruiting || ''} onChange={val => set('recruiting', val)} onCommit={val => persist({ recruiting: val })} placeholder="Recruiting / Casting-Bedarf..." />
                 </div>
               ) : (
                 <button onClick={() => setRecruitingOn(true)} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
