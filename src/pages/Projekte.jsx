@@ -261,6 +261,18 @@ export default function Projekte() {
 
   useEffect(() => { fetchAll() }, [])
 
+  // Live-Aktualisierung: Änderungen anderer Nutzer sofort ins Board holen (leicht entprellt)
+  useEffect(() => {
+    let t
+    const refresh = () => { clearTimeout(t); t = setTimeout(fetchAll, 400) }
+    const ch = supabase.channel('projekte-board')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proj_drehs' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proj_intern' }, refresh)
+      .subscribe()
+    return () => { clearTimeout(t); supabase.removeChannel(ch) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function fetchAll() {
     // kein setLoading(true) hier: sonst würde ein Refresh nach dem Speichern den
     // Lade-Spinner zeigen, das offene Detail-Panel abbauen und mit altem Stand neu aufbauen
@@ -733,21 +745,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
   )
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern (verzögert ~0,7s) + Sofort-Sicherung beim Verlassen,
-  // damit eine noch nicht abgelaufene Eingabe nicht verloren geht.
-  const firstSave = useRef(true)
-  const dirty = useRef(false)
-  const backdropDown = useRef(false)   // nur schließen, wenn der Klick auch auf dem Hintergrund begann (Textauswahl-Fix)
-  const dataRef = useRef({ form, videos })
-  dataRef.current = { form, videos }
-  useEffect(() => {
-    if (firstSave.current) { firstSave.current = false; return }
-    dirty.current = true
-    const t = setTimeout(() => { save(); dirty.current = false }, 700)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, videos])
-
+  // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben + Live-Sync (kein Überschreiben mit altem Stand).
   function buildPayload(f, v) {
     return {
       titel: f.titel || null, drehtag: f.drehtag || null, status: f.status || 'planung',
@@ -755,18 +753,65 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
       video_planung: null, videos: v,
     }
   }
-  async function save() {
+  const baseRef = useRef(buildPayload(item, item.videos || []))
+  const backdropDown = useRef(false)
+  const skipAutosave = useRef(true)
+  const dataRef = useRef({ form, videos })
+  dataRef.current = { form, videos }
+  const [extChanged, setExtChanged] = useState(false)
+
+  function patchOf(f, v) {
+    const cur = buildPayload(f, v); const base = baseRef.current || {}; const patch = {}
+    for (const k of Object.keys(cur)) { if (JSON.stringify(cur[k]) !== JSON.stringify(base[k])) patch[k] = cur[k] }
+    return patch
+  }
+  async function persist(patch) {
+    if (!patch || Object.keys(patch).length === 0) return
     setSaving(true)
-    await supabase.from('proj_intern').update(buildPayload(form, videos)).eq('id', item.id)
+    await supabase.from('proj_intern').update(patch).eq('id', item.id)
+    baseRef.current = { ...baseRef.current, ...patch }
     setSaving(false); onRefresh()
   }
-  // Panel schließen / App in den Hintergrund -> ausstehende Änderung sofort schreiben
+  async function save() { await persist(patchOf(form, videos)) }
+  useEffect(() => {
+    if (skipAutosave.current) { skipAutosave.current = false; return }
+    const t = setTimeout(() => persist(patchOf(form, videos)), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, videos])
+  // Live-Sync für dieses Konzept
+  useEffect(() => {
+    const ch = supabase.channel(`intern-${item.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proj_intern', filter: `id=eq.${item.id}` }, ({ new: fresh }) => {
+        if (!fresh) return
+        const base = baseRef.current || {}
+        const cur = buildPayload(dataRef.current.form, dataRef.current.videos)
+        const freshP = buildPayload(fresh, fresh.videos || [])
+        const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+        const keys = Object.keys(cur)   // Payload-Spalten
+        const isPending = k => !eq(cur[k], base[k])
+        const conflict = keys.some(k => !eq(freshP[k], base[k]) && isPending(k) && !eq(freshP[k], cur[k]))
+        if (conflict) { setExtChanged(true); return }
+        baseRef.current = freshP
+        const applyForm = {}; let applyVideos = false
+        keys.forEach(k => { if (!eq(freshP[k], base[k]) && !isPending(k)) { if (k === 'videos') applyVideos = true; else if (k !== 'video_planung') applyForm[k] = fresh[k] } })
+        if (Object.keys(applyForm).length || applyVideos) {
+          skipAutosave.current = true
+          if (Object.keys(applyForm).length) setForm(f => ({ ...f, ...applyForm }))
+          if (applyVideos) setVideos(fresh.videos || [])
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id])
+  // Panel schließen / App in den Hintergrund -> ausstehende Änderungen (nur geänderte Felder) sofort schreiben
   useEffect(() => {
     const flush = () => {
-      if (!dirty.current) return
-      const { form: f, videos: v } = dataRef.current
-      supabase.from('proj_intern').update(buildPayload(f, v)).eq('id', item.id)
-      dirty.current = false
+      const patch = patchOf(dataRef.current.form, dataRef.current.videos)
+      if (Object.keys(patch).length === 0) return
+      supabase.from('proj_intern').update(patch).eq('id', item.id)
+      baseRef.current = { ...baseRef.current, ...patch }
     }
     const onHide = () => { if (document.visibilityState === 'hidden') flush() }
     document.addEventListener('visibilitychange', onHide)
@@ -778,7 +823,11 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  function saveVideos(nv) { setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
+  async function reloadFresh() {
+    const { data } = await supabase.from('proj_intern').select('*').eq('id', item.id).single()
+    if (data) { baseRef.current = buildPayload(data, data.videos || []); skipAutosave.current = true; setForm(f => ({ ...f, ...data })); setVideos(data.videos || []); setExtChanged(false) }
+  }
+  function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
@@ -815,6 +864,12 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {extChanged && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+              <span className="text-xs text-amber-800">Jemand anderes hat dieses Konzept gerade geändert.</span>
+              <button onClick={reloadFresh} className="text-xs font-medium bg-amber-600 text-white px-2.5 py-1 rounded-md hover:bg-amber-700 whitespace-nowrap">Aktualisieren</button>
+            </div>
+          )}
           {tab === 'info' && (
             <>
               <div><label className="label">Titel</label><input className="input text-xs" value={form.titel || ''} onChange={e => set('titel', e.target.value)} /></div>
@@ -854,10 +909,10 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
                   <AutoTextarea className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
                     onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
-                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }}
+                    onCommit={val => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
                     placeholder="Video-Planung / Konzept..." /></div>
                   <FileAttach files={v.dateien || []} prefix={`${item.id}/${i}`}
-                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }} />
+                    onChange={arr => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
@@ -881,27 +936,74 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const [saving, setSaving] = useState(false)
   const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  // Auto-Speichern (verzögert ~0,7s) + Sofort-Sicherung beim Verlassen,
-  // damit eine noch nicht abgelaufene Eingabe nicht verloren geht.
-  const firstSave = useRef(true)
-  const dirty = useRef(false)
-  const backdropDown = useRef(false)   // nur schließen, wenn der Klick auch auf dem Hintergrund begann (Textauswahl-Fix)
+  // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben (Field-Level) + Live-Sync,
+  // damit gleichzeitige Bearbeitungen sich nicht gegenseitig mit altem Stand überschreiben.
+  const baseRef = useRef(dreh)            // letzter bekannter Serverstand
+  const backdropDown = useRef(false)      // nur schließen, wenn der Klick auch auf dem Hintergrund begann
+  const skipAutosave = useRef(true)       // Mount + nach externem Sync keinen Autosave auslösen
   const dataRef = useRef({ form, videos })
   dataRef.current = { form, videos }
+  const [extChanged, setExtChanged] = useState(false)
+
+  function patchOf(f, v) {
+    const cur = { ...f, videos: v, nas_gesichert: !!(f.raw_gesichert && f.final_gesichert) }
+    const base = baseRef.current || {}
+    const patch = {}
+    for (const k of Object.keys(cur)) {
+      if (k === 'id' || k === 'created_at') continue
+      if (JSON.stringify(cur[k]) !== JSON.stringify(base[k])) patch[k] = cur[k]
+    }
+    return patch
+  }
+  async function persist(patch) {
+    if (!patch || Object.keys(patch).length === 0) return
+    setSaving(true)
+    await supabase.from('proj_drehs').update(cleanDreh(patch)).eq('id', dreh.id)
+    baseRef.current = { ...baseRef.current, ...patch }
+    setSaving(false); onRefresh()
+  }
+  // Auto-Speichern (verzögert ~0,7s) – schreibt nur geänderte Felder
   useEffect(() => {
-    if (firstSave.current) { firstSave.current = false; return }
-    dirty.current = true
-    const t = setTimeout(() => { save(); dirty.current = false }, 700)
+    if (skipAutosave.current) { skipAutosave.current = false; return }
+    const t = setTimeout(() => persist(patchOf(form, videos)), 700)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, videos])
-  // Panel schließen / App in den Hintergrund -> ausstehende Änderung sofort schreiben
+  // Live-Sync: ändert jemand anderes diesen Dreh, wird das offene Panel aktualisiert –
+  // aber nur, wenn keine eigenen ungespeicherten Änderungen offen sind (sonst nur Hinweis).
+  useEffect(() => {
+    const ch = supabase.channel(`dreh-${dreh.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proj_drehs', filter: `id=eq.${dreh.id}` }, ({ new: fresh }) => {
+        if (!fresh) return
+        const base = baseRef.current || {}
+        const f0 = dataRef.current.form, v0 = dataRef.current.videos
+        const cur = { ...f0, videos: v0, nas_gesichert: !!(f0.raw_gesichert && f0.final_gesichert) }
+        const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+        const keys = Object.keys(fresh).filter(k => k !== 'id' && k !== 'created_at')
+        const isPending = k => !eq(cur[k], base[k])
+        // Echter Konflikt: das andere Gerät hat ein Feld geändert, das WIR auch (anders) offen haben
+        const conflict = keys.some(k => !eq(fresh[k], base[k]) && isPending(k) && !eq(fresh[k], cur[k]))
+        if (conflict) { setExtChanged(true); return }
+        baseRef.current = { ...base, ...fresh }
+        const applyForm = {}; let applyVideos = false
+        keys.forEach(k => { if (!eq(fresh[k], base[k]) && !isPending(k)) { if (k === 'videos') applyVideos = true; else applyForm[k] = fresh[k] } })
+        if (Object.keys(applyForm).length || applyVideos) {
+          skipAutosave.current = true
+          if (Object.keys(applyForm).length) setForm(f => ({ ...f, ...applyForm }))
+          if (applyVideos) setVideos(fresh.videos || [])
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dreh.id])
+  // Panel schließen / App in den Hintergrund -> ausstehende Änderungen (nur geänderte Felder) sofort schreiben
   useEffect(() => {
     const flush = () => {
-      if (!dirty.current) return
-      const { form: f, videos: v } = dataRef.current
-      supabase.from('proj_drehs').update(cleanDreh({ ...f, videos: v, nas_gesichert: !!(f.raw_gesichert && f.final_gesichert) })).eq('id', dreh.id)
-      dirty.current = false
+      const patch = patchOf(dataRef.current.form, dataRef.current.videos)
+      if (Object.keys(patch).length === 0) return
+      supabase.from('proj_drehs').update(cleanDreh(patch)).eq('id', dreh.id)
+      baseRef.current = { ...baseRef.current, ...patch }
     }
     const onHide = () => { if (document.visibilityState === 'hidden') flush() }
     document.addEventListener('visibilitychange', onHide)
@@ -913,6 +1015,10 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  async function reloadFresh() {
+    const { data } = await supabase.from('proj_drehs').select('*').eq('id', dreh.id).single()
+    if (data) { baseRef.current = data; skipAutosave.current = true; setForm(f => ({ ...f, ...data })); setVideos(data.videos || []); setExtChanged(false) }
+  }
 
   useEffect(() => { fetchNotes() }, [dreh.id])
 
@@ -921,12 +1027,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     if (data) setNotes(data)
   }
 
-  async function save() {
-    setSaving(true)
-    const payload = { ...form, videos, nas_gesichert: !!(form.raw_gesichert && form.final_gesichert) }
-    await supabase.from('proj_drehs').update(cleanDreh(payload)).eq('id', dreh.id)
-    setSaving(false); onRefresh()
-  }
+  async function save() { await persist(patchOf(form, videos)) }
 
   async function addNote() {
     if (!noteText.trim()) return
@@ -952,7 +1053,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     else if (form.status === 'abgeschlossen') { set('status', 'posting'); onStatusChange('posting'); setNasWarn(true) }
   }
 
-  function saveVideos(nv) { setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
+  function saveVideos(nv) { setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
@@ -1017,6 +1118,12 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {extChanged && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+              <span className="text-xs text-amber-800">Jemand anderes hat diesen Dreh gerade geändert.</span>
+              <button onClick={reloadFresh} className="text-xs font-medium bg-amber-600 text-white px-2.5 py-1 rounded-md hover:bg-amber-700 whitespace-nowrap">Aktualisieren</button>
+            </div>
+          )}
           {tab === 'info' && (
             <>
               <div className="grid grid-cols-2 gap-3">
@@ -1084,10 +1191,10 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   <AutoTextarea className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
                     onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
-                    onCommit={val => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }}
+                    onCommit={val => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
                     placeholder="Video-Planung / Konzept..." /></div>
                   <FileAttach files={v.dateien || []} prefix={`${dreh.id}/${i}`}
-                    onChange={arr => { const nv = videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid); setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }} />
+                    onChange={arr => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
                 </div>
               ))}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
