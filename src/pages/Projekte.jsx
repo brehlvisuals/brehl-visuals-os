@@ -68,10 +68,10 @@ function RichText({ value, onChange, onCommit, placeholder }) {
   const ref = useRef(null)
   useEffect(() => {
     const el = ref.current
-    if (el) el.innerHTML = toHtml(value)
-    // nur beim Mount setzen, sonst springt der Cursor
+    // Beim Mount UND bei externen Änderungen (z.B. Umsortieren) setzen – aber nicht während des Tippens (fokussiert), sonst springt der Cursor
+    if (el && document.activeElement !== el) el.innerHTML = toHtml(value)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [value])
   const exec = (cmd, arg) => {
     document.execCommand(cmd, false, arg)
     if (ref.current) onChange(ref.current.innerHTML)
@@ -778,11 +778,18 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  function saveVideos(nv) { setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
-    const nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
-    setVideos(nv); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh)
+    let nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
+    if (!videos[i].erledigt) { const [d] = nv.splice(i, 1); nv = [...nv, d] }   // beim Abhaken ans Ende
+    saveVideos(nv)
+  }
+  function moveVideo(from, to) {
+    if (to < 0 || to >= videos.length) return
+    const nv = [...videos]; const [it] = nv.splice(from, 1); nv.splice(to, 0, it)
+    saveVideos(nv)
   }
 
   return (
@@ -831,14 +838,18 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
           )}
           {tab === 'videos' && (
             <>
-              {videos.map((v, i) => ({ v, i })).sort((a, b) => (a.v.erledigt ? 1 : 0) - (b.v.erledigt ? 1 : 0)).map(({ v, i }) => (
+              {videos.map((v, i) => (
                 <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
                       <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${i + 1}`}</span>
                     </label>
-                    <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => moveVideo(i, i - 1)} disabled={i === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
+                      <button onClick={() => moveVideo(i, i + 1)} disabled={i === videos.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
+                      <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
+                    </div>
                   </div>
                   <AutoTextarea className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
@@ -941,11 +952,18 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     else if (form.status === 'abgeschlossen') { set('status', 'posting'); onStatusChange('posting'); setNasWarn(true) }
   }
 
+  function saveVideos(nv) { setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
   function addVideo() { setVideos(prev => [...prev, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { setVideos(prev => prev.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
-    const nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
-    setVideos(nv); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh)
+    let nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
+    if (!videos[i].erledigt) { const [d] = nv.splice(i, 1); nv = [...nv, d] }   // beim Abhaken ans Ende
+    saveVideos(nv)
+  }
+  function moveVideo(from, to) {
+    if (to < 0 || to >= videos.length) return
+    const nv = [...videos]; const [it] = nv.splice(from, 1); nv.splice(to, 0, it)
+    saveVideos(nv)
   }
 
   return (
@@ -1050,14 +1068,18 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
           {tab === 'videos' && (
             <>
-              {videos.map((v, i) => ({ v, i })).sort((a, b) => (a.v.erledigt ? 1 : 0) - (b.v.erledigt ? 1 : 0)).map(({ v, i }) => (
+              {videos.map((v, i) => (
                 <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
                       <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${i + 1}`}</span>
                     </label>
-                    <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => moveVideo(i, i - 1)} disabled={i === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
+                      <button onClick={() => moveVideo(i, i + 1)} disabled={i === videos.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
+                      <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
+                    </div>
                   </div>
                   <AutoTextarea className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText value={v.planung || ''}
