@@ -893,16 +893,19 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
           )}
           {tab === 'videos' && (
             <>
-              {videos.map((v, i) => (
+              {(() => {
+                // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
+                const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
+                return ord.map((i, p) => { const v = videos[i]; return (
                 <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${i + 1}`}</span>
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${p + 1}`}</span>
                     </label>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => moveVideo(i, i - 1)} disabled={i === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
-                      <button onClick={() => moveVideo(i, i + 1)} disabled={i === videos.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
+                      <button onClick={() => moveVideo(i, ord[p - 1])} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
+                      <button onClick={() => moveVideo(i, ord[p + 1])} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
                       <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
                     </div>
                   </div>
@@ -914,7 +917,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
                   <FileAttach files={v.dateien || []} prefix={`${item.id}/${i}`}
                     onChange={arr => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
                 </div>
-              ))}
+              )})})()}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
                 + Video hinzufügen
               </button>
@@ -1175,16 +1178,19 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
           {tab === 'videos' && (
             <>
-              {videos.map((v, i) => (
+              {(() => {
+                // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
+                const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
+                return ord.map((i, p) => { const v = videos[i]; return (
                 <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${i + 1}`}</span>
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${p + 1}`}</span>
                     </label>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => moveVideo(i, i - 1)} disabled={i === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
-                      <button onClick={() => moveVideo(i, i + 1)} disabled={i === videos.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
+                      <button onClick={() => moveVideo(i, ord[p - 1])} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
+                      <button onClick={() => moveVideo(i, ord[p + 1])} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
                       <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
                     </div>
                   </div>
@@ -1196,7 +1202,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   <FileAttach files={v.dateien || []} prefix={`${dreh.id}/${i}`}
                     onChange={arr => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
                 </div>
-              ))}
+              )})})()}
               <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
                 + Video hinzufügen
               </button>
