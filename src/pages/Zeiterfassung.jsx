@@ -46,20 +46,29 @@ function sollTage(y, m, at, ftMap) {
   }
   return { brutto, netto }
 }
-function monatsSoll(profile, y, m, ftMap) {
-  const soll = Number(profile?.soll_stunden || 0)
-  if (soll <= 0) return 0
-  const at = arbeitstageOf(profile)
-  const { brutto, netto } = sollTage(y, m, at, ftMap)
-  if (profile?.soll_modus === 'monat') return brutto ? soll * (netto / brutto) : soll
-  return (soll / at.length) * netto
-}
+// Tagessatz (Wert eines Arbeitstags). monat: gleichmäßig auf alle Muster-Arbeitstage; woche: Wochensoll / Arbeitstage.
 function tagesSoll(profile, y, m, ftMap) {
   const soll = Number(profile?.soll_stunden || 0)
   if (soll <= 0) return 0
   const at = arbeitstageOf(profile)
-  if (profile?.soll_modus === 'monat') { const { netto } = sollTage(y, m, at, ftMap); return netto ? monatsSoll(profile, y, m, ftMap) / netto : 0 }
+  if (profile?.soll_modus === 'monat') { const { brutto } = sollTage(y, m, at, ftMap); return brutto ? soll / brutto : 0 }
   return soll / at.length
+}
+// Monats-Soll = VOLLES Soll (Feiertage werden NICHT abgezogen, sondern als Ist gutgeschrieben – siehe tagGutschrift)
+function monatsSoll(profile, y, m, ftMap) {
+  const soll = Number(profile?.soll_stunden || 0)
+  if (soll <= 0) return 0
+  const at = arbeitstageOf(profile)
+  const { brutto } = sollTage(y, m, at, ftMap)
+  if (profile?.soll_modus === 'monat') return soll
+  return tagesSoll(profile, y, m, ftMap) * brutto
+}
+// Gutschrift für einen einzelnen Tag: Feiertag ODER genehmigte Abwesenheit an einem Arbeitstag = Tagessatz (halber Tag = Hälfte)
+function tagGutschrift(ds, at, ftMap, tSoll, abw) {
+  if (!at.includes(wtag(ds))) return 0
+  if (ftMap[ds]) return tSoll
+  if (abw) return (abw.halber_tag && abw.von_datum === abw.bis_datum) ? tSoll * 0.5 : tSoll
+  return 0
 }
 // Arbeitstage in einem Datumsbereich (für Abwesenheits-Tage), ohne Feiertage
 function arbeitstageImRange(von, bis, at, ftAll) {
@@ -157,6 +166,13 @@ export function Zeiterfassung() {
   const bearbeitbar = isAdmin || anchor >= grenzeStr() // 7 Tage rückwirkend frei, älter -> Antrag
   const offenerAntragFuer = id => meineAntraege.find(a => a.eintrag_id === id)
   const abwFor = dstr => abwesenheiten.find(a => dstr >= a.von_datum && dstr <= a.bis_datum) || null
+  // Feiertage & genehmigte Abwesenheiten als Stunden gutschreiben (mit Hinweis im Kalender)
+  const tSollMA = tagesSoll(zielProfil, y, m, ftMap)
+  const atMA = arbeitstageOf(zielProfil)
+  const dayGut = ds => tagGutschrift(ds, atMA, ftMap, tSollMA, abwFor(ds))
+  const daySumEff = ds => daySum(ds) + dayGut(ds)
+  const monatGut = (() => { let s = 0; const last = new Date(y, m + 1, 0).getDate(); for (let t = 1; t <= last; t++) s += dayGut(toStr(new Date(y, m, t))); return s })()
+  const monatIstEff = monatIst + monatGut
 
   function resetForm() { setForm({ beschreibung: '', konto: '', von: '', bis: '', pause: '' }); setEditId(null); setChangeReq(null) }
   const kontoPayload = konto => konto === 'intern' ? { ist_intern: true, kunde_id: null } : { ist_intern: false, kunde_id: konto }
@@ -367,7 +383,7 @@ export function Zeiterfassung() {
                       </div>
                     )
                   })}
-                  <div className="flex items-center justify-between p-4 bg-gray-50/50"><span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tag gesamt</span><span className="text-sm font-semibold text-[#ff6b01]">{fmtH(daySum(anchor))}h</span></div>
+                  <div className="flex items-center justify-between p-4 bg-gray-50/50"><span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tag gesamt</span><span className="text-sm font-semibold text-[#ff6b01]">{fmtH(daySumEff(anchor))}h</span></div>
                 </div>
               ) : (
                 <div className="card p-10 text-center"><p className="text-2xl mb-2">⏱</p><p className="text-sm text-gray-400">Noch keine Einträge für diesen Tag</p></div>
@@ -381,7 +397,7 @@ export function Zeiterfassung() {
 
         {/* Monatskalender rechts */}
         <div className="lg:w-80 flex-shrink-0">
-          <MonatsKalender calMonth={calMonth} setCalMonth={setCalMonth} anchor={anchor} setAnchor={setAnchor} daySum={daySum} ftMap={ftMap} abwFor={abwFor} monatIst={monatIst} monatSoll={monatSoll} />
+          <MonatsKalender calMonth={calMonth} setCalMonth={setCalMonth} anchor={anchor} setAnchor={setAnchor} daySum={daySumEff} ftMap={ftMap} abwFor={abwFor} monatIst={monatIstEff} monatSoll={monatSoll} monatGut={monatGut} />
         </div>
       </div>
     </div>
@@ -427,7 +443,7 @@ function TagesBalken({ entries }) {
 }
 
 /* ─── Monatskalender (Erfassung, kompakt) ─── */
-function MonatsKalender({ calMonth, setCalMonth, anchor, setAnchor, daySum, ftMap, abwFor, monatIst, monatSoll }) {
+function MonatsKalender({ calMonth, setCalMonth, anchor, setAnchor, daySum, ftMap, abwFor, monatIst, monatSoll, monatGut }) {
   const y = calMonth.getFullYear(), m = calMonth.getMonth()
   const startPad = (new Date(y, m, 1).getDay() + 6) % 7
   const daysInMonth = new Date(y, m + 1, 0).getDate()
@@ -467,6 +483,7 @@ function MonatsKalender({ calMonth, setCalMonth, anchor, setAnchor, daySum, ftMa
       </div>
       <div className="mt-3 pt-3 border-t border-gray-100 px-1 space-y-1">
         <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Monat Ist</span><span className="text-sm font-semibold text-[#ff6b01]">{fmtH(monatIst)}h</span></div>
+        {monatGut > 0 && <div className="flex items-center justify-between"><span className="text-[10px] text-gray-400">davon Feiertag/Urlaub</span><span className="text-[10px] text-blue-600">{fmtH(monatGut)}h</span></div>}
         {monatSoll > 0 && <>
           <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Soll</span><span className="text-xs font-medium text-gray-600">{fmtH(monatSoll)}h</span></div>
           <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Differenz</span><span className={`text-xs font-semibold ${monatIst - monatSoll >= 0 ? 'text-green-600' : 'text-gray-500'}`}>{monatIst - monatSoll >= 0 ? '+' : ''}{fmtH(monatIst - monatSoll)}h</span></div>
@@ -638,23 +655,26 @@ export function Auswertung() {
   const abwForDay = dstr => abwUser.find(a => dstr >= a.von_datum && dstr <= a.bis_datum) || null
   const tSoll = einzel ? tagesSoll(aktProfil, y, mo, ftMap) : 0
   const mSoll = einzel ? monatsSoll(aktProfil, y, mo, ftMap) : 0
-  // Gutschrift für Abwesenheiten im Monat (Arbeitstage * Tagessoll)
+  // Gutschrift = Feiertage + genehmigte Abwesenheiten an Arbeitstagen (jeweils Tagessatz) -> werden als Ist-Stunden gutgeschrieben
   const gutschrift = useMemo(() => {
     if (!einzel) return 0
-    const at = arbeitstageOf(aktProfil); let tage = 0
+    const at = arbeitstageOf(aktProfil); let sum = 0
     const last = new Date(y, mo + 1, 0).getDate()
-    for (let t = 1; t <= last; t++) { const ds = toStr(new Date(y, mo, t)); if (at.includes(wtag(ds)) && !ftMap[ds]) { const a = abwForDay(ds); if (a) tage += a.halber_tag && a.von_datum === a.bis_datum ? 0.5 : 1 } }
-    return tage * tSoll
+    for (let t = 1; t <= last; t++) { const ds = toStr(new Date(y, mo, t)); sum += tagGutschrift(ds, at, ftMap, tSoll, abwForDay(ds)) }
+    return sum
   }, [einzel, aktProfil, y, mo, ftMap, abwUser, tSoll])
   const effIst = total + gutschrift
   const saldo = einzel && mSoll > 0 ? effIst - mSoll : null
+  // Tages-Summe inkl. Gutschrift (Feiertag/Urlaub zeigen ihre Stunden im Kalender & zählen mit)
+  const atAkt = arbeitstageOf(aktProfil)
+  const daySumEff = ds => filtered.filter(e => e.datum === ds).reduce((s, e) => s + Number(e.stunden || 0), 0) + (einzel ? tagGutschrift(ds, atAkt, ftMap, tSoll, abwForDay(ds)) : 0)
 
   const urlaubJahr = abwUser.filter(a => a.typ === 'urlaub').reduce((s, a) => s + Number(a.tage || 0), 0)
   const krankJahr = abwUser.filter(a => ABW[a.typ]?.zaehltKrank).reduce((s, a) => s + Number(a.tage || 0), 0)
 
   function buildReport() {
     const label = einzel ? (aktProfil?.full_name || '') : 'Alle Mitarbeiter'
-    let t = `ZEITAUSWERTUNG ${month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}\n${label} · Ist: ${fmtH(total)}h${saldo !== null ? ` · Soll: ${fmtH(mSoll)}h · Saldo: ${saldo >= 0 ? '+' : ''}${fmtH(saldo)}h` : ''}\n\n— NACH KONTO —\n`
+    let t = `ZEITAUSWERTUNG ${month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}\n${label} · Ist: ${fmtH(effIst)}h${gutschrift > 0 ? ` (${fmtH(total)}h gearb. + ${fmtH(gutschrift)}h Feiertag/Urlaub)` : ''}${saldo !== null ? ` · Soll: ${fmtH(mSoll)}h · Saldo: ${saldo >= 0 ? '+' : ''}${fmtH(saldo)}h` : ''}\n\n— NACH KONTO —\n`
     perKunde.forEach(([k, h]) => { t += `${k}: ${fmtH(h)}h (${total ? Math.round(h / total * 100) : 0}%)\n` })
     if (!einzel) { t += `\n— NACH MITARBEITER —\n`; perUser.forEach(([k, h]) => { t += `${k}: ${fmtH(h)}h\n` }) }
     t += `\n— EINTRÄGE —\n`; const byDay = {}; filtered.forEach(e => { (byDay[e.datum] = byDay[e.datum] || []).push(e) })
@@ -707,9 +727,9 @@ export function Auswertung() {
           {/* Kennzahlen */}
           {einzel ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Ist (Monat)</p><p className="text-xl font-semibold text-[#ff6b01]">{fmtH(total)}h</p></div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Ist (Monat)</p><p className="text-xl font-semibold text-[#ff6b01]">{fmtH(effIst)}h</p>{gutschrift > 0 && <p className="text-[10px] text-gray-400 mt-0.5">{fmtH(total)}h gearbeitet + {fmtH(gutschrift)}h Feiertag/Urlaub</p>}</div>
               <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Soll</p><p className="text-xl font-semibold text-gray-700">{mSoll > 0 ? fmtH(mSoll) + 'h' : '–'}</p></div>
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Saldo{gutschrift > 0 ? ' inkl. Abw.' : ''}</p><p className={`text-xl font-semibold ${saldo === null ? 'text-gray-400' : saldo >= 0 ? 'text-green-600' : 'text-red-500'}`}>{saldo === null ? '–' : `${saldo >= 0 ? '+' : ''}${fmtH(saldo)}h`}</p></div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Saldo</p><p className={`text-xl font-semibold ${saldo === null ? 'text-gray-400' : saldo >= 0 ? 'text-green-600' : 'text-red-500'}`}>{saldo === null ? '–' : `${saldo >= 0 ? '+' : ''}${fmtH(saldo)}h`}</p></div>
               <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Urlaub / Krank ({jahr})</p><p className="text-xl font-semibold text-gray-700">{fmtH(urlaubJahr)}{Number(aktProfil?.urlaub_anspruch_tage) ? <span className="text-sm text-gray-400">/{aktProfil.urlaub_anspruch_tage}</span> : ''} <span className="text-sm text-gray-400">· {fmtH(krankJahr)}</span></p></div>
             </div>
           ) : (
@@ -720,7 +740,7 @@ export function Auswertung() {
           )}
 
           {/* Stundenkonto-Kalender (Einzel-MA) */}
-          {einzel && <KontoKalender y={y} mo={mo} ftMap={ftMap} daySum={ds => filtered.filter(e => e.datum === ds).reduce((s, e) => s + Number(e.stunden || 0), 0)} abwForDay={abwForDay} arbeitstage={arbeitstageOf(aktProfil)} />}
+          {einzel && <KontoKalender y={y} mo={mo} ftMap={ftMap} daySum={daySumEff} abwForDay={abwForDay} arbeitstage={arbeitstageOf(aktProfil)} tSoll={tSoll} />}
 
           {/* Nach Konto */}
           <div className="card p-4">
@@ -753,7 +773,7 @@ export function Auswertung() {
 }
 
 /* ─── Stundenkonto-Kalender (Wochenzeilen mit Summen) ─── */
-function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage }) {
+function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage, tSoll }) {
   // Wochenzeilen (Mo-Start), inkl. KW + Wochensumme
   const first = new Date(y, mo, 1)
   const startPad = (first.getDay() + 6) % 7
@@ -789,8 +809,8 @@ function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage }) {
                 return (
                   <div key={di} className={`min-h-[52px] rounded-md p-1 ${bg} ${heute ? 'ring-1 ring-[#ff6b01]/50' : ''}`}>
                     <div className={`text-[10px] ${we ? 'text-gray-300' : 'text-gray-500'} ${heute ? 'text-[#ff6b01] font-bold' : ''}`}>{parse(ds).getDate()}</div>
-                    {ft ? <div className="text-[9px] text-blue-600 leading-tight truncate" title={ft}>{ft}</div>
-                      : abw ? <div className={`text-[9px] leading-tight truncate ${ABW[abw.typ]?.text}`} title={ABW[abw.typ]?.label}>{ABW[abw.typ]?.label}{abw.halber_tag ? ' ½' : ''}</div>
+                    {ft ? <><div className="text-[9px] text-blue-600 leading-tight truncate" title={ft}>{ft}</div>{sum > 0 && <div className="text-[10px] font-semibold text-blue-600">{fmtH(sum)}h</div>}</>
+                      : abw ? <><div className={`text-[9px] leading-tight truncate ${ABW[abw.typ]?.text}`} title={ABW[abw.typ]?.label}>{ABW[abw.typ]?.label}{abw.halber_tag ? ' ½' : ''}</div>{sum > 0 && <div className={`text-[10px] font-semibold ${ABW[abw.typ]?.text}`}>{fmtH(sum)}h</div>}</>
                         : sum > 0 ? <div className="text-[11px] font-semibold text-[#ff6b01] mt-1">{fmtH(sum)}h</div> : null}
                   </div>
                 )
