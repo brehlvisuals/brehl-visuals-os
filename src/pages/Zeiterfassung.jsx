@@ -149,7 +149,7 @@ export function Zeiterfassung() {
         .gte('datum', monatsRange[0]).lte('datum', monatsRange[1]).order('created_at'),
       supabase.from('urlaubsantraege').select('typ, von_datum, bis_datum, halber_tag, status').eq('user_id', zielProfil.id)
         .eq('status', 'genehmigt').lte('von_datum', monatsRange[1]).gte('bis_datum', monatsRange[0]),
-      supabase.from('zeit_aenderungsantraege').select('*, proj_kunden:neu_kunde_id(name), zeiteintraege(beschreibung, stunden, datum, ist_intern, kunde_id, proj_kunden(name)), profiles(full_name)').eq('status', 'offen'),
+      supabase.from('zeit_aenderungsantraege').select('*, proj_kunden:neu_kunde_id(name), zeiteintraege(beschreibung, stunden, datum, ist_intern, kunde_id, proj_kunden(name)), profiles!zeit_aenderungsantraege_user_id_fkey(full_name)').eq('status', 'offen'),
     ])
     setMonthEntries(eintraege.data || [])
     setAbwesenheiten(abw.data || [])
@@ -514,7 +514,7 @@ export function Urlaub() {
 
   async function fetchAll() {
     setLoading(true)
-    const { data } = await supabase.from('urlaubsantraege').select('*, profiles(full_name)').order('von_datum', { ascending: false })
+    const { data } = await supabase.from('urlaubsantraege').select('*, profiles!urlaubsantraege_user_id_fkey(full_name)').order('von_datum', { ascending: false })
     setAntraege(data || []); setLoading(false)
   }
   const meine = antraege.filter(a => a.user_id === profile?.id)
@@ -619,7 +619,7 @@ export function Auswertung() {
     setLoading(true)
     const [e, a] = await Promise.all([
       supabase.from('zeiteintraege').select('*, proj_kunden(name), profiles(full_name)').gte('datum', von).lte('datum', bis).order('datum'),
-      supabase.from('urlaubsantraege').select('*, profiles(full_name)').eq('status', 'genehmigt')
+      supabase.from('urlaubsantraege').select('*, profiles!urlaubsantraege_user_id_fkey(full_name)').eq('status', 'genehmigt')
         .gte('von_datum', `${jahr}-01-01`).lte('bis_datum', `${jahr}-12-31`),
     ])
     setEntries(e.data || []); setAbwesenheiten(a.data || []); setLoading(false)
