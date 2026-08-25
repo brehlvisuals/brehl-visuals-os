@@ -274,6 +274,7 @@ export default function Projekte() {
   const [draggingId, setDraggingId] = useState(null)
   const [dragOverCol, setDragOverCol] = useState(null)
   const [selectedIntern, setSelectedIntern] = useState(null)
+  const [geloeschte, setGeloeschte] = useState([])   // gelöschte Drehs (Papierkorb)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -305,6 +306,16 @@ export default function Projekte() {
     if (dar.data) setDarsteller(dar.data)
     if (p.data) setProfiles(p.data)
     setLoading(false)
+    // Papierkorb: gelöschte Drehs (nur für Admin/MA lesbar)
+    supabase.from('proj_verlauf').select('id, ref_id, snapshot, changed_at').eq('tabelle', 'proj_drehs').eq('aktion', 'delete').order('changed_at', { ascending: false }).limit(50)
+      .then(({ data }) => { if (data) setGeloeschte(data) })
+  }
+
+  async function restoreDreh(snap) {
+    if (!snap?.id) return
+    const { created_at, ...rest } = snap   // created_at neu setzen lassen
+    await supabase.from('proj_drehs').insert({ ...rest })
+    fetchAll()
   }
 
   async function updateDrehStatus(id, status) {
@@ -583,6 +594,35 @@ export default function Projekte() {
               ))}
               {darsteller.length === 0 && <p className="text-xs text-gray-400 py-4 text-center">Noch keine Darsteller</p>}
             </div>
+          </div>
+
+          {/* Papierkorb: gelöschte Drehs wiederherstellen */}
+          <div className="card p-4 md:col-span-2">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">🗑 Gelöschte Drehs (wiederherstellbar)</h3>
+            {(() => {
+              const seen = new Set()
+              const list = geloeschte
+                .filter(g => !drehs.some(d => d.id === g.ref_id))
+                .filter(g => { if (seen.has(g.ref_id)) return false; seen.add(g.ref_id); return true })
+              if (list.length === 0) return <p className="text-xs text-gray-400 py-3 text-center">Keine gelöschten Drehs. Ab jetzt gelöschte Drehs landen hier und können wiederhergestellt werden.</p>
+              return (
+                <div className="space-y-0.5">
+                  {list.map(g => {
+                    const s = g.snapshot || {}
+                    const anz = Array.isArray(s.videos) ? s.videos.length : 0
+                    return (
+                      <div key={g.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{s.kunde_name || 'Dreh'}{s.datum ? ` · ${new Date(s.datum).toLocaleDateString('de-DE')}` : ''}</p>
+                          <p className="text-[10px] text-gray-400">{anz} Video{anz === 1 ? '' : 's'} · gelöscht am {new Date(g.changed_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                        <button onClick={() => { if (window.confirm('Diesen Dreh wiederherstellen?')) restoreDreh(g.snapshot) }} className="text-xs bg-[#ff6b01]/10 text-[#c2410c] px-2.5 py-1 rounded-md font-medium hover:bg-[#ff6b01]/20 whitespace-nowrap flex-shrink-0">Wiederherstellen</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -1100,7 +1140,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
-            {!extern && !videograph && <button onClick={() => { if (window.confirm('Diesen Dreh wirklich löschen? Das kann nicht rückgängig gemacht werden.')) onDelete?.() }}
+            {!extern && !videograph && <button onClick={() => { if (window.confirm(`Dreh „${dreh.kunde_name || ''}"${dreh.datum ? ' vom ' + new Date(dreh.datum).toLocaleDateString('de-DE') : ''} löschen?\n\nEr landet im Papierkorb (Tab „Verwalten") und kann wiederhergestellt werden.`)) onDelete?.() }}
               title="Dreh löschen"
               className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>}
             <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
