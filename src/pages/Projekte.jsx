@@ -802,7 +802,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
         ? [{ titel: 'Video 1', planung: item.video_planung, datei_url: '', datei_name: '' }] : [])
   )
   const [saving, setSaving] = useState(false)
-  const ro = !!videograph   // Nur-Lese-Rolle: darf nur Videos abhaken
+  const ro = false   // Konzepte: Videograph & MA/Admin dürfen bearbeiten (Extern hat hier keinen Zugang)
   const set = (k, v) => { if (ro) return; dataRef.current = { ...dataRef.current, form: { ...dataRef.current.form, [k]: v } }; setForm(p => ({ ...p, [k]: v })) }
   // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben + Live-Sync (kein Überschreiben mit altem Stand).
   function buildPayload(f, v) {
@@ -991,7 +991,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const [nasWarn, setNasWarn] = useState(false)
   const [saving, setSaving] = useState(false)
   const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
-  const ro = !!(extern || videograph)   // Nur-Lese-Rollen: dürfen nur Videos abhaken
+  const ro = !!extern   // Nur-Lese nur für Darsteller (extern); Videograph darf bearbeiten, aber nicht löschen
   const set = (k, v) => { if (ro) return; dataRef.current = { ...dataRef.current, form: { ...dataRef.current.form, [k]: v } }; setForm(p => ({ ...p, [k]: v })) }
   // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben (Field-Level) + Live-Sync,
   // damit gleichzeitige Bearbeitungen sich nicht gegenseitig mit altem Stand überschreiben.
@@ -1149,10 +1149,10 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
           </div>
         </div>
 
-        {/* Status row – für Nur-Lese-Rollen (Extern/Videograph) ausgeblendet */}
+        {/* Status row – für Darsteller (extern) ausgeblendet; Videograph ohne "Abgeschlossen" */}
         {!ro && (
         <div className="px-4 py-2.5 border-b border-gray-100 flex gap-1.5 flex-wrap flex-shrink-0">
-          {STATUSES.map(s => (
+          {(videograph ? STATUSES.filter(s => s.id !== 'abgeschlossen') : STATUSES).map(s => (
             <button key={s.id} onClick={() => handleStatusChange(s.id)}
               className={`text-xs font-medium px-2.5 py-1 rounded-full transition-all border ${form.status === s.id ? 'border-current shadow-sm' : 'border-transparent opacity-50 hover:opacity-80'}`}
               style={{ background: s.bg, color: s.text, borderColor: form.status === s.id ? s.color : 'transparent' }}>
