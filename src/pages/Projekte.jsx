@@ -77,11 +77,13 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
   // Sicherung: schließt/wechselt man die App während des Tippens (ohne aus dem Feld zu klicken),
   // wird der aktuelle Inhalt sofort übernommen & gespeichert (v.a. iOS).
   useEffect(() => {
+    if (readOnly) return
     const commit = () => { const el = ref.current; if (el) { cbRef.current.onChange?.(el.innerHTML); cbRef.current.onCommit?.(el.innerHTML) } }
     const onVis = () => { if (document.visibilityState === 'hidden') commit() }
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('pagehide', commit)
-    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', commit) }
+    // WICHTIG: auch beim Unmount (Panel schließen / Tab wechseln) den aktuellen Inhalt sichern
+    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', commit); commit() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const exec = (cmd, arg) => {
@@ -801,7 +803,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
   )
   const [saving, setSaving] = useState(false)
   const ro = !!videograph   // Nur-Lese-Rolle: darf nur Videos abhaken
-  const set = (k, v) => { if (!ro) setForm(p => ({ ...p, [k]: v })) }
+  const set = (k, v) => { if (ro) return; dataRef.current = { ...dataRef.current, form: { ...dataRef.current.form, [k]: v } }; setForm(p => ({ ...p, [k]: v })) }
   // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben + Live-Sync (kein Überschreiben mit altem Stand).
   function buildPayload(f, v) {
     return {
@@ -878,7 +880,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
     const { data } = await supabase.from('proj_intern').select('*').eq('id', item.id).single()
     if (data) { baseRef.current = buildPayload(data, data.videos || []); skipAutosave.current = true; setForm(f => ({ ...f, ...data })); setVideos(data.videos || []); setExtChanged(false) }
   }
-  function saveVideos(nv) { if (ro) return; setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
+  function saveVideos(nv) { if (ro) return; dataRef.current = { ...dataRef.current, videos: nv }; setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
   function addVideo() { saveVideos([...videos, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { if (window.confirm(`Video ${i + 1} wirklich entfernen? Das kann nicht rückgängig gemacht werden.`)) saveVideos(videos.filter((_, idx) => idx !== i)) }
   function toggleVideoDone(i) {
@@ -990,7 +992,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const [saving, setSaving] = useState(false)
   const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
   const ro = !!(extern || videograph)   // Nur-Lese-Rollen: dürfen nur Videos abhaken
-  const set = (k, v) => { if (!ro) setForm(p => ({ ...p, [k]: v })) }
+  const set = (k, v) => { if (ro) return; dataRef.current = { ...dataRef.current, form: { ...dataRef.current.form, [k]: v } }; setForm(p => ({ ...p, [k]: v })) }
   // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben (Field-Level) + Live-Sync,
   // damit gleichzeitige Bearbeitungen sich nicht gegenseitig mit altem Stand überschreiben.
   const baseRef = useRef(dreh)            // letzter bekannter Serverstand
@@ -1112,7 +1114,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     else if (form.status === 'abgeschlossen') { set('status', 'posting'); onStatusChange('posting'); setNasWarn(true) }
   }
 
-  function saveVideos(nv) { if (ro) return; setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
+  function saveVideos(nv) { if (ro) return; dataRef.current = { ...dataRef.current, videos: nv }; setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
   function addVideo() { saveVideos([...videos, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
   function removeVideo(i) { if (window.confirm(`Video ${i + 1} wirklich entfernen? Das kann nicht rückgängig gemacht werden.`)) saveVideos(videos.filter((_, idx) => idx !== i)) }
   // Abhaken: nur diesen einen Haken serverseitig umschalten (kein Ganz-Array-Write) – funktioniert für alle Rollen
