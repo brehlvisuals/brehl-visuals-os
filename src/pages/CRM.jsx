@@ -680,12 +680,22 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
 }
 
 // Dokumenten-Upload für Darsteller (z.B. Verträge, Ausweis, Lebenslauf) – Storage-Bucket dreh-dateien
+const DOK_BUCKET = 'darsteller-dok'   // privat: nur Admin + Mitarbeiter (Storage-RLS)
 function DarstellerDokumente({ item, onRefresh }) {
   const [files, setFiles] = useState(item.dateien || [])
   const [busy, setBusy] = useState(false)
-  const [preview, setPreview] = useState(null)
+  const [preview, setPreview] = useState(null)      // { name, path, ... }
+  const [previewUrl, setPreviewUrl] = useState('')  // signierter Link (temporär)
   const isImg = n => /\.(png|jpe?g|gif|webp|heic|heif|avif|bmp)$/i.test(n || '')
   const isPdf = n => /\.pdf$/i.test(n || '')
+
+  async function openPreview(f) {
+    setPreview(f); setPreviewUrl('')
+    if (f.path) {
+      const { data } = await supabase.storage.from(DOK_BUCKET).createSignedUrl(f.path, 3600)
+      if (data?.signedUrl) setPreviewUrl(data.signedUrl)
+    } else if (f.url) setPreviewUrl(f.url)
+  }
 
   async function persist(arr) {
     setFiles(arr)
@@ -701,12 +711,11 @@ function DarstellerDokumente({ item, onRefresh }) {
     for (const f of list) {
       try {
         const safe = (f.name || 'datei').replace(/[^a-zA-Z0-9._-]/g, '_')
-        const path = `darsteller/${item.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`
+        const path = `${item.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`
         const buf = await f.arrayBuffer()
-        const { error } = await supabase.storage.from('dreh-dateien').upload(path, buf, { cacheControl: '3600', upsert: false, contentType: f.type || 'application/octet-stream' })
+        const { error } = await supabase.storage.from(DOK_BUCKET).upload(path, buf, { cacheControl: '3600', upsert: false, contentType: f.type || 'application/octet-stream' })
         if (error) { alert('Upload fehlgeschlagen: ' + error.message); continue }
-        const { data } = supabase.storage.from('dreh-dateien').getPublicUrl(path)
-        added.push({ url: data.publicUrl, name: f.name || safe, path })
+        added.push({ name: f.name || safe, path })   // privat: keine öffentliche URL, Zugriff nur über signierte Links
       } catch (err) { alert('Upload fehlgeschlagen: ' + (err?.message || err)) }
     }
     setBusy(false); e.target.value = ''
@@ -715,13 +724,13 @@ function DarstellerDokumente({ item, onRefresh }) {
   async function remove(i) {
     if (!window.confirm('Dokument wirklich löschen?')) return
     const f = files[i]
-    if (f?.path) await supabase.storage.from('dreh-dateien').remove([f.path])
+    if (f?.path) await supabase.storage.from(DOK_BUCKET).remove([f.path])
     persist(files.filter((_, idx) => idx !== i))
   }
   async function download(f) {
     try {
       if (f.path) {
-        const { data, error } = await supabase.storage.from('dreh-dateien').download(f.path)
+        const { data, error } = await supabase.storage.from(DOK_BUCKET).download(f.path)
         if (error || !data) throw error || new Error('leer')
         const url = URL.createObjectURL(data)
         const a = document.createElement('a'); a.href = url; a.download = f.name || 'datei'
@@ -737,7 +746,7 @@ function DarstellerDokumente({ item, onRefresh }) {
         <div className="space-y-1.5">
           {files.map((f, i) => (
             <div key={i} className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-2">
-              <button onClick={() => setPreview(f)} className="flex-1 min-w-0 flex items-center gap-2 text-left">
+              <button onClick={() => openPreview(f)} className="flex-1 min-w-0 flex items-center gap-2 text-left">
                 <span className="text-base flex-shrink-0">{isImg(f.name) ? '🖼️' : isPdf(f.name) ? '📄' : '📎'}</span>
                 <span className="text-xs text-gray-700 truncate">{f.name}</span>
               </button>
@@ -755,18 +764,19 @@ function DarstellerDokumente({ item, onRefresh }) {
       </label>
 
       {preview && (
-        <div className="fixed inset-0 z-[80] bg-black/90 flex flex-col" onClick={() => setPreview(null)}>
+        <div className="fixed inset-0 z-[80] bg-black/90 flex flex-col" onClick={() => { setPreview(null); setPreviewUrl('') }}>
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
             <span className="text-sm text-white/90 truncate mr-3">{preview.name}</span>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button onClick={() => download(preview)} className="text-xs bg-white/15 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/25">⬇ Herunterladen</button>
-              <button onClick={() => setPreview(null)} className="w-8 h-8 rounded-full bg-white/15 text-white text-lg flex items-center justify-center">×</button>
+              <button onClick={() => { setPreview(null); setPreviewUrl('') }} className="w-8 h-8 rounded-full bg-white/15 text-white text-lg flex items-center justify-center">×</button>
             </div>
           </div>
           <div className="flex-1 min-h-0 flex items-center justify-center p-2" onClick={e => e.stopPropagation()}>
-            {isImg(preview.name) ? <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain" />
-              : isPdf(preview.name) ? <iframe src={preview.url} title={preview.name} className="w-full h-full bg-white rounded-lg" />
-              : <div className="text-center text-white/80 text-sm px-6"><p className="mb-4">Keine Vorschau möglich.</p><a href={preview.url} target="_blank" rel="noreferrer" className="btn-primary inline-block">Datei öffnen</a></div>}
+            {!previewUrl ? <div className="text-white/60 text-sm">Lädt…</div>
+              : isImg(preview.name) ? <img src={previewUrl} alt={preview.name} className="max-w-full max-h-full object-contain" />
+              : isPdf(preview.name) ? <iframe src={previewUrl} title={preview.name} className="w-full h-full bg-white rounded-lg" />
+              : <div className="text-center text-white/80 text-sm px-6"><p className="mb-4">Keine Vorschau möglich.</p><button onClick={() => download(preview)} className="btn-primary inline-block">Herunterladen</button></div>}
           </div>
         </div>
       )}
