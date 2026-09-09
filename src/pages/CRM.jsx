@@ -19,7 +19,8 @@ const FALLBACK_CATS = [
       { id:'neu', label:'Neu', color:'#6366f1', bg:'rgba(99,102,241,0.1)', text:'#4338ca' },
       { id:'qualifiziert', label:'Qualifiziert', color:'#f59e0b', bg:'rgba(245,158,11,0.1)', text:'#b45309' },
       { id:'warteliste', label:'Warteliste', color:'#3b82f6', bg:'rgba(59,130,246,0.1)', text:'#1d4ed8' },
-      { id:'erfolgreich', label:'Erfolgreich', color:'#16a34a', bg:'rgba(22,163,74,0.1)', text:'#15803d' },
+      { id:'erfolgreich', label:'Aktiv', color:'#16a34a', bg:'rgba(22,163,74,0.1)', text:'#15803d' },
+      { id:'inaktiv', label:'Inaktiv', color:'#6b7280', bg:'rgba(107,114,128,0.1)', text:'#4b5563' },
       { id:'abgelehnt', label:'Abgelehnt', color:'#ef4444', bg:'rgba(239,68,68,0.1)', text:'#dc2626' },
     ]
   },
@@ -463,6 +464,7 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
   const [noteText, setNoteText] = useState('')
   const [newTask, setNewTask] = useState({ titel: '', faellig_am: '' })
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const isDarsteller = !isLead && !isCustom
   // Foreign Key: je nach Item-Typ andere Spalte
   const fk = isLead ? 'lead_id' : isCustom ? 'custom_entry_id' : 'darsteller_id'
   // Kunden-Board erkennen (Custom-Board mit Label "Kunden")
@@ -552,7 +554,7 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
         </div>
 
         <div className="flex border-b border-gray-100 flex-shrink-0">
-          {[['info','Info'],['notizen',`Notizen (${notes.length})`],['tasks',`Tasks (${openTasks.length})`],...(isKunde ? [['betreuung','Betreuung']] : [])].map(([id, label]) => (
+          {[['info','Info'],['notizen',`Notizen (${notes.length})`],['tasks',`Tasks (${openTasks.length})`],...(isDarsteller ? [['dokumente',`Dokumente${item.dateien?.length ? ` (${item.dateien.length})` : ''}`]] : []),...(isKunde ? [['betreuung','Betreuung']] : [])].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}
               className={`flex-1 py-3 text-xs font-medium transition-all border-b-2 ${tab === id ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>
               {label}
@@ -664,11 +666,110 @@ function CRMDetail({ item, cat, tasks, isLead, isCustom, onClose, onStatusChange
             </>
           )}
 
+          {tab === 'dokumente' && isDarsteller && (
+            <DarstellerDokumente item={item} onRefresh={onRefresh} />
+          )}
+
           {tab === 'betreuung' && isKunde && (
             <KundenBetreuung kundeId={item.id} />
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// Dokumenten-Upload für Darsteller (z.B. Verträge, Ausweis, Lebenslauf) – Storage-Bucket dreh-dateien
+function DarstellerDokumente({ item, onRefresh }) {
+  const [files, setFiles] = useState(item.dateien || [])
+  const [busy, setBusy] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const isImg = n => /\.(png|jpe?g|gif|webp|heic|heif|avif|bmp)$/i.test(n || '')
+  const isPdf = n => /\.pdf$/i.test(n || '')
+
+  async function persist(arr) {
+    setFiles(arr)
+    const { error } = await supabase.from('crm_darsteller').update({ dateien: arr }).eq('id', item.id)
+    if (error) alert('Speichern fehlgeschlagen: ' + error.message)
+    onRefresh?.()
+  }
+  async function upload(e) {
+    const list = Array.from(e.target.files || [])
+    if (!list.length) return
+    setBusy(true)
+    const added = []
+    for (const f of list) {
+      try {
+        const safe = (f.name || 'datei').replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `darsteller/${item.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`
+        const buf = await f.arrayBuffer()
+        const { error } = await supabase.storage.from('dreh-dateien').upload(path, buf, { cacheControl: '3600', upsert: false, contentType: f.type || 'application/octet-stream' })
+        if (error) { alert('Upload fehlgeschlagen: ' + error.message); continue }
+        const { data } = supabase.storage.from('dreh-dateien').getPublicUrl(path)
+        added.push({ url: data.publicUrl, name: f.name || safe, path })
+      } catch (err) { alert('Upload fehlgeschlagen: ' + (err?.message || err)) }
+    }
+    setBusy(false); e.target.value = ''
+    if (added.length) persist([...(files || []), ...added])
+  }
+  async function remove(i) {
+    if (!window.confirm('Dokument wirklich löschen?')) return
+    const f = files[i]
+    if (f?.path) await supabase.storage.from('dreh-dateien').remove([f.path])
+    persist(files.filter((_, idx) => idx !== i))
+  }
+  async function download(f) {
+    try {
+      if (f.path) {
+        const { data, error } = await supabase.storage.from('dreh-dateien').download(f.path)
+        if (error || !data) throw error || new Error('leer')
+        const url = URL.createObjectURL(data)
+        const a = document.createElement('a'); a.href = url; a.download = f.name || 'datei'
+        document.body.appendChild(a); a.click(); a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 4000)
+      } else window.open(f.url, '_blank')
+    } catch { window.open(f.url, '_blank') }
+  }
+
+  return (
+    <div className="space-y-3">
+      {files.length > 0 ? (
+        <div className="space-y-1.5">
+          {files.map((f, i) => (
+            <div key={i} className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-2">
+              <button onClick={() => setPreview(f)} className="flex-1 min-w-0 flex items-center gap-2 text-left">
+                <span className="text-base flex-shrink-0">{isImg(f.name) ? '🖼️' : isPdf(f.name) ? '📄' : '📎'}</span>
+                <span className="text-xs text-gray-700 truncate">{f.name}</span>
+              </button>
+              <button onClick={() => download(f)} title="Herunterladen" className="text-xs text-gray-400 hover:text-gray-700 flex-shrink-0">⬇</button>
+              <button onClick={() => remove(i)} title="Löschen" className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">×</button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400 text-center py-4">Noch keine Dokumente</p>
+      )}
+      <label className="block border border-dashed border-gray-300 rounded-lg py-3 text-center text-xs text-gray-400 cursor-pointer hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
+        {busy ? 'Lädt hoch...' : '📎 Dokument hinzufügen (PDF, Bild, …)'}
+        <input type="file" multiple className="hidden" onChange={upload} />
+      </label>
+
+      {preview && (
+        <div className="fixed inset-0 z-[80] bg-black/90 flex flex-col" onClick={() => setPreview(null)}>
+          <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <span className="text-sm text-white/90 truncate mr-3">{preview.name}</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => download(preview)} className="text-xs bg-white/15 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/25">⬇ Herunterladen</button>
+              <button onClick={() => setPreview(null)} className="w-8 h-8 rounded-full bg-white/15 text-white text-lg flex items-center justify-center">×</button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center justify-center p-2" onClick={e => e.stopPropagation()}>
+            {isImg(preview.name) ? <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain" />
+              : isPdf(preview.name) ? <iframe src={preview.url} title={preview.name} className="w-full h-full bg-white rounded-lg" />
+              : <div className="text-center text-white/80 text-sm px-6"><p className="mb-4">Keine Vorschau möglich.</p><a href={preview.url} target="_blank" rel="noreferrer" className="btn-primary inline-block">Datei öffnen</a></div>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
