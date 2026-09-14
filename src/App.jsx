@@ -22,7 +22,7 @@ function Layout({ children }) {
   )
 }
 
-function Protected({ children, mod, adminOnly, externOk }) {
+function Protected({ children, mod, anyMod, adminOnly, externOk }) {
   const { user, loading, canAccess, isAdmin, isRestricted } = useAuth()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -38,6 +38,9 @@ function Protected({ children, mod, adminOnly, externOk }) {
   if (mod && !canAccess(mod)) return (
     <div className="p-6 text-center mt-20 text-gray-400 text-sm">Kein Zugriff auf diesen Bereich.</div>
   )
+  if (anyMod && !anyMod.some(m => canAccess(m))) return (
+    <div className="p-6 text-center mt-20 text-gray-400 text-sm">Kein Zugriff auf diesen Bereich.</div>
+  )
   return children
 }
 
@@ -51,7 +54,7 @@ export default function App() {
           <Route path="/dashboard" element={<Protected><Layout><Dashboard /></Layout></Protected>} />
           <Route path="/projekte" element={<Protected mod="projekte" externOk><Layout><Projekte /></Layout></Protected>} />
           <Route path="/meine-stunden" element={<Protected externOk><Layout><MeineStunden /></Layout></Protected>} />
-          <Route path="/crm" element={<Protected mod="crm"><Layout><CRM /></Layout></Protected>} />
+          <Route path="/crm" element={<Protected anyMod={['crm', 'crm_darsteller']}><Layout><CRM /></Layout></Protected>} />
           <Route path="/prozess-kunde" element={<Protected mod="crm"><Layout><ProzessKunde /></Layout></Protected>} />
           <Route path="/journal" element={<Protected mod="projekte"><Layout><KundenJournal /></Layout></Protected>} />
           <Route path="/tasks" element={<Protected mod="crm"><Layout><Tasks /></Layout></Protected>} />

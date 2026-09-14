@@ -9,7 +9,7 @@ const NAV = [
   ]},
   { section: 'Arbeit', items: [
     { to: '/projekte', icon: '▦', label: 'Projekte', mod: 'projekte' },
-    { to: '/crm', icon: '◉', label: 'CRM', mod: 'crm' },
+    { to: '/crm', icon: '◉', label: 'CRM', anyMod: ['crm', 'crm_darsteller'] },
     { to: '/tasks', icon: '◷', label: 'Tasks', mod: 'crm', sub: true },
     { to: '/prozess-kunde', icon: '◳', label: 'Prozess Kunde', mod: 'crm', sub: true },
     { to: '/journal', icon: '✎', label: 'Kunden-Journal', mod: 'projekte', sub: true },
@@ -98,6 +98,7 @@ export default function Sidebar() {
                 if (isRestricted && !item.externOnly && !['/projekte', '/einstellungen'].includes(item.to)) return null
                 if (item.adminOnly && !isAdmin) return null
                 if (item.mod && !canAccess(item.mod)) return null
+                if (item.anyMod && !item.anyMod.some(m => canAccess(m))) return null
                 return (
                   <NavLink key={item.to} to={item.to}
                     className={({ isActive }) =>
@@ -187,7 +188,7 @@ export default function Sidebar() {
               {[
                 { to: '/auswertung', icon: '▤', label: 'Auswertung' },
                 ...(canAccess('projekte') ? [{ to: '/projekte', icon: '▦', label: 'Projekte' }] : []),
-                ...(canAccess('crm') ? [{ to: '/crm', icon: '◉', label: 'CRM' }] : []),
+                ...((canAccess('crm') || canAccess('crm_darsteller')) ? [{ to: '/crm', icon: '◉', label: 'CRM' }] : []),
                 ...(canAccess('crm') ? [{ to: '/tasks', icon: '◷', label: 'Tasks' }] : []),
                 ...(canAccess('projekte') ? [{ to: '/journal', icon: '✎', label: 'Journal' }] : []),
                 ...(isAdmin ? [{ to: '/team', icon: '◎', label: 'Team' }] : []),

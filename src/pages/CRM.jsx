@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../components/AuthProvider'
 import KundenBetreuung from '../components/KundenBetreuung'
 
 // Fallback Defaults (falls Supabase Tabelle leer/Fehler – sollte normalerweise nie greifen)
@@ -47,12 +48,18 @@ export default function CRM() {
   const [loading, setLoading] = useState(true)
   const [dragId, setDragId] = useState(null)
 
+  const { canAccess } = useAuth()
+  // Nur Darsteller-Berechtigung (z.B. Pia): kein Zugriff auf Kunden/Leads – nur das Darsteller-Board
+  const darstellerOnly = !canAccess('crm') && canAccess('crm_darsteller')
+  const visibleCats = darstellerOnly ? cats.filter(c => c.id === 'darsteller') : cats
+
   const cat = cats.find(c => c.id === activeCat)
   const isLead = activeCat === 'leads'
   const isDarsteller = activeCat === 'darsteller'
   const isCustom = !isLead && !isDarsteller
 
   useEffect(() => { fetchAll() }, [])
+  useEffect(() => { if (darstellerOnly && activeCat !== 'darsteller') setActiveCat('darsteller') }, [darstellerOnly, activeCat])
 
   async function fetchAll() {
     setLoading(true)
@@ -163,7 +170,7 @@ export default function CRM() {
     <div className="p-4 md:p-6 space-y-4">
       {/* Category tabs + add */}
       <div className="flex items-center gap-2 flex-wrap">
-        {cats.map(c => (
+        {visibleCats.map(c => (
           <div key={c.id} className="relative group">
             <button onClick={() => setActiveCat(c.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${activeCat === c.id ? 'bg-[#ff6b01]/8 border-[#ff6b01]/30 text-[#ff6b01]' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
@@ -181,10 +188,10 @@ export default function CRM() {
             )}
           </div>
         ))}
-        <button onClick={() => setShowAddCat(true)}
+        {!darstellerOnly && <button onClick={() => setShowAddCat(true)}
           className="w-7 h-7 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all text-lg">
           +
-        </button>
+        </button>}
         <button onClick={() => setShowAdd(true)} className="ml-auto btn-primary text-xs py-1.5 px-3">+ Neu</button>
       </div>
 
