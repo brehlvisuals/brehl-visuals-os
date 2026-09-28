@@ -286,15 +286,38 @@ export function Funnels() {
 /* ═══════════════════════════════════════
    KALENDER
 ═══════════════════════════════════════ */
+const K_toStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const K_hhmm = t => (t || '').slice(0, 5)
+function vfbZeitText(e) {
+  if (e.von_zeit && e.bis_zeit) return `${K_hhmm(e.von_zeit)}–${K_hhmm(e.bis_zeit)}`
+  if (e.bis_zeit) return `bis ${K_hhmm(e.bis_zeit)}`
+  if (e.von_zeit) return `ab ${K_hhmm(e.von_zeit)}`
+  return 'ganztags'
+}
+const VFB_STYLE = {
+  verfuegbar: { bg: 'rgba(22,163,74,0.14)', text: '#15803d', label: 'Verfügbar' },
+  blockiert: { bg: 'rgba(239,68,68,0.12)', text: '#dc2626', label: 'Blockiert' },
+}
+
 export function Kalender() {
+  const { user, isAdmin, isVideograph, isExtern } = useAuth()
+  const eigene = isVideograph || isExtern   // trägt eigene Verfügbarkeit ein
   const [drehs, setDrehs] = useState([])
+  const [vfb, setVfb] = useState([])
   const [month, setMonth] = useState(new Date())
+  const [selDay, setSelDay] = useState(null)   // 'YYYY-MM-DD' | null
+  const [form, setForm] = useState({ typ: 'verfuegbar', von: '', bis: '', notiz: '' })
 
-  useEffect(() => { fetchDrehs() }, [])
-
-  async function fetchDrehs() {
-    const { data } = await supabase.from('proj_drehs').select('datum, kunde_name, status').order('datum')
-    if (data) setDrehs(data)
+  useEffect(() => { fetchAll() }, [])
+  async function fetchAll() {
+    const [d, v] = await Promise.all([
+      supabase.from('proj_drehs').select('datum, kunde_name, status').order('datum'),
+      eigene
+        ? supabase.from('verfuegbarkeiten').select('*').eq('user_id', user.id)
+        : supabase.from('verfuegbarkeiten').select('*, profiles!verfuegbarkeiten_user_id_fkey(full_name)'),
+    ])
+    if (d.data) setDrehs(d.data)
+    if (v.data) setVfb(v.data)
   }
 
   const year = month.getFullYear()
@@ -314,57 +337,78 @@ export function Kalender() {
     abgeschlossen: { bg: 'rgba(22,163,74,0.12)', text: '#15803d' },
   }
 
-  function getDrehsForDay(day) {
-    const date = new Date(year, mon, day)
-    return drehs.filter(d => {
-      if (!d.datum) return false
-      const dd = new Date(d.datum)
-      return dd.getDate() === day && dd.getMonth() === mon && dd.getFullYear() === year
-    })
+  const drehsForDay = ds => drehs.filter(d => d.datum === ds)
+  const vfbForDay = ds => vfb.filter(v => v.datum === ds)
+
+  function openDay(ds) {
+    setSelDay(ds)
+    if (eigene) {
+      const mine = vfb.find(v => v.datum === ds)
+      setForm(mine
+        ? { typ: mine.typ, von: K_hhmm(mine.von_zeit), bis: K_hhmm(mine.bis_zeit), notiz: mine.notiz || '' }
+        : { typ: 'verfuegbar', von: '', bis: '', notiz: '' })
+    }
+  }
+  async function saveVfb() {
+    await supabase.from('verfuegbarkeiten').upsert({
+      user_id: user.id, datum: selDay, typ: form.typ,
+      von_zeit: form.von || null, bis_zeit: form.bis || null, notiz: form.notiz || null,
+    }, { onConflict: 'user_id,datum' })
+    setSelDay(null); fetchAll()
+  }
+  async function delVfb() {
+    await supabase.from('verfuegbarkeiten').delete().eq('user_id', user.id).eq('datum', selDay)
+    setSelDay(null); fetchAll()
   }
 
   const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-gray-900">
-          {month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
-        </h2>
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-base font-semibold text-gray-900">{month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</h2>
         <div className="flex gap-2">
           <button onClick={() => setMonth(new Date(year, mon - 1, 1))} className="btn-secondary text-xs px-3">‹</button>
           <button onClick={() => setMonth(new Date())} className="btn-secondary text-xs px-3">Heute</button>
           <button onClick={() => setMonth(new Date(year, mon + 1, 1))} className="btn-secondary text-xs px-3">›</button>
         </div>
       </div>
+      <p className="text-xs text-gray-400 mb-4">{eigene ? 'Tippe einen Tag, um deine Verfügbarkeit einzutragen.' : 'Drehs & Verfügbarkeiten der Videografen. Tippe einen Tag für Details.'}</p>
 
       <div className="grid grid-cols-7 gap-0.5 mb-1">
         {days.map(d => <div key={d} className="text-center text-xs font-semibold text-gray-400 py-2">{d}</div>)}
       </div>
 
       <div className="grid grid-cols-7 gap-0.5">
-        {Array(startPad).fill(null).map((_, i) => <div key={`pad-${i}`} className="min-h-14 rounded-lg" />)}
+        {Array(startPad).fill(null).map((_, i) => <div key={`pad-${i}`} className="min-h-16 rounded-lg" />)}
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-          const dayDrehs = getDrehsForDay(day)
+          const ds = K_toStr(new Date(year, mon, day))
+          const dayDrehs = drehsForDay(ds)
+          const dayVfb = vfbForDay(ds)
           const isToday = today.getDate() === day && today.getMonth() === mon && today.getFullYear() === year
           return (
-            <div key={day} className={`min-h-14 rounded-lg p-1 border ${isToday ? 'bg-[#ff6b01]/6 border-[#ff6b01]/30' : 'border-transparent hover:bg-gray-50'}`}>
+            <button key={day} onClick={() => openDay(ds)} className={`min-h-16 rounded-lg p-1 border text-left transition-all ${isToday ? 'bg-[#ff6b01]/6 border-[#ff6b01]/30' : 'border-transparent hover:bg-gray-50 hover:border-gray-200'}`}>
               <p className={`text-xs font-medium mb-1 ${isToday ? 'text-[#ff6b01]' : 'text-gray-600'}`}>{day}</p>
               {dayDrehs.slice(0, 2).map((d, i) => {
                 const sc = statusColor[d.status] || { bg: '#f3f4f6', text: '#6b7280' }
-                return (
-                  <div key={i} className="text-[9px] font-medium px-1 py-0.5 rounded mb-0.5 truncate" style={{ background: sc.bg, color: sc.text }}>
-                    {d.kunde_name}
-                  </div>
-                )
+                return <div key={i} className="text-[9px] font-medium px-1 py-0.5 rounded mb-0.5 truncate" style={{ background: sc.bg, color: sc.text }}>{d.kunde_name}</div>
               })}
-              {dayDrehs.length > 2 && <div className="text-[9px] text-gray-400">+{dayDrehs.length - 2}</div>}
-            </div>
+              {dayDrehs.length > 2 && <div className="text-[9px] text-gray-400 mb-0.5">+{dayDrehs.length - 2}</div>}
+              {dayVfb.map((v, i) => {
+                const st = VFB_STYLE[v.typ] || VFB_STYLE.verfuegbar
+                const nm = v.profiles?.full_name ? v.profiles.full_name.split(' ')[0] + ': ' : ''
+                return <div key={'v' + i} className="text-[9px] font-medium px-1 py-0.5 rounded mb-0.5 truncate" style={{ background: st.bg, color: st.text }}>
+                  {nm}{v.typ === 'verfuegbar' ? '✓' : '✕'} {vfbZeitText(v)}
+                </div>
+              })}
+            </button>
           )
         })}
       </div>
 
       <div className="flex flex-wrap gap-3 mt-4 px-1">
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ background: VFB_STYLE.verfuegbar.bg, border: `1px solid ${VFB_STYLE.verfuegbar.text}` }} /><span className="text-xs text-gray-400">Verfügbar</span></div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ background: VFB_STYLE.blockiert.bg, border: `1px solid ${VFB_STYLE.blockiert.text}` }} /><span className="text-xs text-gray-400">Blockiert</span></div>
         {Object.entries(statusColor).map(([k, v]) => (
           <div key={k} className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-sm" style={{ background: v.bg, border: `1px solid ${v.text}` }} />
@@ -372,6 +416,64 @@ export function Kalender() {
           </div>
         ))}
       </div>
+
+      {/* Tages-Panel */}
+      {selDay && (
+        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setSelDay(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">{new Date(selDay).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</h3>
+              <button onClick={() => setSelDay(null)} className="text-gray-400 text-xl">×</button>
+            </div>
+
+            {/* Drehs des Tages */}
+            {drehsForDay(selDay).length > 0 && (
+              <div className="mb-3 space-y-1">
+                {drehsForDay(selDay).map((d, i) => {
+                  const sc = statusColor[d.status] || { bg: '#f3f4f6', text: '#6b7280' }
+                  return <div key={i} className="text-xs font-medium px-2 py-1 rounded-lg inline-block mr-1" style={{ background: sc.bg, color: sc.text }}>🎬 {d.kunde_name}</div>
+                })}
+              </div>
+            )}
+
+            {eigene ? (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  {['verfuegbar', 'blockiert'].map(t => (
+                    <button key={t} onClick={() => setForm(p => ({ ...p, typ: t }))}
+                      className={`flex-1 text-sm font-medium py-2 rounded-lg border transition-all ${form.typ === t ? '' : 'opacity-50'}`}
+                      style={{ background: VFB_STYLE[t].bg, color: VFB_STYLE[t].text, borderColor: form.typ === t ? VFB_STYLE[t].text : 'transparent' }}>
+                      {VFB_STYLE[t].label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="label">Von (optional)</label><input type="time" className="input text-sm" value={form.von} onChange={e => setForm(p => ({ ...p, von: e.target.value }))} /></div>
+                  <div><label className="label">Bis (optional)</label><input type="time" className="input text-sm" value={form.bis} onChange={e => setForm(p => ({ ...p, bis: e.target.value }))} /></div>
+                </div>
+                <p className="text-[10px] text-gray-400">Ohne Uhrzeit = ganztags. Beispiel „nur bis 13 Uhr": Bis = 13:00 lassen, Von leer.</p>
+                <div><label className="label">Notiz (optional)</label><input className="input text-sm" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} placeholder="z.B. nur vormittags" /></div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={saveVfb} className="btn-primary flex-1 text-sm">Speichern</button>
+                  {vfb.some(v => v.datum === selDay) && <button onClick={delVfb} className="btn-secondary text-sm text-red-500">Entfernen</button>}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <p className="section-title mb-1">Verfügbarkeiten</p>
+                {vfbForDay(selDay).length === 0 ? <p className="text-xs text-gray-400">Niemand hat für diesen Tag etwas eingetragen.</p>
+                  : vfbForDay(selDay).map((v, i) => {
+                    const st = VFB_STYLE[v.typ] || VFB_STYLE.verfuegbar
+                    return <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-gray-700">{v.profiles?.full_name || 'Unbekannt'}</span>
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: st.bg, color: st.text }}>{st.label} · {vfbZeitText(v)}{v.notiz ? ` · ${v.notiz}` : ''}</span>
+                    </div>
+                  })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

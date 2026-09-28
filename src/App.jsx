@@ -61,7 +61,7 @@ export default function App() {
           <Route path="/zeiterfassung" element={<Protected><Layout><Zeiterfassung /></Layout></Protected>} />
           <Route path="/urlaub" element={<Protected><Layout><Urlaub /></Layout></Protected>} />
           <Route path="/auswertung" element={<Protected><Layout><Auswertung /></Layout></Protected>} />
-          <Route path="/kalender" element={<Protected><Layout><Kalender /></Layout></Protected>} />
+          <Route path="/kalender" element={<Protected externOk><Layout><Kalender /></Layout></Protected>} />
           <Route path="/team" element={<Protected adminOnly><Layout><Team /></Layout></Protected>} />
           <Route path="/einstellungen" element={<Protected externOk><Layout><Einstellungen /></Layout></Protected>} />
         </Routes>

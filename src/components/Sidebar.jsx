@@ -95,7 +95,7 @@ export default function Sidebar() {
               {group.section && <div className="text-[10px] font-semibold text-gray-300 uppercase tracking-widest px-2 pt-3 pb-1">{group.section}</div>}
               {group.items?.map(item => {
                 if (item.externOnly && !isRestricted) return null
-                if (isRestricted && !item.externOnly && !['/projekte', '/einstellungen'].includes(item.to)) return null
+                if (isRestricted && !item.externOnly && !['/projekte', '/einstellungen', ...(isVideograph ? ['/kalender'] : [])].includes(item.to)) return null
                 if (item.adminOnly && !isAdmin) return null
                 if (item.mod && !canAccess(item.mod)) return null
                 if (item.anyMod && !item.anyMod.some(m => canAccess(m))) return null
@@ -146,6 +146,11 @@ export default function Sidebar() {
                 <MIcon name="clock" />
                 <span className="text-[10px] font-medium">Stunden</span>
               </NavLink>
+              {isVideograph && <NavLink to="/kalender"
+                className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/kalender') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
+                <MIcon name="calendar" />
+                <span className="text-[10px] font-medium">Kalender</span>
+              </NavLink>}
               <NavLink to="/einstellungen"
                 className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg transition-all ${location.pathname.startsWith('/einstellungen') ? 'text-[#ff6b01]' : 'text-gray-400'}`}>
                 <MIcon name="settings" />
