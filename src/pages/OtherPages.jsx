@@ -588,6 +588,12 @@ export function Team() {
     setLocalStamm(id, { soll_modus: val })
     await supabase.from('profiles').update({ soll_modus: val }).eq('id', id)
   }
+  async function toggleZeiterfassung(m) {
+    const next = m.zeiterfassung === false
+    setLocalStamm(m.id, { zeiterfassung: next })
+    const { error } = await supabase.from('profiles').update({ zeiterfassung: next }).eq('id', m.id)
+    if (error) { setErr(error.message); setLocalStamm(m.id, { zeiterfassung: !next }) }
+  }
   async function toggleArbeitstag(m, tag) {
     const cur = Array.isArray(m.arbeitstage) && m.arbeitstage.length ? m.arbeitstage : [1, 2, 3, 4, 5]
     const next = cur.includes(tag) ? cur.filter(x => x !== tag) : [...cur, tag].sort((a, b) => a - b)
@@ -761,16 +767,22 @@ export function Team() {
                       <p className="text-sm font-medium text-gray-800 truncate">{m.full_name || '—'}</p>
                       <p className="text-xs text-gray-400 truncate">{m.email}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <input type="number" step="0.5" inputMode="decimal" className="input text-xs w-20 text-center px-1"
-                        value={lohnMap[m.id] ?? ''} onChange={e => setLohnMap(p => ({ ...p, [m.id]: e.target.value }))}
-                        onBlur={e => saveLohn(m.id, e.target.value)} placeholder="€/h" />
-                      <span className="text-[10px] text-gray-400">€/Std.</span>
-                    </div>
-                    <div className="text-xs text-gray-500 whitespace-nowrap">
-                      {new Date().toLocaleDateString('de-DE', { month: 'long' })}: <span className="font-semibold text-gray-800">{(Math.round(h * 100) / 100).toLocaleString('de-DE')} Std.</span>
-                      {' · '}<span className="font-semibold text-[#c2410c]">{(h * lohn).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
-                    </div>
+                    <button onClick={() => toggleZeiterfassung(m)} title="Stunden erfassen & vergüten?"
+                      className={`text-[11px] px-2 py-1 rounded-md transition-all whitespace-nowrap ${m.zeiterfassung !== false ? 'bg-[#ff6b01]/10 text-[#c2410c]' : 'bg-gray-100 text-gray-500'}`}>
+                      {m.zeiterfassung !== false ? '⏱ Stunden & Vergütung an' : 'Nur Planungszugang'}
+                    </button>
+                    {m.zeiterfassung !== false && <>
+                      <div className="flex items-center gap-1.5">
+                        <input type="number" step="0.5" inputMode="decimal" className="input text-xs w-20 text-center px-1"
+                          value={lohnMap[m.id] ?? ''} onChange={e => setLohnMap(p => ({ ...p, [m.id]: e.target.value }))}
+                          onBlur={e => saveLohn(m.id, e.target.value)} placeholder="€/h" />
+                        <span className="text-[10px] text-gray-400">€/Std.</span>
+                      </div>
+                      <div className="text-xs text-gray-500 whitespace-nowrap">
+                        {new Date().toLocaleDateString('de-DE', { month: 'long' })}: <span className="font-semibold text-gray-800">{(Math.round(h * 100) / 100).toLocaleString('de-DE')} Std.</span>
+                        {' · '}<span className="font-semibold text-[#c2410c]">{(h * lohn).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                      </div>
+                    </>}
                   </div>
                   {m.role === 'videograph' ? (
                     <p className="text-[10px] text-gray-400">Videograph – sieht alle Drehs außer „Abgeschlossen" (keine Kundenzuordnung nötig).</p>
@@ -794,7 +806,7 @@ export function Team() {
             })}
           </div>
         )}
-        <p className="text-[10px] text-gray-400 mt-3">Stundenlohn wird automatisch gespeichert (nur du & die Person sehen ihn). Zugeordnete Kunden bestimmen, welche Drehs (Status „Dreh") der/die Externe sieht. „Stunden" = laufender Monat.</p>
+        <p className="text-[10px] text-gray-400 mt-3">Stundenlohn wird automatisch gespeichert (nur du & die Person sehen ihn). Zugeordnete Kunden bestimmen, welche Drehs (Status „Dreh") der/die Externe sieht. „Stunden" = laufender Monat. „Nur Planungszugang" blendet Stunden & Vergütung für die Person komplett aus.</p>
       </div>
 
       {showAdd && (

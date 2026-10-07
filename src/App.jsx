@@ -22,8 +22,8 @@ function Layout({ children }) {
   )
 }
 
-function Protected({ children, mod, anyMod, adminOnly, externOk }) {
-  const { user, loading, canAccess, isAdmin, isRestricted } = useAuth()
+function Protected({ children, mod, anyMod, adminOnly, externOk, needsZeit }) {
+  const { user, profile, loading, canAccess, isAdmin, isRestricted } = useAuth()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-8 h-8 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" />
@@ -32,6 +32,8 @@ function Protected({ children, mod, anyMod, adminOnly, externOk }) {
   if (!user) return <Navigate to="/login" replace />
   // Eingeschränkte Rollen (Videograf/Darsteller) dürfen nur ausdrücklich freigegebene Seiten (Projekte, Meine Stunden, Einstellungen)
   if (isRestricted && !externOk) return <Navigate to="/projekte" replace />
+  // Reiner Planungszugang (zeiterfassung = false) hat keine Stunden-Seite
+  if (needsZeit && profile?.zeiterfassung === false) return <Navigate to="/projekte" replace />
   if (adminOnly && !isAdmin) return (
     <div className="p-6 text-center mt-20 text-gray-400 text-sm">Kein Zugriff auf diesen Bereich.</div>
   )
@@ -53,7 +55,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Protected><Layout><Dashboard /></Layout></Protected>} />
           <Route path="/projekte" element={<Protected mod="projekte" externOk><Layout><Projekte /></Layout></Protected>} />
-          <Route path="/meine-stunden" element={<Protected externOk><Layout><MeineStunden /></Layout></Protected>} />
+          <Route path="/meine-stunden" element={<Protected externOk needsZeit><Layout><MeineStunden /></Layout></Protected>} />
           <Route path="/crm" element={<Protected anyMod={['crm', 'crm_darsteller']}><Layout><CRM /></Layout></Protected>} />
           <Route path="/prozess-kunde" element={<Protected mod="crm"><Layout><ProzessKunde /></Layout></Protected>} />
           <Route path="/journal" element={<Protected mod="projekte"><Layout><KundenJournal /></Layout></Protected>} />
