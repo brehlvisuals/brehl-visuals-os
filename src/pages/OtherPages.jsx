@@ -767,9 +767,12 @@ export function Team() {
                       <p className="text-sm font-medium text-gray-800 truncate">{m.full_name || '—'}</p>
                       <p className="text-xs text-gray-400 truncate">{m.email}</p>
                     </div>
-                    <button onClick={() => toggleZeiterfassung(m)} title="Stunden erfassen & vergüten?"
-                      className={`text-[11px] px-2 py-1 rounded-md transition-all whitespace-nowrap ${m.zeiterfassung !== false ? 'bg-[#ff6b01]/10 text-[#c2410c]' : 'bg-gray-100 text-gray-500'}`}>
-                      {m.zeiterfassung !== false ? '⏱ Stunden & Vergütung an' : 'Nur Planungszugang'}
+                    <button onClick={() => toggleZeiterfassung(m)} title="Antippen zum Umschalten"
+                      className="flex items-center gap-2 text-[11px] text-gray-600 whitespace-nowrap">
+                      <span className={`relative inline-block w-8 h-[18px] rounded-full transition-colors ${m.zeiterfassung !== false ? 'bg-[#ff6b01]' : 'bg-gray-300'}`}>
+                        <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-all ${m.zeiterfassung !== false ? 'left-[16px]' : 'left-[2px]'}`} />
+                      </span>
+                      {m.zeiterfassung !== false ? 'Stunden & Geld' : 'Nur Planung (keine Stunden/Geld)'}
                     </button>
                     {m.zeiterfassung !== false && <>
                       <div className="flex items-center gap-1.5">
