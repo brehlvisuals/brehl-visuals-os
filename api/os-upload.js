@@ -81,7 +81,7 @@ function render(){list.innerHTML='';D.forEach((d,i)=>{const r=document.createEle
   list.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{const f=inp.files[0];if(f)up(+inp.dataset.i,f)})}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
 async function up(i,file){const d=D[i];d.busy=true;d.status='Lädt …';d.cls='busy';render();
-  try{const r=await fetch(location.pathname+'?t='+encodeURIComponent(d.t)+'&name='+encodeURIComponent(file.name),{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream'},body:file});
+  try{const r=await fetch(location.pathname+'?t='+encodeURIComponent(d.t),{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream'},body:file});
     const j=await r.json();if(!r.ok)throw new Error(j.error||'Fehler');d.offen=false;d.status='✓ hochgeladen';d.cls='ok'}
   catch(e){d.status='Fehler: '+e.message;d.cls='err'}d.busy=false;render()}
 document.getElementById('all').onchange=async e=>{const files=[...e.target.files];const ohne=[];const jobs=[];
