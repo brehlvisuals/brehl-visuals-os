@@ -9,7 +9,7 @@ Ablauf: Erst mit drehs_auflisten (z.B. nach kunde und Datum) den richtigen Dreh 
 Videos sind ab 1 nummeriert (video_nr) wie in der App. Texte dürfen einfache HTML-Formatierung enthalten (<b>, <i>, <u>, <ul><li>), normaler Text mit Zeilenumbrüchen geht auch.
 Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Es gibt bewusst keine Lösch-Funktionen.
 Immer diese Werkzeuge nutzen – nicht direkt per SQL oder Supabase in die Datenbank schreiben.
-Dateien (PDF/Bilder), die der Nutzer im Chat schickt: upload_link_erstellen aufrufen und dem Nutzer den Link als anklickbaren Link geben („Hier tippen und die Datei auswählen“). Er wählt die Datei dann selbst aus – das funktioniert immer, auch wenn deine Code-Umgebung keinen Netzwerkzugriff hat. Nur bei sehr kleinen Dateien oder öffentlichen https-Links datei_anhaengen nutzen.`
+Dateien (PDF/Bilder), die der Nutzer im Chat schickt: EIN upload_sammellink_erstellen-Aufruf pro Dreh mit allen Dateien (inkl. original_dateiname = Name der Datei, wie der Nutzer sie hochgeladen hat, z.B. IMG_3818.jpeg) und dem Nutzer den EINEN Link geben. Er wählt dort alle Dateien auf einmal aus, sie werden per Dateiname dem richtigen Video zugeordnet. Das funktioniert immer, auch ohne Netzwerkzugriff deiner Code-Umgebung – versuche nicht selbst hochzuladen. Nur bei öffentlichen https-Links datei_anhaengen nutzen.`
 
 const vNr = { type: 'integer', minimum: 1, description: 'Video-Nummer wie in der App (1 = erstes Video)' }
 const drehId = { type: 'string', description: 'dreh_id aus drehs_auflisten' }
@@ -88,7 +88,7 @@ const TOOLS = [
   },
   {
     name: 'datei_anhaengen',
-    description: 'Nur für sehr kleine Dateien (base64) oder öffentliche https-Links (url). Für Dateien, die der Nutzer im Chat geschickt hat, stattdessen upload_link_erstellen verwenden.',
+    description: 'Nur für sehr kleine Dateien (base64) oder öffentliche https-Links (url). Für Dateien, die der Nutzer im Chat geschickt hat, stattdessen upload_sammellink_erstellen verwenden.',
     inputSchema: {
       type: 'object', properties: {
         dreh_id: drehId, video_nr: vNr,
@@ -99,8 +99,26 @@ const TOOLS = [
     },
   },
   {
+    name: 'upload_sammellink_erstellen',
+    description: 'Standardweg für Dateien aus dem Chat: EIN Link für mehrere Dateien eines Drehs (24 Std. gültig). Der Nutzer öffnet ihn, wählt alle Dateien auf einmal aus, die Seite ordnet sie per Dateiname den Videos zu. Den Link dem Nutzer als anklickbaren Link geben.',
+    inputSchema: {
+      type: 'object', properties: {
+        dreh_id: drehId,
+        dateien: {
+          type: 'array', minItems: 1, items: {
+            type: 'object', properties: {
+              video_nr: vNr,
+              dateiname: { type: 'string', description: 'Sprechender Name für die Anzeige im OS, z.B. "Kommentar_Vorta.jpg"' },
+              original_dateiname: { type: 'string', description: 'Exakter Dateiname, wie der Nutzer die Datei im Chat hochgeladen hat (z.B. "IMG_3818.jpeg") – wichtig für die automatische Zuordnung' },
+            }, required: ['video_nr', 'dateiname'],
+          },
+        },
+      }, required: ['dreh_id', 'dateien'],
+    },
+  },
+  {
     name: 'upload_link_erstellen',
-    description: 'Standardweg für Dateien aus dem Chat: erstellt einen Einmal-Link (24 Std. gültig) für ein bestimmtes Video. Den Link dem Nutzer geben – er öffnet ihn, tippt „Datei auswählen“ und die Datei hängt am Video. Mehrere Dateien = mehrere Links. (Alternativ per HTTP PUT mit Rohdaten hochladbar.)',
+    description: 'Einzelne Datei: erstellt einen Einmal-Link (24 Std. gültig) für ein bestimmtes Video. Den Link dem Nutzer geben – er öffnet ihn, tippt „Datei auswählen“ und die Datei hängt am Video. Mehrere Dateien = mehrere Links. (Alternativ per HTTP PUT mit Rohdaten hochladbar.)',
     inputSchema: {
       type: 'object', properties: { dreh_id: drehId, video_nr: vNr, dateiname: { type: 'string' } },
       required: ['dreh_id', 'video_nr', 'dateiname'],
@@ -138,6 +156,15 @@ async function callTool(token, name, args = {}) {
       const { path } = await osApi(token, 'upload_ticket', { dreh_id, video_nr, dateiname })
       const publicUrl = await uploadToStorage(path, bytes, contentTypeOf(dateiname))
       return osApi(token, 'datei_registrieren', { dreh_id, path, url: publicUrl })
+    }
+
+    case 'upload_sammellink_erstellen': {
+      const r = await osApi(token, 'upload_sammel', args)
+      return {
+        upload_url: `${BASE}/api/os-upload?g=${r.gruppe}`,
+        anzahl_dateien: r.anzahl,
+        hinweis: 'Diesen EINEN Link dem Nutzer geben. Er wählt dort alle Dateien auf einmal aus. Gültig 24 Std.',
+      }
     }
 
     case 'upload_link_erstellen': {
