@@ -8,7 +8,8 @@ const INSTRUCTIONS = `Brehl Visuals OS – Drehplanung der Videoagentur Brehl Vi
 Ablauf: Erst mit drehs_auflisten (z.B. nach kunde und Datum) den richtigen Dreh finden, dann dreh_lesen für die Details.
 Videos sind ab 1 nummeriert (video_nr) wie in der App. Texte dürfen einfache HTML-Formatierung enthalten (<b>, <i>, <u>, <ul><li>), normaler Text mit Zeilenumbrüchen geht auch.
 Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Es gibt bewusst keine Lösch-Funktionen.
-Dateien (PDF/Bilder) mit datei_anhaengen an ein Video hängen – per base64 (kleine Dateien) oder öffentlicher URL. Bei großen Dateien upload_link_erstellen nutzen und die Datei per HTTP-PUT aus der Code-Umgebung hochladen.`
+Immer diese Werkzeuge nutzen – nicht direkt per SQL oder Supabase in die Datenbank schreiben.
+Dateien (PDF/Bilder), die der Nutzer im Chat schickt: upload_link_erstellen aufrufen und dem Nutzer den Link als anklickbaren Link geben („Hier tippen und die Datei auswählen“). Er wählt die Datei dann selbst aus – das funktioniert immer, auch wenn deine Code-Umgebung keinen Netzwerkzugriff hat. Nur bei sehr kleinen Dateien oder öffentlichen https-Links datei_anhaengen nutzen.`
 
 const vNr = { type: 'integer', minimum: 1, description: 'Video-Nummer wie in der App (1 = erstes Video)' }
 const drehId = { type: 'string', description: 'dreh_id aus drehs_auflisten' }
@@ -87,7 +88,7 @@ const TOOLS = [
   },
   {
     name: 'datei_anhaengen',
-    description: 'PDF/Bild an ein Video hängen. Entweder base64 (Dateiinhalt) ODER url (öffentlich erreichbare https-Adresse).',
+    description: 'Nur für sehr kleine Dateien (base64) oder öffentliche https-Links (url). Für Dateien, die der Nutzer im Chat geschickt hat, stattdessen upload_link_erstellen verwenden.',
     inputSchema: {
       type: 'object', properties: {
         dreh_id: drehId, video_nr: vNr,
@@ -99,7 +100,7 @@ const TOOLS = [
   },
   {
     name: 'upload_link_erstellen',
-    description: 'Einmal-Link (15 Min.) zum Hochladen einer größeren Datei an ein Video. Datei per HTTP PUT mit Rohdaten an die zurückgegebene URL senden, z.B. curl -T datei.pdf "<url>".',
+    description: 'Standardweg für Dateien aus dem Chat: erstellt einen Einmal-Link (24 Std. gültig) für ein bestimmtes Video. Den Link dem Nutzer geben – er öffnet ihn, tippt „Datei auswählen“ und die Datei hängt am Video. Mehrere Dateien = mehrere Links. (Alternativ per HTTP PUT mit Rohdaten hochladbar.)',
     inputSchema: {
       type: 'object', properties: { dreh_id: drehId, video_nr: vNr, dateiname: { type: 'string' } },
       required: ['dreh_id', 'video_nr', 'dateiname'],
@@ -143,7 +144,7 @@ async function callTool(token, name, args = {}) {
       const { path } = await osApi(token, 'upload_ticket', args)
       return {
         upload_url: `${BASE}/api/os-upload?t=${encodeURIComponent(path)}`,
-        methode: 'PUT (Rohdaten im Body), gültig 15 Minuten, nur einmal nutzbar',
+        hinweis: 'Diesen Link dem Nutzer zum Antippen geben. Gültig 24 Std., nur einmal nutzbar.',
         beispiel: `curl -T "${args.dateiname}" "${BASE}/api/os-upload?t=${encodeURIComponent(path)}"`,
       }
     }
