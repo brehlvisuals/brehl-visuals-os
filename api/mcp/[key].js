@@ -6,12 +6,14 @@ const BASE = 'https://brehl-visuals-os.vercel.app'
 
 const INSTRUCTIONS = `Brehl Visuals OS – Drehplanung der Videoagentur Brehl Visuals.
 Ablauf: Erst mit drehs_auflisten (z.B. nach kunde und Datum) den richtigen Dreh finden, dann dreh_lesen für die Details.
-Videos sind ab 1 nummeriert (video_nr) wie in der App. Texte dürfen einfache HTML-Formatierung enthalten (<b>, <i>, <u>, <ul><li>), normaler Text mit Zeilenumbrüchen geht auch.
+Videos sind ab 1 nummeriert (video_nr) GENAU wie in der App: offene Videos zuerst, erledigte stehen unten – die Nummern können sich also verschieben, wenn jemand etwas abhakt. Jedes Video hat eine feste video_id (aus dreh_lesen): zum Bearbeiten, Dateien anhängen und Upload-Links IMMER video_id verwenden. Nur video_nr geht auch, dann aber zusätzlich video_titel mitgeben (der aktuelle Titel) – passt er nicht, wird abgebrochen statt das falsche Video zu bearbeiten. Texte dürfen einfache HTML-Formatierung enthalten (<b>, <i>, <u>, <ul><li>), normaler Text mit Zeilenumbrüchen geht auch.
 Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Es gibt bewusst keine Lösch-Funktionen.
 Immer diese Werkzeuge nutzen – nicht direkt per SQL oder Supabase in die Datenbank schreiben.
 Dateien (PDF/Bilder), die der Nutzer im Chat schickt: ZUERST selbst hochladen – pro Datei upload_link_erstellen aufrufen und die Datei aus deiner Code-Umgebung mit curl -T "<datei>" "<upload_url>" hochladen (brehl-visuals-os.vercel.app ist freigegeben). Nur wenn das nicht klappt (Netzwerk gesperrt): EIN upload_sammellink_erstellen-Aufruf pro Dreh mit allen Dateien (inkl. original_dateiname = Name der Datei, wie der Nutzer sie hochgeladen hat, z.B. IMG_3818.jpeg) und dem Nutzer den EINEN Link geben. Er wählt dort alle Dateien auf einmal aus, sie werden per Dateiname dem richtigen Video zugeordnet. Das funktioniert immer, auch ohne Netzwerkzugriff deiner Code-Umgebung. Nur bei öffentlichen https-Links datei_anhaengen nutzen.`
 
-const vNr = { type: 'integer', minimum: 1, description: 'Video-Nummer wie in der App (1 = erstes Video)' }
+const vNr = { type: 'integer', minimum: 1, description: 'Video-Nummer wie in der App (offene zuerst, erledigte unten). Besser video_id verwenden.' }
+const vId = { type: 'string', description: 'Feste video_id aus dreh_lesen – hat Vorrang vor video_nr' }
+const vTitel = { type: 'string', description: 'Nur nötig, wenn ohne video_id gearbeitet wird: aktueller Titel des Videos zur Kontrolle' }
 const drehId = { type: 'string', description: 'dreh_id aus drehs_auflisten' }
 
 const TOOLS = [
@@ -35,7 +37,7 @@ const TOOLS = [
     annotations: { readOnlyHint: true },
   },
   {
-    name: 'dreh_lesen', description: 'Alle Details eines Drehs: Infos, Videos mit Planung und Dateinamen, Kommentare.',
+    name: 'dreh_lesen', description: 'Alle Details eines Drehs: Infos, Videos (video_nr wie in der App + feste video_id + Titel, Planung, Dateinamen), Kommentare.',
     inputSchema: { type: 'object', properties: { dreh_id: drehId }, required: ['dreh_id'] },
     annotations: { readOnlyHint: true },
   },
@@ -69,7 +71,7 @@ const TOOLS = [
       type: 'object', properties: {
         dreh_id: drehId, titel: { type: 'string' },
         planung: { type: 'string', description: 'Planung/Skript (Hook, Inhalt, CTA …)' },
-        video_nr: { ...vNr, description: 'Optional: an dieser Position einfügen' },
+        video_nr: { ...vNr, description: 'Optional: vor dem Video einfügen, das in der App gerade diese Nummer hat' },
       }, required: ['dreh_id', 'titel'],
     },
   },
@@ -77,9 +79,9 @@ const TOOLS = [
     name: 'video_bearbeiten', description: 'Titel und/oder Planung eines Videos ändern. Planung standardmäßig ersetzen, mit modus "anhaengen" ergänzen.',
     inputSchema: {
       type: 'object', properties: {
-        dreh_id: drehId, video_nr: vNr, titel: { type: 'string' }, planung: { type: 'string' },
+        dreh_id: drehId, video_id: vId, video_nr: vNr, video_titel: vTitel, titel: { type: 'string', description: 'Neuer Titel' }, planung: { type: 'string' },
         modus: { type: 'string', enum: ['ersetzen', 'anhaengen'], default: 'ersetzen' },
-      }, required: ['dreh_id', 'video_nr'],
+      }, required: ['dreh_id'],
     },
   },
   {
@@ -91,11 +93,11 @@ const TOOLS = [
     description: 'Nur für sehr kleine Dateien (base64) oder öffentliche https-Links (url). Für Dateien, die der Nutzer im Chat geschickt hat, stattdessen upload_sammellink_erstellen verwenden.',
     inputSchema: {
       type: 'object', properties: {
-        dreh_id: drehId, video_nr: vNr,
+        dreh_id: drehId, video_id: vId, video_nr: vNr, video_titel: vTitel,
         dateiname: { type: 'string', description: 'z.B. "Skript.pdf"' },
         base64: { type: 'string', description: 'Dateiinhalt base64-kodiert' },
         url: { type: 'string', description: 'https-Link zur Datei' },
-      }, required: ['dreh_id', 'video_nr', 'dateiname'],
+      }, required: ['dreh_id', 'dateiname'],
     },
   },
   {
@@ -107,10 +109,10 @@ const TOOLS = [
         dateien: {
           type: 'array', minItems: 1, items: {
             type: 'object', properties: {
-              video_nr: vNr,
+              video_id: vId, video_nr: vNr, video_titel: vTitel,
               dateiname: { type: 'string', description: 'Sprechender Name für die Anzeige im OS, z.B. "Kommentar_Vorta.jpg"' },
               original_dateiname: { type: 'string', description: 'Exakter Dateiname, wie der Nutzer die Datei im Chat hochgeladen hat (z.B. "IMG_3818.jpeg") – wichtig für die automatische Zuordnung' },
-            }, required: ['video_nr', 'dateiname'],
+            }, required: ['dateiname'],
           },
         },
       }, required: ['dreh_id', 'dateien'],
@@ -120,8 +122,8 @@ const TOOLS = [
     name: 'upload_link_erstellen',
     description: 'Einzelne Datei: erstellt einen Einmal-Link (24 Std. gültig) für ein bestimmtes Video. Den Link dem Nutzer geben – er öffnet ihn, tippt „Datei auswählen“ und die Datei hängt am Video. Mehrere Dateien = mehrere Links. (Alternativ per HTTP PUT mit Rohdaten hochladbar.)',
     inputSchema: {
-      type: 'object', properties: { dreh_id: drehId, video_nr: vNr, dateiname: { type: 'string' } },
-      required: ['dreh_id', 'video_nr', 'dateiname'],
+      type: 'object', properties: { dreh_id: drehId, video_id: vId, video_nr: vNr, video_titel: vTitel, dateiname: { type: 'string' } },
+      required: ['dreh_id', 'dateiname'],
     },
   },
 ]
@@ -139,7 +141,7 @@ async function callTool(token, name, args = {}) {
       return osApi(token, name, args)
 
     case 'datei_anhaengen': {
-      const { dreh_id, video_nr, dateiname, base64, url } = args
+      const { dreh_id, video_id, video_nr, video_titel, dateiname, base64, url } = args
       let bytes
       if (base64) {
         bytes = Buffer.from(String(base64).replace(/^data:[^,]*,/, ''), 'base64')
@@ -153,7 +155,7 @@ async function callTool(token, name, args = {}) {
       }
       if (!bytes.length) throw new Error('Datei ist leer')
       if (bytes.length > MAX_BYTES) throw new Error('Datei ist größer als 25 MB')
-      const { path } = await osApi(token, 'upload_ticket', { dreh_id, video_nr, dateiname })
+      const { path } = await osApi(token, 'upload_ticket', { dreh_id, video_id, video_nr, video_titel, dateiname })
       const publicUrl = await uploadToStorage(path, bytes, contentTypeOf(dateiname))
       return osApi(token, 'datei_registrieren', { dreh_id, path, url: publicUrl })
     }
@@ -192,7 +194,7 @@ async function handle(token, msg) {
       return reply(id, {
         protocolVersion: params?.protocolVersion || '2025-06-18',
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.0.0' },
+        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.1.0' },
         instructions: INSTRUCTIONS,
       })
     case 'ping':

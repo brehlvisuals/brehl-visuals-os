@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { useLiveDatensatz } from '../lib/useLiveDatensatz'
 
 const STATUSES = [
   { id: 'planung',        label: 'Planung',         color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  text: '#b45309' },
@@ -68,9 +69,14 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
   const ref = useRef(null)
   const cbRef = useRef({ onChange, onCommit })
   cbRef.current = { onChange, onCommit }
+  const valueRef = useRef(value)
+  valueRef.current = value
+  // Nur wenn hier wirklich getippt/formatiert wurde, wird beim Verlassen gespeichert –
+  // sonst würde reines Anklicken eine Änderung von jemand anderem mit dem alten Text überschreiben.
+  const geaendert = useRef(false)
   useEffect(() => {
     const el = ref.current
-    // Beim Mount UND bei externen Änderungen (z.B. Umsortieren) setzen – aber nicht während des Tippens (fokussiert), sonst springt der Cursor
+    // Beim Mount UND bei externen Änderungen (Live-Sync, Umsortieren) setzen – aber nicht während des Tippens (fokussiert), sonst springt der Cursor
     if (el && document.activeElement !== el) el.innerHTML = toHtml(value)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
@@ -78,7 +84,10 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
   // wird der aktuelle Inhalt sofort übernommen & gespeichert (v.a. iOS).
   useEffect(() => {
     if (readOnly) return
-    const commit = () => { const el = ref.current; if (el) { cbRef.current.onChange?.(el.innerHTML); cbRef.current.onCommit?.(el.innerHTML) } }
+    const commit = () => {
+      const el = ref.current
+      if (el && geaendert.current) { geaendert.current = false; cbRef.current.onChange?.(el.innerHTML); cbRef.current.onCommit?.(el.innerHTML) }
+    }
     const onVis = () => { if (document.visibilityState === 'hidden') commit() }
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('pagehide', commit)
@@ -88,6 +97,7 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
   }, [])
   const exec = (cmd, arg) => {
     document.execCommand(cmd, false, arg)
+    geaendert.current = true
     if (ref.current) onChange(ref.current.innerHTML)
   }
   // Eingefügten Text bereinigen: Schriftgrößen/Farben/Fonts raus, nur einfache Struktur (fett/kursiv/Listen) bleibt
@@ -104,6 +114,7 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
       out = plain.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
     }
     document.execCommand('insertHTML', false, out)
+    geaendert.current = true
     if (ref.current) onChange(ref.current.innerHTML)
   }
   const B = 'w-7 h-7 rounded text-xs text-gray-600 hover:bg-gray-100 flex items-center justify-center'
@@ -122,9 +133,12 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
         <button type="button" title="Formatierung entfernen" onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'DIV'); exec('removeFormat') }} className={B}>⌫</button>
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning
-        onInput={e => onChange(e.currentTarget.innerHTML)}
+        onInput={e => { geaendert.current = true; onChange(e.currentTarget.innerHTML) }}
         onPaste={handlePaste}
-        onBlur={e => { onChange(e.currentTarget.innerHTML); onCommit?.(e.currentTarget.innerHTML) }}
+        onBlur={e => {
+          if (geaendert.current) { geaendert.current = false; onChange(e.currentTarget.innerHTML); onCommit?.(e.currentTarget.innerHTML) }
+          else e.currentTarget.innerHTML = toHtml(valueRef.current)   // nichts getippt → neuesten Stand anzeigen
+        }}
         data-ph={placeholder || ''}
         className="rt-edit text-xs text-gray-700 leading-relaxed px-2.5 py-2 outline-none min-h-[2.5rem]" />
     </div>
@@ -152,7 +166,8 @@ function AutoTextarea({ className = '', value, onChange, ...rest }) {
 }
 
 // Bilder/Dateien pro Video: Upload in Supabase Storage, Anzeige als Thumbnail/Link
-function FileAttach({ files, onChange, prefix, readOnly }) {
+// Mehrbenutzer-sicher: jede Datei wird einzeln angehängt/entfernt (onAdd/onRemove), nie die ganze Liste überschrieben.
+function FileAttach({ files, onAdd, onRemove, prefix, readOnly }) {
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(null)
   const isImg = n => /\.(png|jpe?g|gif|webp|heic|heif|avif|bmp)$/i.test(n || '')
@@ -161,7 +176,6 @@ function FileAttach({ files, onChange, prefix, readOnly }) {
     const list = Array.from(e.target.files || [])
     if (!list.length) return
     setBusy(true)
-    const added = []
     for (const f of list) {
       try {
         const safe = (f.name || 'datei').replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -173,19 +187,20 @@ function FileAttach({ files, onChange, prefix, readOnly }) {
         })
         if (error) { alert('Upload fehlgeschlagen: ' + error.message); continue }
         const { data } = supabase.storage.from('dreh-dateien').getPublicUrl(path)
-        added.push({ url: data.publicUrl, name: f.name || safe, path })
+        await onAdd?.({ url: data.publicUrl, name: f.name || safe, path })
       } catch (err) {
         alert('Upload fehlgeschlagen: ' + (err?.message || err))
       }
     }
     setBusy(false)
     e.target.value = ''
-    if (added.length) onChange([...(files || []), ...added])
   }
   async function remove(i) {
     const f = files[i]
-    if (f?.path) await supabase.storage.from('dreh-dateien').remove([f.path])
-    onChange(files.filter((_, idx) => idx !== i))
+    if (!f) return
+    // erst aus dem Dreh austragen, dann die Datei selbst löschen (so bleibt nie ein toter Link stehen)
+    await onRemove?.(f)
+    if (f.path) await supabase.storage.from('dreh-dateien').remove([f.path])
   }
   // Datei herunterladen: als Blob laden und mit richtigem Namen speichern (klappt auch cross-origin / iOS)
   async function download(f) {
@@ -210,7 +225,7 @@ function FileAttach({ files, onChange, prefix, readOnly }) {
       {files?.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {files.map((f, i) => (
-            <div key={i} className="relative">
+            <div key={f.path || f.url || i} className="relative">
               {isImg(f.name) ? (
                 <button type="button" onClick={() => setPreview(f)}><img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-lg border border-gray-200" /></button>
               ) : (
@@ -320,13 +335,10 @@ export default function Projekte() {
     fetchAll()
   }
 
-  async function updateDrehStatus(id, status) {
-    const dreh = drehs.find(d => d.id === id)
-    if (status === 'abgeschlossen' && !istGesichert(dreh)) return false
-    await supabase.from('proj_drehs').update({ status }).eq('id', id)
-    fetchAll()
-    if (selected?.id === id) setSelected(prev => ({ ...prev, status }))
-    return true
+  // Status im geöffneten Dreh geändert: die Detailansicht speichert selbst (feldgenau) –
+  // hier nur das Board sofort mitziehen, der Rest kommt per Live-Sync
+  function updateDrehStatus(id, status) {
+    setDrehs(prev => prev.map(d => d.id === id ? { ...d, status } : d))
   }
 
   async function deleteDreh(id) {
@@ -348,7 +360,8 @@ export default function Projekte() {
       return
     }
     setDrehs(prev => prev.map(d => d.id === id ? { ...d, status } : d))   // optimistisch
-    await supabase.from('proj_drehs').update({ status }).eq('id', id)
+    const { error } = await supabase.rpc('dreh_felder_setzen', { p_tabelle: 'proj_drehs', p_id: id, p_felder: { status } })
+    if (error) alert('Status konnte nicht gespeichert werden: ' + error.message)
     fetchAll()
   }
 
@@ -795,103 +808,25 @@ function AddInternForm({ profiles, onSave, onClose }) {
 
 function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph }) {
   const [tab, setTab] = useState('info')
-  const [form, setForm] = useState({ ...item })
-  const [videos, setVideos] = useState(
-    (item.videos && item.videos.length) ? item.videos
-      : (item.video_planung && String(item.video_planung).trim()
-        ? [{ titel: 'Video 1', planung: item.video_planung, datei_url: '', datei_name: '' }] : [])
-  )
-  const [saving, setSaving] = useState(false)
   const ro = false   // Konzepte: Videograph & MA/Admin dürfen bearbeiten (Extern hat hier keinen Zugang)
-  const set = (k, v) => { if (ro) return; dataRef.current = { ...dataRef.current, form: { ...dataRef.current.form, [k]: v } }; setForm(p => ({ ...p, [k]: v })) }
-  // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben + Live-Sync (kein Überschreiben mit altem Stand).
-  function buildPayload(f, v) {
-    return {
-      titel: f.titel || null, drehtag: f.drehtag || null, status: f.status || 'planung',
-      zustaendig: f.zustaendig || null, requisiten: f.requisiten || null, drehort: f.drehort || null,
-      video_planung: null, videos: v,
-    }
-  }
-  const baseRef = useRef(buildPayload(item, item.videos || []))
+  // Mehrbenutzer-sicher: feldgenau speichern (Videos über ihre feste id) + Live-Sync – siehe lib/useLiveDatensatz.js
+  const live = useLiveDatensatz('proj_intern', item, { ro })
+  const form = live.row
+  const videos = form.videos || []
+  const saving = live.speichert
   const backdropDown = useRef(false)
-  const skipAutosave = useRef(true)
-  const dataRef = useRef({ form, videos })
-  dataRef.current = { form, videos }
-  const [extChanged, setExtChanged] = useState(false)
-
-  function patchOf(f, v) {
-    const cur = buildPayload(f, v); const base = baseRef.current || {}; const patch = {}
-    for (const k of Object.keys(cur)) { if (JSON.stringify(cur[k]) !== JSON.stringify(base[k])) patch[k] = cur[k] }
-    return patch
-  }
-  const lastWriteAt = useRef(0)
-  async function persist(patch) {
-    if (ro) return
-    if (!patch || Object.keys(patch).length === 0) return
-    setSaving(true)
-    lastWriteAt.current = Date.now()
-    await supabase.from('proj_intern').update(patch).eq('id', item.id)
-    baseRef.current = { ...baseRef.current, ...patch }; lastWriteAt.current = Date.now()
-    setSaving(false); onRefresh()
-  }
-  async function save() { await persist(patchOf(form, videos)) }
-  useEffect(() => {
-    if (skipAutosave.current) { skipAutosave.current = false; return }
-    const t = setTimeout(() => persist(patchOf(form, videos)), 700)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, videos])
-  // Live-Sync: NUR Hinweis, wenn jemand anderes ändert. Kein automatisches Überschreiben des offenen Panels.
-  useEffect(() => {
-    const ch = supabase.channel(`intern-${item.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proj_intern', filter: `id=eq.${item.id}` }, ({ new: fresh }) => {
-        if (!fresh) return
-        if (Date.now() - lastWriteAt.current < 5000) return
-        const base = baseRef.current || {}
-        const freshP = buildPayload(fresh, fresh.videos || [])
-        const externAnders = Object.keys(freshP).some(k => JSON.stringify(freshP[k]) !== JSON.stringify(base[k]))
-        if (externAnders) setExtChanged(true)
-      })
-      .subscribe()
-    return () => supabase.removeChannel(ch)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id])
-  // Panel schließen / App in den Hintergrund -> ausstehende Änderungen (nur geänderte Felder) sofort schreiben
-  useEffect(() => {
-    const flush = () => {
-      if (ro) return
-      const patch = patchOf(dataRef.current.form, dataRef.current.videos)
-      if (Object.keys(patch).length === 0) return
-      lastWriteAt.current = Date.now()
-      supabase.from('proj_intern').update(patch).eq('id', item.id)
-      baseRef.current = { ...baseRef.current, ...patch }
-    }
-    const onHide = () => { if (document.visibilityState === 'hidden') flush() }
-    document.addEventListener('visibilitychange', onHide)
-    window.addEventListener('pagehide', flush)
-    return () => {
-      document.removeEventListener('visibilitychange', onHide)
-      window.removeEventListener('pagehide', flush)
-      flush()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  async function reloadFresh() {
-    const { data } = await supabase.from('proj_intern').select('*').eq('id', item.id).single()
-    if (data) { baseRef.current = buildPayload(data, data.videos || []); skipAutosave.current = true; setForm(f => ({ ...f, ...data })); setVideos(data.videos || []); setExtChanged(false) }
-  }
-  function saveVideos(nv) { if (ro) return; dataRef.current = { ...dataRef.current, videos: nv }; setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_intern').update({ videos: nv }).eq('id', item.id).then(onRefresh) }
-  function addVideo() { saveVideos([...videos, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
-  function removeVideo(i) { if (window.confirm(`Video ${i + 1} wirklich entfernen? Das kann nicht rückgängig gemacht werden.`)) saveVideos(videos.filter((_, idx) => idx !== i)) }
-  function toggleVideoDone(i) {
-    const nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
-    setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now()
-    supabase.rpc('toggle_video_done', { p_table: 'proj_intern', p_id: item.id, p_index: i }).then(onRefresh)
-  }
-  function moveVideo(from, to) {
-    if (to < 0 || to >= videos.length) return
-    const nv = [...videos]; const [it] = nv.splice(from, 1); nv.splice(to, 0, it)
-    saveVideos(nv)
+  const TEXTFELDER = ['titel', 'drehort', 'requisiten']
+  const set = (k, v) => live.setFeld(k, v, { sofort: !TEXTFELDER.includes(k) })
+  const persist = patch => { for (const [k, v] of Object.entries(patch)) live.setFeld(k, v, { sofort: true }) }
+  function addVideo() { live.videoHinzufuegen() }
+  function removeVideo(v, nr) { if (window.confirm(`Video ${nr} wirklich entfernen? Das kann nicht rückgängig gemacht werden.`)) live.videoEntfernen(v.id) }
+  function toggleVideoDone(v) { live.videoErledigt(v.id, !v.erledigt) }
+  function moveVideo(vonId, zuId) {
+    const ids = videos.map(v => v.id)
+    const a = ids.indexOf(vonId), b = ids.indexOf(zuId)
+    if (a < 0 || b < 0) return
+    const [it] = ids.splice(a, 1); ids.splice(b, 0, it)
+    live.videosSortieren(ids)
   }
 
   return (
@@ -917,15 +852,13 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {extChanged && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
-              <span className="text-xs text-amber-800">Jemand anderes hat dieses Konzept gerade geändert.</span>
-              <button onClick={reloadFresh} className="text-xs font-medium bg-amber-600 text-white px-2.5 py-1 rounded-md hover:bg-amber-700 whitespace-nowrap">Aktualisieren</button>
-            </div>
+          {live.hinweis && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">{live.hinweis}</div>
           )}
           {tab === 'info' && (
             <>
-              <div><label className="label">Titel</label><input className="input text-xs" value={form.titel || ''} onChange={e => set('titel', e.target.value)} /></div>
+              <div><label className="label">Titel</label><input className="input text-xs" value={form.titel || ''} onChange={e => set('titel', e.target.value)}
+                onFocus={() => live.setFokus('f:titel', true)} onBlur={() => { live.setFokus('f:titel', false); live.flush() }} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="label">Drehtag</label><input type="date" className="input text-xs" value={form.drehtag || ''} onChange={e => set('drehtag', e.target.value)} /></div>
                 <div><label className="label">Status</label>
@@ -950,25 +883,27 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
                 // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
                 const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
                 return ord.map((i, p) => { const v = videos[i]; return (
-                <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
+                <div key={v.id || i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
+                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(v)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
                       <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${p + 1}`}</span>
                     </label>
                     {!ro && <div className="flex items-center gap-1">
-                      <button onClick={() => moveVideo(i, ord[p - 1])} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
-                      <button onClick={() => moveVideo(i, ord[p + 1])} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
-                      <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
+                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
+                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
+                      <button onClick={() => removeVideo(v, p + 1)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
                     </div>}
                   </div>
-                  <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
+                  <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''}
+                    onFocus={() => live.setFokus(`v:${v.id}:titel`, true)} onBlur={() => live.setFokus(`v:${v.id}:titel`, false)}
+                    onChange={e => live.setVideoFeld(v.id, 'titel', e.target.value)} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText readOnly={ro} value={v.planung || ''}
-                    onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
-                    onCommit={val => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
+                    onChange={val => live.setVideoFeld(v.id, 'planung', val)}
+                    onCommit={val => live.setVideoFeld(v.id, 'planung', val, { sofort: true })}
                     placeholder="Video-Planung / Konzept..." /></div>
-                  <FileAttach readOnly={ro} files={v.dateien || []} prefix={`${item.id}/${i}`}
-                    onChange={arr => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
+                  <FileAttach readOnly={ro} files={v.dateien || []} prefix={`${item.id}/${v.id}`}
+                    onAdd={d => live.dateiAnhaengen(v.id, d)} onRemove={d => live.dateiEntfernen(v.id, d.path)} />
                 </div>
               )})})()}
               {!ro && <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
@@ -984,92 +919,32 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
 
 function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChange, onRefresh, onDelete, extern, videograph }) {
   const [tab, setTab] = useState('info')
-  const [form, setForm] = useState({ ...dreh })
-  const [videos, setVideos] = useState(dreh.videos || [])
+  const ro = !!extern   // Nur-Lese nur für Darsteller (extern); Videograph darf bearbeiten, aber nicht löschen
+  // Mehrbenutzer-sicher: jede Änderung wird feldgenau gespeichert (Videos über ihre feste id),
+  // Änderungen anderer (auch Claude) kommen live an – siehe lib/useLiveDatensatz.js
+  const live = useLiveDatensatz('proj_drehs', dreh, { ro })
+  const form = live.row
+  const videos = form.videos || []
+  const saving = live.speichert
   const [notes, setNotes] = useState([])
   const [noteText, setNoteText] = useState('')
   const [nasWarn, setNasWarn] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
-  const ro = !!extern   // Nur-Lese nur für Darsteller (extern); Videograph darf bearbeiten, aber nicht löschen
-  const set = (k, v) => { if (ro) return; dataRef.current = { ...dataRef.current, form: { ...dataRef.current.form, [k]: v } }; setForm(p => ({ ...p, [k]: v })) }
-  // Mehrbenutzer-sicher: nur GEÄNDERTE Felder schreiben (Field-Level) + Live-Sync,
-  // damit gleichzeitige Bearbeitungen sich nicht gegenseitig mit altem Stand überschreiben.
-  const baseRef = useRef(dreh)            // letzter bekannter Serverstand
   const backdropDown = useRef(false)      // nur schließen, wenn der Klick auch auf dem Hintergrund begann
-  const skipAutosave = useRef(true)       // Mount + nach externem Sync keinen Autosave auslösen
-  const dataRef = useRef({ form, videos })
-  dataRef.current = { form, videos }
-  const [extChanged, setExtChanged] = useState(false)
+  // Texte verzögert speichern, Auswahlfelder/Häkchen sofort
+  const TEXTFELDER = ['erlaeuterungen_cutter', 'erlaeuterungen_videograph', 'requisiten', 'recruiting', 'dauer']
+  const set = (k, v) => live.setFeld(k, v, { sofort: !TEXTFELDER.includes(k) })
+  const persist = patch => { for (const [k, v] of Object.entries(patch)) live.setFeld(k, v, { sofort: true }) }
 
-  function patchOf(f, v) {
-    const cur = { ...f, videos: v, nas_gesichert: !!(f.raw_gesichert && f.final_gesichert) }
-    const base = baseRef.current || {}
-    const patch = {}
-    for (const k of Object.keys(cur)) {
-      if (k === 'id' || k === 'created_at') continue
-      if (JSON.stringify(cur[k]) !== JSON.stringify(base[k])) patch[k] = cur[k]
-    }
-    return patch
-  }
-  const lastWriteAt = useRef(0)   // Zeitpunkt unseres letzten eigenen Schreibvorgangs (um eigene Echos zu ignorieren)
-  async function persist(patch) {
-    if (ro) return
-    if (!patch || Object.keys(patch).length === 0) return
-    setSaving(true)
-    lastWriteAt.current = Date.now()
-    await supabase.from('proj_drehs').update(cleanDreh(patch)).eq('id', dreh.id)
-    baseRef.current = { ...baseRef.current, ...patch }; lastWriteAt.current = Date.now()
-    setSaving(false); onRefresh()
-  }
-  // Auto-Speichern (verzögert ~0,7s) – schreibt nur geänderte Felder
+  useEffect(() => { fetchNotes() }, [dreh.id])
+  // Kommentare live (z. B. wenn Claude oder jemand anderes kommentiert)
   useEffect(() => {
-    if (skipAutosave.current) { skipAutosave.current = false; return }
-    const t = setTimeout(() => persist(patchOf(form, videos)), 700)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, videos])
-  // Live-Sync: NUR Hinweis, wenn jemand anderes diesen Dreh ändert. Das offene Panel wird bewusst
-  // NICHT automatisch überschrieben – so kann kein verzögertes Echo eigene neuere Eingaben zurücksetzen.
-  useEffect(() => {
-    const ch = supabase.channel(`dreh-${dreh.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proj_drehs', filter: `id=eq.${dreh.id}` }, ({ new: fresh }) => {
-        if (!fresh) return
-        if (Date.now() - lastWriteAt.current < 5000) return   // kurz nach eigenem Speichern: eigenes Echo -> ignorieren
-        const base = baseRef.current || {}
-        const externAnders = Object.keys(fresh).some(k => k !== 'id' && k !== 'created_at' && JSON.stringify(fresh[k]) !== JSON.stringify(base[k]))
-        if (externAnders) setExtChanged(true)
-      })
+    const ch = supabase.channel(`notizen-${dreh.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proj_notizen', filter: `dreh_id=eq.${dreh.id}` }, () => fetchNotes())
       .subscribe()
     return () => supabase.removeChannel(ch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dreh.id])
-  // Panel schließen / App in den Hintergrund -> ausstehende Änderungen (nur geänderte Felder) sofort schreiben
-  useEffect(() => {
-    const flush = () => {
-      if (ro) return
-      const patch = patchOf(dataRef.current.form, dataRef.current.videos)
-      if (Object.keys(patch).length === 0) return
-      lastWriteAt.current = Date.now()
-      supabase.from('proj_drehs').update(cleanDreh(patch)).eq('id', dreh.id)
-      baseRef.current = { ...baseRef.current, ...patch }
-    }
-    const onHide = () => { if (document.visibilityState === 'hidden') flush() }
-    document.addEventListener('visibilitychange', onHide)
-    window.addEventListener('pagehide', flush)
-    return () => {
-      document.removeEventListener('visibilitychange', onHide)
-      window.removeEventListener('pagehide', flush)
-      flush()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  async function reloadFresh() {
-    const { data } = await supabase.from('proj_drehs').select('*').eq('id', dreh.id).single()
-    if (data) { baseRef.current = data; skipAutosave.current = true; setForm(f => ({ ...f, ...data })); setVideos(data.videos || []); setExtChanged(false) }
-  }
-
-  useEffect(() => { fetchNotes() }, [dreh.id])
   const [verlauf, setVerlauf] = useState([])
   useEffect(() => { if (tab === 'verlauf') loadVerlauf() /* eslint-disable-next-line */ }, [tab, dreh.id])
   async function loadVerlauf() {
@@ -1079,7 +954,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const nameOf = uid => profiles.find(p => p.id === uid)?.full_name || 'jemand'
   function restoreVideos(snapVideos) {
     if (!window.confirm('Diesen früheren Video-Stand wiederherstellen? Der aktuelle Stand wird ersetzt (und im Verlauf gesichert).')) return
-    saveVideos(snapVideos || [])
+    live.videosErsetzen(snapVideos || [])
     setTab('videos')
   }
 
@@ -1087,8 +962,6 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
     const { data } = await supabase.from('proj_notizen').select('*').eq('dreh_id', dreh.id).order('created_at', { ascending: false })
     if (data) setNotes(data)
   }
-
-  async function save() { await persist(patchOf(form, videos)) }
 
   async function addNote() {
     if (!noteText.trim()) return
@@ -1099,34 +972,34 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   function handleStatusChange(status) {
     if (status === 'abgeschlossen' && !(form.raw_gesichert && form.final_gesichert)) {
       // Ohne RAW+Final-Sicherung nicht abschließbar -> zurück auf Posting
-      setNasWarn(true); set('status', 'posting'); onStatusChange('posting'); return
+      setNasWarn(true); live.setFelder({ status: 'posting' }); onStatusChange('posting'); return
     }
     setNasWarn(false)
-    set('status', status)
+    live.setFelder({ status })
     onStatusChange(status)
   }
 
   // Sicherung umschalten; wird ein Häkchen entfernt und der Dreh war "Abgeschlossen" -> zurück auf Posting
   function toggleSicherung(field, val) {
-    const beide = field === 'raw_gesichert' ? (val && !!form.final_gesichert) : (!!form.raw_gesichert && val)
-    set(field, val)
-    if (beide) setNasWarn(false)
-    else if (form.status === 'abgeschlossen') { set('status', 'posting'); onStatusChange('posting'); setNasWarn(true) }
+    const raw = field === 'raw_gesichert' ? val : !!form.raw_gesichert
+    const fin = field === 'final_gesichert' ? val : !!form.final_gesichert
+    const felder = { [field]: val, nas_gesichert: raw && fin }
+    if (raw && fin) setNasWarn(false)
+    else if (form.status === 'abgeschlossen') { felder.status = 'posting'; onStatusChange('posting'); setNasWarn(true) }
+    live.setFelder(felder)
   }
 
-  function saveVideos(nv) { if (ro) return; dataRef.current = { ...dataRef.current, videos: nv }; setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now(); supabase.from('proj_drehs').update({ videos: nv }).eq('id', dreh.id).then(onRefresh) }
-  function addVideo() { saveVideos([...videos, { titel: '', planung: '', datei_url: '', datei_name: '' }]) }
-  function removeVideo(i) { if (window.confirm(`Video ${i + 1} wirklich entfernen? Das kann nicht rückgängig gemacht werden.`)) saveVideos(videos.filter((_, idx) => idx !== i)) }
-  // Abhaken: nur diesen einen Haken serverseitig umschalten (kein Ganz-Array-Write) – funktioniert für alle Rollen
-  function toggleVideoDone(i) {
-    const nv = videos.map((vid, idx) => idx === i ? { ...vid, erledigt: !vid.erledigt } : vid)
-    setVideos(nv); baseRef.current = { ...baseRef.current, videos: nv }; lastWriteAt.current = Date.now()
-    supabase.rpc('toggle_video_done', { p_table: 'proj_drehs', p_id: dreh.id, p_index: i }).then(onRefresh)
-  }
-  function moveVideo(from, to) {
-    if (to < 0 || to >= videos.length) return
-    const nv = [...videos]; const [it] = nv.splice(from, 1); nv.splice(to, 0, it)
-    saveVideos(nv)
+  function addVideo() { live.videoHinzufuegen() }
+  function removeVideo(v, nr) { if (window.confirm(`Video ${nr} wirklich entfernen? Das kann nicht rückgängig gemacht werden.`)) live.videoEntfernen(v.id) }
+  // Abhaken: nur dieses eine Video (per id) – funktioniert für alle Rollen
+  function toggleVideoDone(v) { live.videoErledigt(v.id, !v.erledigt) }
+  // ▲▼: Video an die Stelle eines anderen Videos verschieben (per id)
+  function moveVideo(vonId, zuId) {
+    const ids = videos.map(v => v.id)
+    const a = ids.indexOf(vonId), b = ids.indexOf(zuId)
+    if (a < 0 || b < 0) return
+    const [it] = ids.splice(a, 1); ids.splice(b, 0, it)
+    live.videosSortieren(ids)
   }
 
   return (
@@ -1137,8 +1010,8 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div>
-            <p className="font-bold text-gray-900">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Dreh'}</p>
-            <p className="text-xs text-gray-400">{dreh.kunde_name}</p>
+            <p className="font-bold text-gray-900">{form.datum ? new Date(form.datum).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Dreh'}</p>
+            <p className="text-xs text-gray-400">{form.kunde_name}</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
@@ -1180,17 +1053,14 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {extChanged && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
-              <span className="text-xs text-amber-800">Jemand anderes hat diesen Dreh gerade geändert.</span>
-              <button onClick={reloadFresh} className="text-xs font-medium bg-amber-600 text-white px-2.5 py-1 rounded-md hover:bg-amber-700 whitespace-nowrap">Aktualisieren</button>
-            </div>
+          {live.hinweis && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">{live.hinweis}</div>
           )}
           {tab === 'info' && (
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="label">Kunde</label>
-                  <select className="input text-xs" value={form.kunde_id || ''} onChange={e => { const k = kunden.find(k => k.id === e.target.value); setForm(p => ({ ...p, kunde_id: e.target.value, kunde_name: k?.name || '' })) }}>
+                  <select className="input text-xs" value={form.kunde_id || ''} onChange={e => { const k = kunden.find(k => k.id === e.target.value); live.setFelder({ kunde_id: e.target.value, kunde_name: k?.name || '' }) }}>
                     {kunden.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
                   </select>
                 </div>
@@ -1241,25 +1111,27 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                 // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
                 const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
                 return ord.map((i, p) => { const v = videos[i]; return (
-                <div key={i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
+                <div key={v.id || i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(i)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
+                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(v)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
                       <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${p + 1}`}</span>
                     </label>
                     {!ro && <div className="flex items-center gap-1">
-                      <button onClick={() => moveVideo(i, ord[p - 1])} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
-                      <button onClick={() => moveVideo(i, ord[p + 1])} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
-                      <button onClick={() => removeVideo(i)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
+                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
+                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
+                      <button onClick={() => removeVideo(v, p + 1)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
                     </div>}
                   </div>
-                  <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''} onChange={e => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, titel: e.target.value } : vid))} placeholder="Video-Titel..." />
+                  <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''}
+                    onFocus={() => live.setFokus(`v:${v.id}:titel`, true)} onBlur={() => live.setFokus(`v:${v.id}:titel`, false)}
+                    onChange={e => live.setVideoFeld(v.id, 'titel', e.target.value)} placeholder="Video-Titel..." />
                   <div className="mb-2"><RichText readOnly={ro} value={v.planung || ''}
-                    onChange={val => setVideos(prev => prev.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
-                    onCommit={val => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, planung: val } : vid))}
+                    onChange={val => live.setVideoFeld(v.id, 'planung', val)}
+                    onCommit={val => live.setVideoFeld(v.id, 'planung', val, { sofort: true })}
                     placeholder="Video-Planung / Konzept..." /></div>
-                  <FileAttach readOnly={ro} files={v.dateien || []} prefix={`${dreh.id}/${i}`}
-                    onChange={arr => saveVideos(videos.map((vid, idx) => idx === i ? { ...vid, dateien: arr } : vid))} />
+                  <FileAttach readOnly={ro} files={v.dateien || []} prefix={`${dreh.id}/${v.id}`}
+                    onAdd={d => live.dateiAnhaengen(v.id, d)} onRemove={d => live.dateiEntfernen(v.id, d.path)} />
                 </div>
               )})})()}
               {!ro && <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
