@@ -82,7 +82,7 @@ const ABW = {
   urlaub: { label: 'Urlaub', bg: 'bg-green-50', text: 'text-green-700', dot: '#16a34a', zaehltUrlaub: true },
   ueberstunden: { label: 'Überstunden abbauen', bg: 'bg-indigo-50', text: 'text-indigo-700', dot: '#6366f1' },
   sonderurlaub: { label: 'Sonderurlaub', bg: 'bg-teal-50', text: 'text-teal-700', dot: '#0d9488' },
-  unbezahlt: { label: 'Sonderurlaub (unbezahlt)', bg: 'bg-gray-100', text: 'text-gray-600', dot: '#9ca3af' },
+  unbezahlt: { label: 'Sonderurlaub (unbezahlt)', bg: 'bg-black/[0.05]', text: 'text-ink-2', dot: '#9ca3af' },
   schule: { label: 'Schule / Weiterbildung', bg: 'bg-purple-50', text: 'text-purple-700', dot: '#9333ea' },
   krankheit: { label: 'Krankheit', bg: 'bg-red-50', text: 'text-red-600', dot: '#dc2626', zaehltKrank: true },
   krankheit_kind: { label: 'Krankheit eines Kindes', bg: 'bg-rose-50', text: 'text-rose-600', dot: '#e11d48', zaehltKrank: true },
@@ -235,15 +235,15 @@ export function Zeiterfassung() {
   // Für externe Minijobler: gleiche Ansicht wie sie selbst (Von/Bis + Fahrtkosten)
   if (zielIstExtern) {
     return (
-      <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4">
+      <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 max-w-2xl mx-auto space-y-4">
         <div className="page-header">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Zeiterfassung</h2>
-            <p className="text-xs text-gray-400">Minijob-Ansicht – erfasst für {zielProfil?.full_name}</p>
+            <h1 className="page-title">Zeiterfassung</h1>
+            <p className="text-xs text-ink-3">Minijob-Ansicht – erfasst für {zielProfil?.full_name}</p>
           </div>
         </div>
         <div className="card p-3 flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-gray-500">Erfassen für:</span>
+          <span className="text-xs font-semibold text-ink-2">Erfassen für:</span>
           <select className="input text-xs w-auto" value={zielUserId} onChange={e => { setZielUserId(e.target.value); resetForm() }}>
             <option value="">Mich selbst ({profile?.full_name || 'ich'})</option>
             {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : mb.role === 'videograph' ? ' (Videograph)' : ''}</option>)}
@@ -255,17 +255,17 @@ export function Zeiterfassung() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl">
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 max-w-5xl">
       <div className="page-header">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Zeiterfassung</h2>
-          <p className="text-xs text-gray-400">Stunden & Abwesenheiten erfassen</p>
+          <h1 className="page-title">Zeiterfassung</h1>
+          <p className="text-[13px] text-ink-2 mt-1.5">Stunden & Abwesenheiten erfassen</p>
         </div>
       </div>
 
       {isAdmin && (
         <div className="card p-3 mb-4 flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-gray-500">Erfassen für:</span>
+          <span className="text-xs font-semibold text-ink-2">Erfassen für:</span>
           <select className="input text-xs w-auto" value={zielUserId} onChange={e => { setZielUserId(e.target.value); resetForm() }}>
             <option value="">Mich selbst ({profile?.full_name || 'ich'})</option>
             {members.filter(mb => mb.id !== profile?.id).map(mb => <option key={mb.id} value={mb.id}>{mb.full_name}{mb.role === 'extern' ? ' (Extern)' : mb.role === 'videograph' ? ' (Videograph)' : ''}</option>)}
@@ -281,11 +281,11 @@ export function Zeiterfassung() {
             {adminAntraege.map(a => {
               const orig = a.zeiteintraege
               return (
-                <div key={a.id} className="border border-gray-100 rounded-lg p-3">
-                  <p className="text-xs text-gray-400 mb-1">{a.profiles?.full_name} · {orig?.datum && fmtDate(orig.datum)} · {a.art === 'delete' ? 'Löschung' : 'Änderung'}</p>
+                <div key={a.id} className="border border-black/[0.06] rounded-xl p-3">
+                  <p className="text-xs text-ink-3 mb-1">{a.profiles?.full_name} · {orig?.datum && fmtDate(orig.datum)} · {a.art === 'delete' ? 'Löschung' : 'Änderung'}</p>
                   {a.art === 'delete'
-                    ? <p className="text-sm text-gray-700 line-through">{orig?.beschreibung} — {fmtH(orig?.stunden)}h</p>
-                    : <div className="text-sm space-y-0.5"><p className="text-gray-400 line-through">{orig?.beschreibung} — {fmtH(orig?.stunden)}h [{orig?.ist_intern ? 'Intern' : kurz(orig?.proj_kunden?.name)}]</p><p className="text-gray-800">↳ {a.neu_beschreibung} — {fmtH(a.neu_stunden)}h [{a.neu_ist_intern ? 'Intern' : kurz(a.proj_kunden?.name)}]</p></div>}
+                    ? <p className="text-sm text-ink line-through">{orig?.beschreibung} — {fmtH(orig?.stunden)}h</p>
+                    : <div className="text-sm space-y-0.5"><p className="text-ink-3 line-through">{orig?.beschreibung} — {fmtH(orig?.stunden)}h [{orig?.ist_intern ? 'Intern' : kurz(orig?.proj_kunden?.name)}]</p><p className="text-ink">↳ {a.neu_beschreibung} — {fmtH(a.neu_stunden)}h [{a.neu_ist_intern ? 'Intern' : kurz(a.proj_kunden?.name)}]</p></div>}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => entscheide(a, true)} className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-md font-medium hover:bg-green-200">✓ Genehmigen</button>
                     <button onClick={() => entscheide(a, false)} className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-md font-medium hover:bg-red-100">✕ Ablehnen</button>
@@ -301,21 +301,21 @@ export function Zeiterfassung() {
         <div className="flex-1 min-w-0 space-y-4">
           {/* Erfassungskarte mit Tabs */}
           <div className="card p-4 space-y-3">
-            <div className="flex bg-gray-100 rounded-lg p-1 w-fit gap-0.5">
+            <div className="seg w-fit max-w-full overflow-x-auto">
               {[['zeit', 'Zeit'], ['abwesenheit', 'Abwesenheit']].map(([id, label]) => (
-                <button key={id} onClick={() => setTab(id)} className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${tab === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>{label}</button>
+                <button key={id} onClick={() => setTab(id)} className={`seg-btn ${tab === id ? 'is-active' : ''}`}>{label}</button>
               ))}
             </div>
 
             {tab === 'zeit' ? (
               <>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">{anchorDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}{isToday && <span className="ml-2 text-[10px] text-[#ff6b01] font-medium">HEUTE</span>}</p>
-                  {(editId || changeReq) && <button onClick={resetForm} className="text-xs text-gray-400 hover:text-gray-600">Abbrechen</button>}
+                  <p className="text-sm font-semibold text-ink">{anchorDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}{isToday && <span className="ml-2 text-[10px] text-[#ff6b01] font-medium">HEUTE</span>}</p>
+                  {(editId || changeReq) && <button onClick={resetForm} className="text-xs text-ink-3 hover:text-ink-2">Abbrechen</button>}
                 </div>
-                {anchorFeiertag && <div className="bg-blue-50 text-blue-700 text-xs rounded-lg px-3 py-2">🎌 Feiertag: {anchorFeiertag}</div>}
-                {changeReq && <div className="bg-yellow-50 text-yellow-700 text-xs rounded-lg px-3 py-2">Änderungsantrag – geht nach dem Speichern an Felix zur Freigabe.</div>}
-                {!bearbeitbar && !changeReq && <div className="bg-gray-50 text-gray-500 text-xs rounded-lg px-3 py-2">Älter als 7 Tage: neue Einträge gehen direkt, Änderungen an bestehenden musst du beantragen.</div>}
+                {anchorFeiertag && <div className="bg-blue-50 text-blue-700 text-xs rounded-xl px-3 py-2">🎌 Feiertag: {anchorFeiertag}</div>}
+                {changeReq && <div className="bg-yellow-50 text-yellow-700 text-xs rounded-xl px-3 py-2">Änderungsantrag – geht nach dem Speichern an Felix zur Freigabe.</div>}
+                {!bearbeitbar && !changeReq && <div className="bg-white/55 text-ink-2 text-xs rounded-xl px-3 py-2">Älter als 7 Tage: neue Einträge gehen direkt, Änderungen an bestehenden musst du beantragen.</div>}
                 <div><label className="label">Was hast du gemacht?</label><textarea className="input text-sm" rows={2} value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} placeholder="z.B. Schnitt Reel Bierschneider, 3 Cuts + Musik" /></div>
                 <div className="grid grid-cols-3 gap-2">
                   <div><label className="label">Von</label><input type="time" className="input text-sm" value={form.von} onChange={e => setForm(p => ({ ...p, von: e.target.value }))} /></div>
@@ -336,7 +336,7 @@ export function Zeiterfassung() {
               </>
             ) : (
               <>
-                <p className="text-xs text-gray-400">{isAdmin ? 'Wird direkt genehmigt.' : 'Antrag geht an Felix zur Genehmigung.'}</p>
+                <p className="text-xs text-ink-3">{isAdmin ? 'Wird direkt genehmigt.' : 'Antrag geht an Felix zur Genehmigung.'}</p>
                 <div><label className="label">Typ</label>
                   <select className="input text-sm" value={abwForm.typ} onChange={e => setAbwForm(p => ({ ...p, typ: e.target.value }))}>
                     {Object.entries(ABW).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -346,9 +346,9 @@ export function Zeiterfassung() {
                   <div><label className="label">Von</label><input type="date" className="input text-sm" value={abwForm.von_datum} onChange={e => setAbwForm(p => ({ ...p, von_datum: e.target.value }))} /></div>
                   <div><label className="label">Bis</label><input type="date" className="input text-sm" value={abwForm.bis_datum} onChange={e => setAbwForm(p => ({ ...p, bis_datum: e.target.value }))} /></div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={abwForm.halber_tag} onChange={e => setAbwForm(p => ({ ...p, halber_tag: e.target.checked }))} /> Halber Tag (nur bei 1 Tag)</label>
+                <label className="flex items-center gap-2 text-sm text-ink-2"><input type="checkbox" checked={abwForm.halber_tag} onChange={e => setAbwForm(p => ({ ...p, halber_tag: e.target.checked }))} /> Halber Tag (nur bei 1 Tag)</label>
                 <div><label className="label">Notiz (optional)</label><input className="input text-sm" value={abwForm.grund} onChange={e => setAbwForm(p => ({ ...p, grund: e.target.value }))} placeholder="z.B. Erkältung" /></div>
-                {abwTageForm > 0 && <p className="text-xs text-gray-500">{fmtH(abwTageForm)} Arbeitstag{abwTageForm !== 1 ? 'e' : ''} (nach deinem Arbeitstage-Muster, ohne Feiertage)</p>}
+                {abwTageForm > 0 && <p className="text-xs text-ink-2">{fmtH(abwTageForm)} Arbeitstag{abwTageForm !== 1 ? 'e' : ''} (nach deinem Arbeitstage-Muster, ohne Feiertage)</p>}
                 <button onClick={saveAbw} disabled={saving} className="btn-primary w-full text-sm">{saving ? 'Speichert…' : isAdmin ? 'Eintragen →' : 'Antrag stellen →'}</button>
               </>
             )}
@@ -360,33 +360,33 @@ export function Zeiterfassung() {
               {abwFor(anchor) && <div className={`card p-3 text-sm ${ABW[abwFor(anchor).typ]?.text}`}>{ABW[abwFor(anchor).typ]?.label}{abwFor(anchor).halber_tag ? ' (halber Tag)' : ''} an diesem Tag</div>}
               <TagesBalken entries={dayEntries} />
               {dayEntries.length > 0 ? (
-                <div className="card divide-y divide-gray-50">
+                <div className="card divide-y divide-black/[0.05]">
                   {dayEntries.map(e => {
                     const antrag = offenerAntragFuer(e.id)
                     return (
                       <div key={e.id} className="flex items-start gap-3 p-4">
-                        <span className={`pill flex-shrink-0 ${e.ist_intern ? 'bg-gray-100 text-gray-600' : 'bg-[#ff6b01]/10 text-[#ff6b01]'}`}>{kontoLabel(e)}</span>
+                        <span className={`pill flex-shrink-0 ${e.ist_intern ? 'bg-black/[0.05] text-ink-2' : 'bg-[#ff6b01]/10 text-[#ff6b01]'}`}>{kontoLabel(e)}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{e.beschreibung}</p>
+                          <p className="text-sm text-ink whitespace-pre-wrap">{e.beschreibung}</p>
                           {antrag && <p className="text-[10px] text-yellow-600 mt-1">⏳ {antrag.art === 'delete' ? 'Löschung' : 'Änderung'} beantragt</p>}
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <span className="text-sm font-semibold text-gray-700">{fmtH(e.stunden)}h</span>
+                          <span className="text-sm font-semibold text-ink">{fmtH(e.stunden)}h</span>
                           {!antrag && (
                             <div className="flex gap-2">
                               {bearbeitbar
-                                ? <><button onClick={() => startEdit(e)} className="text-xs text-gray-400 hover:text-gray-600" title="Bearbeiten">✎</button><button onClick={() => remove(e.id)} className="text-xs text-red-400 hover:text-red-600" title="Löschen">✕</button></>
-                                : <><button onClick={() => startChangeReq(e)} className="text-[10px] text-gray-400 hover:text-gray-600">Ändern</button><button onClick={() => reqDelete(e)} className="text-[10px] text-red-400 hover:text-red-600">Löschen</button></>}
+                                ? <><button onClick={() => startEdit(e)} className="text-xs text-ink-3 hover:text-ink-2" title="Bearbeiten">✎</button><button onClick={() => remove(e.id)} className="text-xs text-red-400 hover:text-red-600" title="Löschen">✕</button></>
+                                : <><button onClick={() => startChangeReq(e)} className="text-[10px] text-ink-3 hover:text-ink-2">Ändern</button><button onClick={() => reqDelete(e)} className="text-[10px] text-red-400 hover:text-red-600">Löschen</button></>}
                             </div>
                           )}
                         </div>
                       </div>
                     )
                   })}
-                  <div className="flex items-center justify-between p-4 bg-gray-50/50"><span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tag gesamt</span><span className="text-sm font-semibold text-[#ff6b01]">{fmtH(daySumEff(anchor))}h</span></div>
+                  <div className="flex items-center justify-between p-4 bg-gray-50/50"><span className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Tag gesamt</span><span className="text-sm font-semibold text-[#ff6b01]">{fmtH(daySumEff(anchor))}h</span></div>
                 </div>
               ) : (
-                <div className="card p-10 text-center"><p className="text-2xl mb-2">⏱</p><p className="text-sm text-gray-400">Noch keine Einträge für diesen Tag</p></div>
+                <div className="card p-10 text-center"><p className="text-2xl mb-2">⏱</p><p className="text-sm text-ink-3">Noch keine Einträge für diesen Tag</p></div>
               )}
             </>
           )}
@@ -424,17 +424,17 @@ function TagesBalken({ entries }) {
           const left = (s - min) / range * 100, width = (en - s) / range * 100
           return (
             <div key={e.id}>
-              <div className="flex justify-between text-[11px] text-gray-500 mb-1 gap-2">
+              <div className="flex justify-between text-[11px] text-ink-2 mb-1 gap-2">
                 <span className="truncate">{kontoLabel(e)} · {e.beschreibung}</span>
                 <span className="flex-shrink-0">{e.von_zeit.slice(0, 5)}–{e.bis_zeit.slice(0, 5)}{e.pause_min ? ` · ${e.pause_min}min Pause` : ''} · {fmtH(e.stunden)}h</span>
               </div>
-              <div className="h-3.5 bg-gray-100 rounded-full relative overflow-hidden">
+              <div className="h-3.5 bg-black/[0.05] rounded-full relative overflow-hidden">
                 <div className="h-full rounded-full absolute bg-[#ff6b01]" style={{ left: `${left}%`, width: `${Math.max(3, width)}%` }} />
               </div>
             </div>
           )
         })}
-        <div className="flex justify-between text-[9px] text-gray-300 pt-0.5">
+        <div className="flex justify-between text-[9px] text-ink-3 pt-0.5">
           {ticks.map(h => <span key={h}>{String(Math.floor((h % 1440) / 60)).padStart(2, '0')}:00</span>)}
         </div>
       </div>
@@ -458,18 +458,18 @@ function MonatsKalender({ calMonth, setCalMonth, anchor, setAnchor, daySum, ftMa
       onTouchEnd={e => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; if (dx > 50) prev(); else if (dx < -50) next(); touchX.current = null }}>
       <div className="flex items-center justify-between mb-3 px-1">
         <button onClick={prev} className="btn-secondary text-xs px-2.5 py-1">‹</button>
-        <span className="text-sm font-semibold text-gray-800">{calMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</span>
+        <span className="text-sm font-semibold text-ink">{calMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</span>
         <button onClick={next} className="btn-secondary text-xs px-2.5 py-1">›</button>
       </div>
-      <div className="grid grid-cols-7 gap-0.5 mb-1">{WD.map(d => <div key={d} className="text-center text-[10px] font-semibold text-gray-300 py-1">{d}</div>)}</div>
+      <div className="grid grid-cols-7 gap-0.5 mb-1">{WD.map(d => <div key={d} className="text-center text-[10px] font-semibold text-ink-3 py-1">{d}</div>)}</div>
       <div className="grid grid-cols-7 gap-0.5">
         {Array(startPad).fill(null).map((_, i) => <div key={`p${i}`} />)}
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(tag => {
           const ds = toStr(new Date(y, m, tag))
           const sum = daySum(ds), ft = ftMap[ds], abw = abwFor(ds), we = istWochenende(ds)
           const sel = ds === anchor, heute = ds === todayStr()
-          let bg = 'hover:bg-gray-50', txt = 'text-gray-700'
-          if (we) txt = 'text-gray-300'
+          let bg = 'hover:bg-white/55', txt = 'text-ink'
+          if (we) txt = 'text-ink-3'
           if (ft) { bg = 'bg-blue-50 hover:bg-blue-100'; txt = 'text-blue-600' }
           if (abw) { bg = `${ABW[abw.typ]?.bg} hover:opacity-80`; txt = ABW[abw.typ]?.text }
           if (sel) bg = 'bg-[#ff6b01]/10 ring-1 ring-[#ff6b01]/40'
@@ -481,18 +481,18 @@ function MonatsKalender({ calMonth, setCalMonth, anchor, setAnchor, daySum, ftMa
           )
         })}
       </div>
-      <div className="mt-3 pt-3 border-t border-gray-100 px-1 space-y-1">
-        <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Monat Ist</span><span className="text-sm font-semibold text-[#ff6b01]">{fmtH(monatIst)}h</span></div>
-        {monatGut > 0 && <div className="flex items-center justify-between"><span className="text-[10px] text-gray-400">davon Feiertag/Urlaub</span><span className="text-[10px] text-blue-600">{fmtH(monatGut)}h</span></div>}
+      <div className="mt-3 pt-3 border-t border-black/[0.06] px-1 space-y-1">
+        <div className="flex items-center justify-between"><span className="text-xs text-ink-3">Monat Ist</span><span className="text-sm font-semibold text-[#ff6b01]">{fmtH(monatIst)}h</span></div>
+        {monatGut > 0 && <div className="flex items-center justify-between"><span className="text-[10px] text-ink-3">davon Feiertag/Urlaub</span><span className="text-[10px] text-blue-600">{fmtH(monatGut)}h</span></div>}
         {monatSoll > 0 && <>
-          <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Soll</span><span className="text-xs font-medium text-gray-600">{fmtH(monatSoll)}h</span></div>
-          <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Differenz</span><span className={`text-xs font-semibold ${monatIst - monatSoll >= 0 ? 'text-green-600' : 'text-gray-500'}`}>{monatIst - monatSoll >= 0 ? '+' : ''}{fmtH(monatIst - monatSoll)}h</span></div>
+          <div className="flex items-center justify-between"><span className="text-xs text-ink-3">Soll</span><span className="text-xs font-medium text-ink-2">{fmtH(monatSoll)}h</span></div>
+          <div className="flex items-center justify-between"><span className="text-xs text-ink-3">Differenz</span><span className={`text-xs font-semibold ${monatIst - monatSoll >= 0 ? 'text-green-600' : 'text-ink-2'}`}>{monatIst - monatSoll >= 0 ? '+' : ''}{fmtH(monatIst - monatSoll)}h</span></div>
         </>}
       </div>
       {monatFeiertage.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-100 px-1">
-          <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider mb-1">Feiertage</p>
-          {monatFeiertage.map(([ds, name]) => <div key={ds} className="flex justify-between text-[11px] text-gray-500 py-0.5"><span>{parse(ds).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span><span className="text-blue-600">{name}</span></div>)}
+        <div className="mt-3 pt-3 border-t border-black/[0.06] px-1">
+          <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">Feiertage</p>
+          {monatFeiertage.map(([ds, name]) => <div key={ds} className="flex justify-between text-[11px] text-ink-2 py-0.5"><span>{parse(ds).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span><span className="text-blue-600">{name}</span></div>)}
         </div>
       )}
     </div>
@@ -529,13 +529,13 @@ export function Urlaub() {
   if (loading) return <Spinner />
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      <div className="page-header"><div><h2 className="text-base font-semibold text-gray-900">Urlaub & Abwesenheit</h2><p className="text-xs text-gray-400">Übersicht & Genehmigung · Erfassen unter „Zeiterfassung → Abwesenheit"</p></div></div>
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-4 max-w-3xl">
+      <div className="page-header"><div><h1 className="page-title">Urlaub & Abwesenheit</h1><p className="text-[13px] text-ink-2 mt-1.5">Übersicht & Genehmigung · Erfassen unter „Zeiterfassung → Abwesenheit"</p></div></div>
 
       {anspruch > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          {[['Anspruch', anspruch, 'text-gray-700'], ['Genommen', urlaubJahr, 'text-gray-700'], ['Rest ' + jahr, anspruch - urlaubJahr, 'text-[#ff6b01]']].map(([l, v, c]) => (
-            <div key={l} className="card p-4 text-center"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{l}</p><p className={`text-xl font-semibold ${c}`}>{fmtH(v)}</p><p className="text-[10px] text-gray-400">Tage</p></div>
+          {[['Anspruch', anspruch, 'text-ink'], ['Genommen', urlaubJahr, 'text-ink'], ['Rest ' + jahr, anspruch - urlaubJahr, 'text-[#ff6b01]']].map(([l, v, c]) => (
+            <div key={l} className="card p-4 text-center"><p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">{l}</p><p className={`text-xl font-semibold ${c}`}>{fmtH(v)}</p><p className="text-[10px] text-ink-3">Tage</p></div>
           ))}
         </div>
       )}
@@ -545,8 +545,8 @@ export function Urlaub() {
           <h3 className="section-title text-yellow-600">Zu genehmigen ({offeneFremde.length})</h3>
           <div className="space-y-2">
             {offeneFremde.map(a => (
-              <div key={a.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                <div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-800">{a.profiles?.full_name || '—'} · {abwLabel(a.typ)}</p><p className="text-xs text-gray-400">{fmtDate(a.von_datum)} – {fmtDate(a.bis_datum)} · {fmtH(a.tage)} Tage{a.halber_tag ? ' (halb)' : ''}{a.grund ? ` · ${a.grund}` : ''}</p></div>
+              <div key={a.id} className="flex items-center gap-3 py-2 border-b border-black/[0.04] last:border-0">
+                <div className="flex-1 min-w-0"><p className="text-sm font-medium text-ink">{a.profiles?.full_name || '—'} · {abwLabel(a.typ)}</p><p className="text-xs text-ink-3">{fmtDate(a.von_datum)} – {fmtDate(a.bis_datum)} · {fmtH(a.tage)} Tage{a.halber_tag ? ' (halb)' : ''}{a.grund ? ` · ${a.grund}` : ''}</p></div>
                 <button onClick={() => entscheide(a.id, 'genehmigt')} className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-md font-medium hover:bg-green-200">✓</button>
                 <button onClick={() => entscheide(a.id, 'abgelehnt')} className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-md font-medium hover:bg-red-100">✕</button>
               </div>
@@ -559,23 +559,23 @@ export function Urlaub() {
         <div className="card p-4">
           <h3 className="section-title">Alle Anträge (Team)</h3>
           {antraege.filter(a => a.user_id !== profile?.id && a.status !== 'offen').length === 0
-            ? <p className="text-sm text-gray-400 py-2 text-center">Keine weiteren Einträge</p>
+            ? <p className="text-sm text-ink-3 py-2 text-center">Keine weiteren Einträge</p>
             : <div className="space-y-2">{antraege.filter(a => a.user_id !== profile?.id && a.status !== 'offen').slice(0, 30).map(a => (
-              <div key={a.id} className="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
+              <div key={a.id} className="flex items-center gap-3 py-1.5 border-b border-black/[0.04] last:border-0">
                 <span className={`pill flex-shrink-0 ${statusPill[a.status]}`}>{a.status === 'genehmigt' ? 'OK' : 'Abgelehnt'}</span>
-                <div className="flex-1 min-w-0"><p className="text-sm text-gray-800">{a.profiles?.full_name} · {abwLabel(a.typ)}</p><p className="text-xs text-gray-400">{fmtDate(a.von_datum)} – {fmtDate(a.bis_datum)} · {fmtH(a.tage)} Tage</p></div>
+                <div className="flex-1 min-w-0"><p className="text-sm text-ink">{a.profiles?.full_name} · {abwLabel(a.typ)}</p><p className="text-xs text-ink-3">{fmtDate(a.von_datum)} – {fmtDate(a.bis_datum)} · {fmtH(a.tage)} Tage</p></div>
               </div>))}</div>}
         </div>
       )}
 
       <div className="card p-4">
         <h3 className="section-title">Meine Anträge</h3>
-        {meine.length === 0 ? <p className="text-sm text-gray-400 py-4 text-center">Noch keine Anträge</p> : (
+        {meine.length === 0 ? <p className="text-sm text-ink-3 py-4 text-center">Noch keine Anträge</p> : (
           <div className="space-y-2">
             {meine.map(a => (
-              <div key={a.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+              <div key={a.id} className="flex items-center gap-3 py-2 border-b border-black/[0.04] last:border-0">
                 <span className={`pill flex-shrink-0 ${statusPill[a.status]}`}>{a.status === 'offen' ? 'Offen' : a.status === 'genehmigt' ? 'Genehmigt' : 'Abgelehnt'}</span>
-                <div className="flex-1 min-w-0"><p className="text-sm text-gray-800">{abwLabel(a.typ)} · {fmtDate(a.von_datum)} – {fmtDate(a.bis_datum)}</p><p className="text-xs text-gray-400">{fmtH(a.tage)} Tage{a.halber_tag ? ' (halb)' : ''}{a.grund ? ` · ${a.grund}` : ''}</p></div>
+                <div className="flex-1 min-w-0"><p className="text-sm text-ink">{abwLabel(a.typ)} · {fmtDate(a.von_datum)} – {fmtDate(a.bis_datum)}</p><p className="text-xs text-ink-3">{fmtH(a.tage)} Tage{a.halber_tag ? ' (halb)' : ''}{a.grund ? ` · ${a.grund}` : ''}</p></div>
                 {a.status === 'offen' && <button onClick={() => zuruecknehmen(a.id)} className="text-xs text-red-400 hover:text-red-600 flex-shrink-0">Zurückziehen</button>}
               </div>
             ))}
@@ -683,9 +683,9 @@ export function Auswertung() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-4xl">
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-4 max-w-4xl">
       <div className="page-header">
-        <div><h2 className="text-base font-semibold text-gray-900">Auswertung</h2><p className="text-xs text-gray-400">Stundenkonto, Feiertage & Kunden-Zeiten</p></div>
+        <div><h1 className="page-title">Auswertung</h1><p className="text-[13px] text-ink-2 mt-1.5">Stundenkonto, Feiertage & Kunden-Zeiten</p></div>
         <div className="flex gap-2">
           <button onClick={() => setMonth(new Date(y, mo - 1, 1))} className="btn-secondary text-xs px-3">‹</button>
           <button onClick={() => { const d = new Date(); setMonth(new Date(d.getFullYear(), d.getMonth(), 1)) }} className="btn-secondary text-xs px-3">Aktuell</button>
@@ -694,7 +694,7 @@ export function Auswertung() {
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm font-semibold text-gray-800">{month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</p>
+        <p className="text-sm font-semibold text-ink">{month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</p>
         {isAdmin && (
           <select className="input text-xs w-auto" value={selUser || 'alle'} onChange={e => setSelUser(e.target.value)}>
             <option value="alle">Alle Mitarbeiter</option>
@@ -711,8 +711,8 @@ export function Auswertung() {
             {pending.map(e => (
               <div key={e.id} className="flex items-center gap-3 py-2">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-800 truncate"><span className="font-medium">{memberName(e.user_id)}</span> · {new Date(e.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })}</p>
-                  <p className="text-xs text-gray-500 truncate">{e.start_zeit?.slice(0, 5)}–{e.end_zeit?.slice(0, 5)} Uhr · {fmtH(Number(e.stunden))} Std.{e.notiz ? ` · ${e.notiz}` : ''}</p>
+                  <p className="text-sm text-ink truncate"><span className="font-medium">{memberName(e.user_id)}</span> · {new Date(e.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })}</p>
+                  <p className="text-xs text-ink-2 truncate">{e.start_zeit?.slice(0, 5)}–{e.end_zeit?.slice(0, 5)} Uhr · {fmtH(Number(e.stunden))} Std.{e.notiz ? ` · ${e.notiz}` : ''}</p>
                 </div>
                 <button onClick={() => decideMj(e.id, 'genehmigt')} title="Genehmigen" className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-md font-medium hover:bg-green-200 flex-shrink-0">✓</button>
                 <button onClick={() => decideMj(e.id, 'abgelehnt')} title="Ablehnen" className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-md font-medium hover:bg-red-200 flex-shrink-0">✗</button>
@@ -727,15 +727,15 @@ export function Auswertung() {
           {/* Kennzahlen */}
           {einzel ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Ist (Monat)</p><p className="text-xl font-semibold text-[#ff6b01]">{fmtH(effIst)}h</p>{gutschrift > 0 && <p className="text-[10px] text-gray-400 mt-0.5">{fmtH(total)}h gearbeitet + {fmtH(gutschrift)}h Feiertag/Urlaub</p>}</div>
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Soll</p><p className="text-xl font-semibold text-gray-700">{mSoll > 0 ? fmtH(mSoll) + 'h' : '–'}</p></div>
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Saldo</p><p className={`text-xl font-semibold ${saldo === null ? 'text-gray-400' : saldo >= 0 ? 'text-green-600' : 'text-red-500'}`}>{saldo === null ? '–' : `${saldo >= 0 ? '+' : ''}${fmtH(saldo)}h`}</p></div>
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Urlaub / Krank ({jahr})</p><p className="text-xl font-semibold text-gray-700">{fmtH(urlaubJahr)}{Number(aktProfil?.urlaub_anspruch_tage) ? <span className="text-sm text-gray-400">/{aktProfil.urlaub_anspruch_tage}</span> : ''} <span className="text-sm text-gray-400">· {fmtH(krankJahr)}</span></p></div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">Ist (Monat)</p><p className="text-xl font-semibold text-[#ff6b01]">{fmtH(effIst)}h</p>{gutschrift > 0 && <p className="text-[10px] text-ink-3 mt-0.5">{fmtH(total)}h gearbeitet + {fmtH(gutschrift)}h Feiertag/Urlaub</p>}</div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">Soll</p><p className="text-xl font-semibold text-ink">{mSoll > 0 ? fmtH(mSoll) + 'h' : '–'}</p></div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">Saldo</p><p className={`text-xl font-semibold ${saldo === null ? 'text-ink-3' : saldo >= 0 ? 'text-green-600' : 'text-red-500'}`}>{saldo === null ? '–' : `${saldo >= 0 ? '+' : ''}${fmtH(saldo)}h`}</p></div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">Urlaub / Krank ({jahr})</p><p className="text-xl font-semibold text-ink">{fmtH(urlaubJahr)}{Number(aktProfil?.urlaub_anspruch_tage) ? <span className="text-sm text-ink-3">/{aktProfil.urlaub_anspruch_tage}</span> : ''} <span className="text-sm text-ink-3">· {fmtH(krankJahr)}</span></p></div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Gesamt</p><p className="text-2xl font-semibold text-[#ff6b01]">{fmtH(total)}h</p></div>
-              <div className="card p-4"><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Einträge</p><p className="text-2xl font-semibold text-gray-700">{filtered.length}</p></div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">Gesamt</p><p className="text-2xl font-semibold text-[#ff6b01]">{fmtH(total)}h</p></div>
+              <div className="card p-4"><p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider mb-1">Einträge</p><p className="text-2xl font-semibold text-ink">{filtered.length}</p></div>
             </div>
           )}
 
@@ -745,20 +745,20 @@ export function Auswertung() {
           {/* Nach Konto */}
           <div className="card p-4">
             <h3 className="section-title">Nach Konto</h3>
-            {perKunde.length === 0 ? <p className="text-sm text-gray-400 py-3 text-center">Keine Einträge in diesem Monat</p> : (
+            {perKunde.length === 0 ? <p className="text-sm text-ink-3 py-3 text-center">Keine Einträge in diesem Monat</p> : (
               <div className="space-y-2.5">{perKunde.map(([k, h]) => (
-                <div key={k}><div className="flex items-center justify-between mb-1"><span className="text-sm text-gray-700">{k}</span><span className="text-xs font-medium text-gray-500">{fmtH(h)}h · {total ? Math.round(h / total * 100) : 0}%</span></div><div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-[#ff6b01] rounded-full" style={{ width: `${(h / maxKunde) * 100}%` }} /></div></div>
+                <div key={k}><div className="flex items-center justify-between mb-1"><span className="text-sm text-ink">{k}</span><span className="text-xs font-medium text-ink-2">{fmtH(h)}h · {total ? Math.round(h / total * 100) : 0}%</span></div><div className="h-1.5 bg-black/[0.05] rounded-full overflow-hidden"><div className="h-full bg-[#ff6b01] rounded-full" style={{ width: `${(h / maxKunde) * 100}%` }} /></div></div>
               ))}</div>
             )}
           </div>
 
           {!einzel && perUser.length > 0 && (
-            <div className="card p-4"><h3 className="section-title">Nach Mitarbeiter</h3><div className="space-y-1">{perUser.map(([k, h]) => <div key={k} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0"><span className="text-sm text-gray-700">{k}</span><span className="text-sm font-medium text-[#ff6b01]">{fmtH(h)}h</span></div>)}</div></div>
+            <div className="card p-4"><h3 className="section-title">Nach Mitarbeiter</h3><div className="space-y-1">{perUser.map(([k, h]) => <div key={k} className="flex items-center justify-between py-1.5 border-b border-black/[0.04] last:border-0"><span className="text-sm text-ink">{k}</span><span className="text-sm font-medium text-[#ff6b01]">{fmtH(h)}h</span></div>)}</div></div>
           )}
 
           {filtered.length > 0 && (
             <div className="card p-4">
-              <div className="flex items-center justify-between"><div><h3 className="section-title mb-0">Report</h3><p className="text-xs text-gray-400 mt-1">Kompletter Text zum Kopieren – für die Monatsauswertung.</p></div><button onClick={() => setShowReport(!showReport)} className="btn-secondary text-xs py-1.5 px-3">{showReport ? 'Verbergen' : '📋 Anzeigen'}</button></div>
+              <div className="flex items-center justify-between"><div><h3 className="section-title mb-0">Report</h3><p className="text-xs text-ink-3 mt-1">Kompletter Text zum Kopieren – für die Monatsauswertung.</p></div><button onClick={() => setShowReport(!showReport)} className="btn-secondary text-xs py-1.5 px-3">{showReport ? 'Verbergen' : '📋 Anzeigen'}</button></div>
               {showReport && <textarea readOnly className="input text-xs font-mono mt-3 leading-relaxed" rows={14} value={buildReport()} onFocus={e => e.target.select()} />}
             </div>
           )}
@@ -790,16 +790,16 @@ function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage, tSoll }) 
     <div className="card p-3 md:p-4 overflow-x-auto table-scroll">
       <div className="min-w-[560px]">
         <div className="grid grid-cols-[32px_repeat(7,1fr)_56px] gap-1 mb-1">
-          <div className="text-[10px] font-semibold text-gray-300 text-center py-1">KW</div>
-          {WD.map(d => <div key={d} className="text-[10px] font-semibold text-gray-300 py-1 pl-1">{d}</div>)}
-          <div className="text-[10px] font-semibold text-gray-300 text-right py-1 pr-1">Summe</div>
+          <div className="text-[10px] font-semibold text-ink-3 text-center py-1">KW</div>
+          {WD.map(d => <div key={d} className="text-[10px] font-semibold text-ink-3 py-1 pl-1">{d}</div>)}
+          <div className="text-[10px] font-semibold text-ink-3 text-right py-1 pr-1">Summe</div>
         </div>
         {weeks.map((wk, wi) => {
           const wkSum = wk.filter(Boolean).reduce((s, ds) => s + daySum(ds), 0)
           const kw = wk.find(Boolean) ? isoWeek(wk.find(Boolean)) : ''
           return (
             <div key={wi} className="grid grid-cols-[32px_repeat(7,1fr)_56px] gap-1 mb-1">
-              <div className="text-[10px] text-gray-400 text-center flex items-center justify-center">{kw}</div>
+              <div className="text-[10px] text-ink-3 text-center flex items-center justify-center">{kw}</div>
               {wk.map((ds, di) => {
                 if (!ds) return <div key={di} className="min-h-[52px] rounded-md bg-gray-50/40" />
                 const sum = daySum(ds), ft = ftMap[ds], abw = abwForDay(ds), we = istWochenende(ds), heute = ds === todayStr()
@@ -808,19 +808,19 @@ function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage, tSoll }) 
                 if (abw) bg = ABW[abw.typ]?.bg
                 return (
                   <div key={di} className={`min-h-[52px] rounded-md p-1 ${bg} ${heute ? 'ring-1 ring-[#ff6b01]/50' : ''}`}>
-                    <div className={`text-[10px] ${we ? 'text-gray-300' : 'text-gray-500'} ${heute ? 'text-[#ff6b01] font-bold' : ''}`}>{parse(ds).getDate()}</div>
+                    <div className={`text-[10px] ${we ? 'text-ink-3' : 'text-ink-2'} ${heute ? 'text-[#ff6b01] font-bold' : ''}`}>{parse(ds).getDate()}</div>
                     {ft ? <><div className="text-[9px] text-blue-600 leading-tight truncate" title={ft}>{ft}</div>{sum > 0 && <div className="text-[10px] font-semibold text-blue-600">{fmtH(sum)}h</div>}</>
                       : abw ? <><div className={`text-[9px] leading-tight truncate ${ABW[abw.typ]?.text}`} title={ABW[abw.typ]?.label}>{ABW[abw.typ]?.label}{abw.halber_tag ? ' ½' : ''}</div>{sum > 0 && <div className={`text-[10px] font-semibold ${ABW[abw.typ]?.text}`}>{fmtH(sum)}h</div>}</>
                         : sum > 0 ? <div className="text-[11px] font-semibold text-[#ff6b01] mt-1">{fmtH(sum)}h</div> : null}
                   </div>
                 )
               })}
-              <div className="text-xs font-medium text-gray-600 text-right pr-1 flex items-center justify-end">{wkSum > 0 ? fmtH(wkSum) + 'h' : '–'}</div>
+              <div className="text-xs font-medium text-ink-2 text-right pr-1 flex items-center justify-end">{wkSum > 0 ? fmtH(wkSum) + 'h' : '–'}</div>
             </div>
           )
         })}
-        <div className="grid grid-cols-[32px_repeat(7,1fr)_56px] gap-1 mt-2 pt-2 border-t border-gray-100">
-          <div className="col-span-8 text-xs font-semibold text-gray-400 uppercase tracking-wider pl-1 flex items-center">Monat gesamt</div>
+        <div className="grid grid-cols-[32px_repeat(7,1fr)_56px] gap-1 mt-2 pt-2 border-t border-black/[0.06]">
+          <div className="col-span-8 text-xs font-semibold text-ink-3 uppercase tracking-wider pl-1 flex items-center">Monat gesamt</div>
           <div className="text-sm font-semibold text-[#ff6b01] text-right pr-1">{fmtH(monatSum)}h</div>
         </div>
       </div>

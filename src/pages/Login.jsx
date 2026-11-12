@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../components/AuthProvider'
 import { supabase } from '../lib/supabase'
+import { BrandMark } from '../components/BrandMark'
 
 export default function Login() {
   const { signIn, user, isRestricted } = useAuth()
@@ -66,25 +67,30 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="h-screen overflow-y-auto relative">
+      <div className="app-bg" aria-hidden="true"><i /></div>
+      <div className="app-shell min-h-full flex items-center justify-center p-4">
+      <div className="w-full max-w-sm fade-up">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-[#ff6b01] rounded-2xl mb-4 shadow-lg shadow-orange-200">
-            <span className="text-white font-bold text-xl">B</span>
+          <div className="inline-flex items-center justify-center w-[76px] h-[76px] rounded-[22px] mb-5 bg-white/80 border border-white shadow-[0_18px_40px_-16px_rgba(124,58,237,0.45),0_8px_20px_-10px_rgba(255,107,1,0.4)]">
+            <BrandMark size={48} />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">Brehl Visuals OS</h1>
-          <p className="text-sm text-gray-400 mt-1">Internes Betriebssystem</p>
+          <h1 className="leading-none" style={{ fontFamily: "'Poppins', -apple-system, system-ui, sans-serif" }}>
+            <span className="block text-[34px] font-bold tracking-[-0.03em] text-[#333]">brehl</span>
+            <span className="block text-[17px] font-light text-[#333] -mt-0.5">visuals <span className="brand-text font-bold">OS</span></span>
+          </h1>
+          <p className="text-[15px] text-ink-2 mt-3">Internes Betriebssystem</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="glass rounded-[28px] p-6">
           {mode === 'login' && (
             <>
-              <p className="text-sm font-medium text-gray-700 mb-4">Anmelden</p>
+              <p className="text-[17px] font-semibold text-ink mb-4 tracking-tight">Anmelden</p>
               <form onSubmit={handleLogin} className="space-y-3">
                 <div><label className="label">E-Mail</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input" placeholder="name@brehlvisuals.de" /></div>
                 <div><label className="label">Passwort</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="input" placeholder="••••••••" /></div>
-                {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
-                <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Wird angemeldet...' : 'Anmelden →'}</button>
+                {error && <div className="text-xs text-[#d70015] bg-[#ff3b30]/10 rounded-xl px-3 py-2">{error}</div>}
+                <button type="submit" disabled={loading} className="btn-primary w-full !py-3">{loading ? 'Wird angemeldet...' : 'Anmelden →'}</button>
               </form>
               <button onClick={() => setMode('reset')} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-4 transition-colors">Passwort vergessen?</button>
             </>
@@ -92,12 +98,12 @@ export default function Login() {
 
           {mode === 'reset' && !sent && (
             <>
-              <p className="text-sm font-medium text-gray-700 mb-1">Passwort zurücksetzen</p>
+              <p className="text-[17px] font-semibold text-ink mb-1 tracking-tight">Passwort zurücksetzen</p>
               <p className="text-xs text-gray-400 mb-4">Wir senden dir einen Link per E-Mail.</p>
               <form onSubmit={handleReset} className="space-y-3">
                 <div><label className="label">E-Mail</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input" placeholder="name@brehlvisuals.de" /></div>
-                {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
-                <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Wird gesendet...' : 'Link senden →'}</button>
+                {error && <div className="text-xs text-[#d70015] bg-[#ff3b30]/10 rounded-xl px-3 py-2">{error}</div>}
+                <button type="submit" disabled={loading} className="btn-primary w-full !py-3">{loading ? 'Wird gesendet...' : 'Link senden →'}</button>
               </form>
               <button onClick={() => setMode('login')} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-4 transition-colors">← Zurück</button>
             </>
@@ -114,17 +120,18 @@ export default function Login() {
 
           {mode === 'set-password' && (
             <>
-              <p className="text-sm font-medium text-gray-700 mb-1">Neues Passwort setzen</p>
+              <p className="text-[17px] font-semibold text-ink mb-1 tracking-tight">Neues Passwort setzen</p>
               <p className="text-xs text-gray-400 mb-4">Mindestens 8 Zeichen.</p>
               <form onSubmit={handleSetPw} className="space-y-3">
                 <div><label className="label">Neues Passwort</label><input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={8} className="input" placeholder="Min. 8 Zeichen" /></div>
-                {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
-                <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Wird gespeichert...' : 'Passwort speichern →'}</button>
+                {error && <div className="text-xs text-[#d70015] bg-[#ff3b30]/10 rounded-xl px-3 py-2">{error}</div>}
+                <button type="submit" disabled={loading} className="btn-primary w-full !py-3">{loading ? 'Wird gespeichert...' : 'Passwort speichern →'}</button>
               </form>
             </>
           )}
         </div>
-        <p className="text-center text-xs text-gray-400 mt-4">Zugang nur für Brehl Visuals Team</p>
+        <p className="text-center text-xs text-ink-3 mt-5">Zugang nur für das Brehl Visuals Team</p>
+      </div>
       </div>
     </div>
   )

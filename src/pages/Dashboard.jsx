@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { BrandMark } from '../components/BrandMark'
 
 export default function Dashboard() {
   const { profile, isAdmin, canAccess } = useAuth()
@@ -58,12 +59,13 @@ export default function Dashboard() {
   )
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-5 max-w-5xl mx-auto">
       {/* Greeting */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">{greeting}, {name} 👋</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <BrandMark size={30} className="mb-3 md:hidden" />
+          <h1 className="page-title">{greeting}, {name.split(' ')[0]}</h1>
+          <p className="text-sm text-ink-3 mt-0.5">
             {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
@@ -79,9 +81,9 @@ export default function Dashboard() {
             { label: 'Offene Tasks', value: tasksCount, sub: overdueTasks.length > 0 ? `${overdueTasks.length} überfällig` : 'Alles im Plan', color: overdueTasks.length > 0 ? 'text-red-500' : '' },
           ].map(kpi => (
             <div key={kpi.label} className="card p-4">
-              <p className="text-xs text-gray-400 mb-1">{kpi.label}</p>
+              <p className="text-xs text-ink-3 mb-1">{kpi.label}</p>
               <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{kpi.sub}</p>
+              <p className="text-xs text-ink-3 mt-0.5">{kpi.sub}</p>
             </div>
           ))}
         </div>
@@ -91,13 +93,13 @@ export default function Dashboard() {
         {/* Tasks */}
         <div className="md:col-span-2 card p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Meine Tasks</h2>
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tasksCount} offen</span>
+            <h2 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Meine Tasks</h2>
+            <span className="text-xs bg-black/[0.05] text-ink-2 px-2 py-0.5 rounded-full">{tasksCount} offen</span>
           </div>
           {tasksCount === 0 ? (
             <div className="text-center py-8">
               <p className="text-2xl mb-2">🎉</p>
-              <p className="text-sm text-gray-400">Keine offenen Tasks!</p>
+              <p className="text-sm text-ink-3">Keine offenen Tasks!</p>
             </div>
           ) : (
             <>
@@ -105,12 +107,12 @@ export default function Dashboard() {
                 {tasks.map(t => {
                   const overdue = t.faellig_am && new Date(t.faellig_am) < new Date()
                   return (
-                    <div key={t.id} className={`flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0 ${overdue ? 'bg-red-50 -mx-4 px-4 rounded' : ''}`}>
+                    <div key={t.id} className={`flex items-start gap-3 py-2.5 border-b border-black/[0.04] last:border-0 ${overdue ? 'bg-red-50 -mx-4 px-4 rounded' : ''}`}>
                       <button onClick={() => completeTask(t.id)}
                         className="w-4 h-4 rounded-full border-2 border-gray-300 hover:border-[#ff6b01] flex-shrink-0 mt-0.5 transition-colors" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{t.titel}</p>
-                        <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-gray-400'}`}>
+                        <p className="text-sm font-medium text-ink truncate">{t.titel}</p>
+                        <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-ink-3'}`}>
                           {t.crm_leads?.name && `${t.crm_leads.name} · `}
                           {overdue ? '⚠ Überfällig' : t.faellig_am ? new Date(t.faellig_am).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' }) : ''}
                         </p>
@@ -119,12 +121,6 @@ export default function Dashboard() {
                   )
                 })}
               </div>
-              {tasksCount > tasks.length && (
-                <button onClick={() => navigate('/tasks')}
-                  className="mt-3 w-full text-center text-xs text-[#ff6b01] hover:text-[#e55f00] font-medium py-2 transition-colors">
-                  Alle {tasksCount} Tasks anzeigen →
-                </button>
-              )}
             </>
           )}
         </div>
@@ -133,18 +129,17 @@ export default function Dashboard() {
         <div className="space-y-4">
           {/* Quick access */}
           <div className="card p-4">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Schnellzugriff</h2>
+            <h2 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Schnellzugriff</h2>
             <div className="grid grid-cols-2 gap-2">
               {[
                 { to: '/projekte', icon: '▦', label: 'Projekte', show: true },
                 { to: '/crm', icon: '◉', label: 'CRM', show: canAccess('crm') },
-                { to: '/tasks', icon: '◷', label: 'Tasks', show: canAccess('crm') },
                 { to: '/kalender', icon: '◻', label: 'Kalender', show: true },
               ].filter(i => i.show).map(item => (
                 <button key={item.to} onClick={() => navigate(item.to)}
-                  className="bg-gray-50 hover:bg-gray-100 rounded-lg p-3 text-center transition-all group">
+                  className="bg-white/55 hover:bg-black/[0.05] rounded-xl p-3 text-center transition-all group">
                   <span className="text-lg block mb-1">{item.icon}</span>
-                  <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900">{item.label}</span>
+                  <span className="text-xs font-medium text-ink-2 group-hover:text-ink">{item.label}</span>
                 </button>
               ))}
             </div>
@@ -153,13 +148,13 @@ export default function Dashboard() {
           {/* Upcoming Drehs - Admin */}
           {isAdmin && upcomingDrehs.length > 0 && (
             <div className="card p-4">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Nächste Drehs</h2>
+              <h2 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Nächste Drehs</h2>
               <div className="space-y-2">
                 {upcomingDrehs.slice(0, 3).map(d => (
                   <div key={d.id} className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium text-gray-800">{d.kunde_name}</p>
-                      <p className="text-xs text-gray-400">{d.datum ? new Date(d.datum).toLocaleDateString('de-DE') : '—'}</p>
+                      <p className="text-xs font-medium text-ink">{d.kunde_name}</p>
+                      <p className="text-xs text-ink-3">{d.datum ? new Date(d.datum).toLocaleDateString('de-DE') : '—'}</p>
                     </div>
                     <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full capitalize">{d.status}</span>
                   </div>
@@ -171,12 +166,12 @@ export default function Dashboard() {
           {/* News */}
           {news.length > 0 && (
             <div className="card p-4">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Team-News</h2>
+              <h2 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Team-News</h2>
               <div className="space-y-3">
                 {news.map(n => (
                   <div key={n.id}>
-                    <p className="text-xs font-semibold text-gray-800">{n.titel}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{n.inhalt}</p>
+                    <p className="text-xs font-semibold text-ink">{n.titel}</p>
+                    <p className="text-xs text-ink-3 mt-0.5 leading-relaxed">{n.inhalt}</p>
                   </div>
                 ))}
               </div>

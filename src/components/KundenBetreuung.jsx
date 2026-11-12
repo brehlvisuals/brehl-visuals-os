@@ -157,7 +157,7 @@ export default function KundenBetreuung({ kundeId }) {
     } catch (e) { console.error('deleteTouchpoint error:', e); setErr(e.message) }
   }
 
-  if (loading) return <p className="text-xs text-gray-400 text-center py-4">Lädt…</p>
+  if (loading) return <p className="text-xs text-ink-3 text-center py-4">Lädt…</p>
 
   const wochenStart = mondayOfWeek()
   const tpDieseWoche = touchpoints.filter(t => t.datum >= wochenStart)
@@ -177,11 +177,11 @@ export default function KundenBetreuung({ kundeId }) {
         tpDieseWoche={tpDieseWoche} tpProgress={tpProgress} touchpoints={touchpoints}
         onAdd={addTouchpoint} onDelete={deleteTouchpoint} />
 
-      <p className="text-[10px] font-bold tracking-wider uppercase text-gray-400 mt-5 mb-2">
+      <p className="text-[10px] font-bold tracking-wider uppercase text-ink-3 mt-5 mb-2">
         Anstehende Gespräche
       </p>
       {offeneCalls.length === 0 && (
-        <p className="text-xs text-gray-400 py-2">Keine offenen Gespräche.</p>
+        <p className="text-xs text-ink-3 py-2">Keine offenen Gespräche.</p>
       )}
       {offeneCalls.map(call => (
         <CallCard key={call.id} call={call} onDone={markCallDone}
@@ -191,7 +191,7 @@ export default function KundenBetreuung({ kundeId }) {
 
       {erledigteCalls.length > 0 && (
         <>
-          <p className="text-[10px] font-bold tracking-wider uppercase text-gray-400 mt-5 mb-2">
+          <p className="text-[10px] font-bold tracking-wider uppercase text-ink-3 mt-5 mb-2">
             Verlauf ({erledigteCalls.length})
           </p>
           {erledigteCalls.map(call => (
@@ -211,9 +211,9 @@ function TouchpointSection({ tpDieseWoche, tpProgress, touchpoints, onAdd, onDel
   const erfuellt = tpProgress >= TOUCHPOINT_ZIEL
 
   return (
-    <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+    <div className="bg-white/55 border border-black/[0.06] rounded-xl p-3">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-xs font-bold text-gray-800">Touchpoints diese Woche</span>
+        <span className="text-xs font-bold text-ink">Touchpoints diese Woche</span>
         <span className={`text-xs font-bold ${erfuellt ? 'text-green-600' : 'text-[#ff6b01]'}`}>
           {tpDieseWoche.length} / {TOUCHPOINT_ZIEL}
         </span>
@@ -225,7 +225,7 @@ function TouchpointSection({ tpDieseWoche, tpProgress, touchpoints, onAdd, onDel
             i < tpProgress ? (erfuellt ? 'bg-green-500' : 'bg-[#ff6b01]') : 'bg-gray-200'}`} />
         ))}
       </div>
-      <p className="text-[10px] text-gray-400 mb-2 leading-relaxed">
+      <p className="text-[10px] text-ink-3 mb-2 leading-relaxed">
         Ziel: mindestens 2 Touchpoints pro Woche (WhatsApp, Anruf, Mail, Newsletter …), um die Kundenbeziehung aktiv zu halten.
       </p>
 
@@ -254,15 +254,15 @@ function TouchpointSection({ tpDieseWoche, tpProgress, touchpoints, onAdd, onDel
       )}
 
       {touchpoints.length > 0 && (
-        <div className="mt-3 pt-2 border-t border-gray-100 space-y-1">
+        <div className="mt-3 pt-2 border-t border-black/[0.06] space-y-1">
           {touchpoints.slice(0, 12).map(tp => (
-            <div key={tp.id} className="flex items-center gap-2 text-xs text-gray-600 py-0.5">
+            <div key={tp.id} className="flex items-center gap-2 text-xs text-ink-2 py-0.5">
               <span>{TOUCHPOINT_TYPES[tp.typ]?.icon || '•'}</span>
               <span className="font-medium">{TOUCHPOINT_TYPES[tp.typ]?.label || tp.typ}</span>
-              <span className="text-gray-400">{fmtDate(tp.datum)}</span>
-              {tp.notiz && <span className="text-gray-400 truncate">— {tp.notiz}</span>}
+              <span className="text-ink-3">{fmtDate(tp.datum)}</span>
+              {tp.notiz && <span className="text-ink-3 truncate">— {tp.notiz}</span>}
               <button onClick={() => onDelete(tp.id)}
-                className="ml-auto text-gray-300 hover:text-red-500 text-sm">×</button>
+                className="ml-auto text-ink-3 hover:text-red-500 text-sm">×</button>
             </div>
           ))}
         </div>
@@ -280,12 +280,12 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
   const ueberfaellig = !done && call.faellig_am && call.faellig_am < todayStr()
 
   return (
-    <div className={`border rounded-xl p-3 mb-2 ${done ? 'border-gray-100 bg-gray-50/60' : 'border-gray-200 bg-white'}`}>
+    <div className={`border rounded-xl p-3 mb-2 ${done ? 'border-black/[0.06] bg-gray-50/60' : 'border-black/[0.08] bg-white'}`}>
       <div className="flex items-start gap-2">
         <span className="text-lg leading-none">{cfg.icon}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-bold text-gray-800">{cfg.label}</span>
+            <span className="text-xs font-bold text-ink">{cfg.label}</span>
             {cfg.recurring && (
               <span className="text-[9px] bg-indigo-50 text-indigo-500 rounded px-1.5 py-0.5 font-semibold">
                 alle 4 Wochen
@@ -297,7 +297,7 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
               </span>
             )}
           </div>
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <p className="text-[11px] text-ink-3 mt-0.5">
             {done
               ? `Erledigt am ${fmtDate(call.erledigt_am)}`
               : call.faellig_am ? `Fällig ab ${fmtDate(call.faellig_am)}` : ''}
@@ -305,7 +305,7 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
         </div>
         {!done && !dateOpen && (
           <button onClick={() => setDateOpen(true)} disabled={busy}
-            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors">
+            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl px-2.5 py-1.5 whitespace-nowrap transition-colors">
             {busy ? '…' : '✓ Geführt'}
           </button>
         )}
@@ -313,24 +313,24 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
 
       {/* Datum-Bestätigung beim Abhaken */}
       {!done && dateOpen && (
-        <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-2.5">
-          <p className="text-[11px] text-gray-600 mb-1.5 font-medium">Wann wurde der Call geführt?</p>
+        <div className="mt-2 bg-green-50 border border-green-200 rounded-xl p-2.5">
+          <p className="text-[11px] text-ink-2 mb-1.5 font-medium">Wann wurde der Call geführt?</p>
           <div className="flex gap-2 items-center">
             <input type="date" value={doneDate} max={todayStr()}
               onChange={e => setDoneDate(e.target.value)}
               className="input text-xs flex-1" />
             <button onClick={() => { onDone(call, doneDate); setDateOpen(false) }} disabled={busy}
-              className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg px-3 py-2 whitespace-nowrap">
+              className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl px-3 py-2 whitespace-nowrap">
               {busy ? '…' : 'Bestätigen'}
             </button>
             <button onClick={() => { setDateOpen(false); setDoneDate(todayStr()) }}
-              className="text-gray-400 hover:text-gray-600 text-sm px-1">×</button>
+              className="text-ink-3 hover:text-ink-2 text-sm px-1">×</button>
           </div>
         </div>
       )}
 
       {cfg.erklaerung && !done && (
-        <p className="text-[11px] text-gray-500 leading-relaxed mt-2 bg-gray-50 rounded-lg px-2.5 py-2">
+        <p className="text-[11px] text-ink-2 leading-relaxed mt-2 bg-white/55 rounded-xl px-2.5 py-2">
           {cfg.erklaerung}
         </p>
       )}
@@ -339,7 +339,7 @@ function CallCard({ call, onDone, onSaveNote, savingNote, done, busy }) {
         {!noteOpen ? (
           <div onClick={() => setNoteOpen(true)} className="cursor-pointer">
             {call.notizen ? (
-              <p className="text-[11px] text-gray-600 whitespace-pre-wrap bg-[#ff6b01]/5 border-l-2 border-[#ff6b01] rounded px-2.5 py-1.5">
+              <p className="text-[11px] text-ink-2 whitespace-pre-wrap bg-[#ff6b01]/5 border-l-2 border-[#ff6b01] rounded px-2.5 py-1.5">
                 {call.notizen}
               </p>
             ) : (
