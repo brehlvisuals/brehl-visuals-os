@@ -1265,11 +1265,25 @@ function SchalterZeile({ label, an, onChange }) {
 // Videoliste: feste Nummern (Position im Dreh – Video 7 bleibt 7, auch abgehakt), erledigte unten,
 // jedes Video einzeln ein-/ausklappbar (Zustand pro Dreh im Browser gemerkt)
 function VideoListe({ videos, live, ro, datensatzId, onToggleDone, onRemove, onMove }) {
-  const key = `os-zu-${datensatzId}`
-  const [zu, setZu] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() } })
-  const merken = n => { setZu(n); try { localStorage.setItem(key, JSON.stringify([...n])) } catch { /* egal */ } }
-  const umschalten = id => { const n = new Set(zu); n.has(id) ? n.delete(id) : n.add(id); merken(n) }
-  const alleZu = videos.length > 0 && videos.every(v => zu.has(v.id))
+  // Standard: alle Videos zugeklappt. Gemerkt wird, welche offen sind – pro Dreh und Gerät,
+  // bleibt also beim Hin- und Herwechseln, Schließen und Neuladen erhalten.
+  const key = `os-offen-${datensatzId}`
+  const [auf, setAuf] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() } })
+  const aufRef = useRef(auf)
+  aufRef.current = auf
+  const merken = n => { aufRef.current = n; setAuf(n); try { localStorage.setItem(key, JSON.stringify([...n])) } catch { /* egal */ } }
+  const umschalten = id => { const n = new Set(aufRef.current); n.has(id) ? n.delete(id) : n.add(id); merken(n) }
+  // Neu hinzugefügte Videos direkt aufklappen, damit man gleich lostippen kann
+  const bekannt = useRef(null)
+  useEffect(() => {
+    const ids = videos.map(v => v.id).filter(Boolean)
+    if (bekannt.current === null) { bekannt.current = new Set(ids); return }
+    const neu = ids.filter(id => !bekannt.current.has(id))
+    ids.forEach(id => bekannt.current.add(id))
+    if (neu.length) { const n = new Set(aufRef.current); neu.forEach(id => n.add(id)); merken(n) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videos.map(v => v.id).join(',')])
+  const alleZu = videos.length > 0 && videos.every(v => !auf.has(v.id))
   // Anzeige: offene zuerst, erledigte unten – jeweils in fester Reihenfolge
   const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0) || a - b)
   const offen = videos.filter(v => !v.erledigt).length
@@ -1278,7 +1292,7 @@ function VideoListe({ videos, live, ro, datensatzId, onToggleDone, onRemove, onM
       {videos.length > 0 && (
         <div className="flex items-center justify-between px-0.5">
           <span className="text-xs text-ink-2">{offen} offen · {videos.length - offen} erledigt</span>
-          <button onClick={() => merken(alleZu ? new Set() : new Set(videos.map(v => v.id)))}
+          <button onClick={() => merken(alleZu ? new Set(videos.map(v => v.id)) : new Set())}
             className="text-xs font-medium text-[#ff6b01] hover:text-[#e05f00] px-2 py-1 rounded-full hover:bg-[#ff6b01]/8 transition">
             {alleZu ? 'Alle ausklappen' : 'Alle einklappen'}
           </button>
@@ -1287,7 +1301,7 @@ function VideoListe({ videos, live, ro, datensatzId, onToggleDone, onRemove, onM
       {ord.map((i, p) => {
         const v = videos[i]
         const nr = i + 1
-        const eingeklappt = zu.has(v.id)
+        const eingeklappt = !auf.has(v.id)
         // ▲▼ nur innerhalb der gleichen Gruppe (offen/erledigt)
         const vor = ord[p - 1] != null && !!videos[ord[p - 1]].erledigt === !!v.erledigt ? videos[ord[p - 1]] : null
         const nach = ord[p + 1] != null && !!videos[ord[p + 1]].erledigt === !!v.erledigt ? videos[ord[p + 1]] : null
