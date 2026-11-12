@@ -3,7 +3,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { BrandMark } from '../components/BrandMark'
-import { metricool, auswerten, ampel, alsDatum } from '../lib/kundenvideos'
+import { metricool, auswerten, ampel, alsDatum, alsVideo, zaehlNetze } from '../lib/kundenvideos'
+
+const NETZ = { instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', facebook: 'Facebook', linkedin: 'LinkedIn', twitter: 'X', pinterest: 'Pinterest', threads: 'Threads', gmb: 'Google', bluesky: 'Bluesky' }
+const VIDEO_NETZE = ['instagram', 'tiktok', 'youtube', 'facebook']
 
 // Kundenvideos: pro Kunde, wie viele Videos diesen Monat bei Metricool online sind, noch geplant sind,
 // auf Freigabe warten – im Vergleich zum Monatsziel. Warnung, wenn eine Freigabe kurz vor dem Termin fehlt.
@@ -158,6 +161,10 @@ function Legende() {
         <div className="flex gap-2"><span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.05] text-ink-2 whitespace-nowrap h-fit">Content bis …</span><span>bis zu diesem Tag sind Beiträge eingeplant</span></div>
         <div className="flex gap-2"><span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#ff9f0a]/15 text-[#9a5b00] whitespace-nowrap h-fit">Dreh planen</span><span>es fehlen Videos und es ist noch kein Dreh angesetzt</span></div>
       </div>
+      <p className="text-xs text-ink-2 mt-3 pt-3 border-t hairline">
+        <b className="text-ink">Gezählt</b> (online, geplant, Monatsziel) werden nur <b className="text-ink">Videos</b> auf Instagram, TikTok, YouTube oder Facebook – je Beitrag einmal, egal auf wie vielen Plattformen. Reine LinkedIn-Beiträge zählen nicht. Pro Kunde lässt sich das einschränken (z. B. Bierschneider: nur TikTok).
+        Die <b className="text-ink">Freigabe-Warnungen</b> umfassen dagegen alle Beiträge, auch LinkedIn.
+      </p>
     </div>
   )
 }
@@ -267,7 +274,9 @@ function KundenDetail({ k, a, monat, isAdmin, onClose, onSpeichern, onDreh }) {
     const n = new Set(gewaehlt); n.has(String(id)) ? n.delete(String(id)) : n.add(String(id))
     onSpeichern({ metricool_brand_ids: [...n].map(Number) })
   }
-  const liste = [...a.imMonat, ...a.freigabeOffen.filter(p => !a.imMonat.includes(p))].sort((x, y) => String(x.datum).localeCompare(String(y.datum)))
+  const liste = [...a.alleImMonat, ...a.freigabeOffen.filter(p => !a.alleImMonat.includes(p))].sort((x, y) => String(x.datum).localeCompare(String(y.datum)))
+  const nur = k.zaehl_netzwerke || []
+  const toggleNetz = n => onSpeichern({ zaehl_netzwerke: nur.includes(n) ? nur.filter(x => x !== n) : [...nur, n] })
   const marke = k.metricool_brand_ids?.[0]
 
   return (
@@ -328,13 +337,16 @@ function KundenDetail({ k, a, monat, isAdmin, onClose, onSpeichern, onDreh }) {
             <p className="text-[13px] font-semibold text-ink mb-2 px-0.5">Beiträge</p>
             {liste.length === 0 ? <p className="text-xs text-ink-3 px-0.5">Keine Beiträge in diesem Monat.</p> : (
               <div className="rounded-[20px] bg-white/70 border border-white divide-y divide-black/[0.05] overflow-hidden">
-                {liste.map(p => {
+                {liste.map(roh => {
+                  const v = alsVideo(roh, k)
+                  const p = v || roh
+                  const zaehltNicht = !v ? (!roh.video ? 'kein Video – zählt nicht' : (roh.netzwerke || []).every(n => n.netz === 'linkedin') ? 'nur LinkedIn – zählt nicht' : 'Plattform zählt nicht') : null
                   const d = alsDatum(p.datum)
                   const vorbei = d < new Date()
                   const st = p.status === 'online' || p.status === 'teilweise' ? ['online', 'gruen']
                     : p.status === 'fehler' ? ['Fehler', 'rot'] : vorbei ? ['nicht online', 'rot'] : ['geplant', 'blau']
                   return (
-                    <div key={p.uuid || p.id} className="px-3.5 py-2.5 flex items-start gap-3">
+                    <div key={p.uuid || p.id} className={`px-3.5 py-2.5 flex items-start gap-3 ${zaehltNicht ? 'opacity-60' : ''}`}>
                       <div className="w-12 flex-shrink-0 text-center">
                         <p className="text-[10px] font-semibold text-ink-3 uppercase">{d.toLocaleDateString('de-DE', { weekday: 'short' })}</p>
                         <p className="text-[15px] font-bold text-ink leading-tight">{d.getDate()}.{d.getMonth() + 1}.</p>
@@ -343,11 +355,13 @@ function KundenDetail({ k, a, monat, isAdmin, onClose, onSpeichern, onDreh }) {
                         <p className="text-[13px] text-ink truncate">{p.titel || p.text || 'Ohne Text'}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           <Chip ton={st[1] === 'blau' ? undefined : st[1]}>{st[0]}</Chip>
-                          {p.freigabe === 'pending' && !vorbei && <Chip ton={a.dringend.includes(p) ? 'rot' : 'gelb'}>wartet auf Freigabe</Chip>}
+                          {zaehltNicht && <Chip>{zaehltNicht}</Chip>}
+                          {p.freigabe === 'pending' && !vorbei && <Chip ton={a.dringend.includes(roh) ? 'rot' : 'gelb'}>wartet auf Freigabe</Chip>}
                           {p.freigabe === 'approved' && p.status === 'geplant' && <Chip ton="gruen">freigegeben</Chip>}
                           {p.freigabe === 'rejected' && <Chip ton="rot">abgelehnt</Chip>}
                           {p.notizen > 0 && <Chip>{p.notizen} Notiz{p.notizen > 1 ? 'en' : ''}{p.ungelesen ? ' (neu)' : ''}</Chip>}
                         </div>
+                        <p className="text-[10.5px] text-ink-3 mt-1">{(roh.netzwerke || []).map(n => NETZ[n.netz] || n.netz).join(' · ')}</p>
                       </div>
                       <span className="text-[11px] text-ink-3 whitespace-nowrap">{d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
@@ -365,6 +379,16 @@ function KundenDetail({ k, a, monat, isAdmin, onClose, onSpeichern, onDreh }) {
                 <label className="label">Videos pro Monat</label>
                 <input type="number" min="0" max="200" className="input max-w-[160px]" value={ziel} placeholder="z. B. 15"
                   onChange={e => setZiel(e.target.value)} onBlur={() => onSpeichern({ videos_pro_monat: ziel === '' ? null : Math.max(0, parseInt(ziel) || 0) })} />
+              </div>
+              <div>
+                <label className="label">Zählt fürs Monatsziel auf</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {VIDEO_NETZE.map(n => (
+                    <button key={n} onClick={() => toggleNetz(n)}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-full transition ${nur.includes(n) ? 'bg-[#ff6b01] text-white' : 'bg-black/[0.05] text-ink-2 hover:bg-black/[0.08]'}`}>{NETZ[n]}</button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-ink-3 mt-1.5">{nur.length ? `Nur Videos auf ${nur.map(n => NETZ[n]).join(', ')} zählen.` : 'Nichts gewählt = alle Video-Plattformen zählen.'} Reine LinkedIn-Beiträge zählen nie.</p>
               </div>
               <div>
                 <label className="label">Metricool-Marke(n)</label>

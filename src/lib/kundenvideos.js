@@ -14,8 +14,27 @@ export async function metricool(params) {
   return body
 }
 
+// Welche Plattformen eines Beitrags zählen fürs Monatsziel?
+// Nie LinkedIn (dort sind es Textbeiträge oder Duplikate). Optional pro Kunde eingeschränkt (z. B. Bierschneider = nur TikTok).
+export function zaehlNetze(p, kunde) {
+  const nur = kunde?.zaehl_netzwerke || []
+  return (p.netzwerke || []).filter(n => n.netz !== 'linkedin' && (!nur.length || nur.includes(n.netz)))
+}
+// Zählt der Beitrag als Video fürs Monatsziel? Wenn ja, mit Status nur aus den zählenden Plattformen.
+export function alsVideo(p, kunde) {
+  const netze = zaehlNetze(p, kunde)
+  if (!p.video || !netze.length) return null
+  const st = netze.map(n => String(n.status || '').toUpperCase())
+  const status = st.every(s => s === 'PUBLISHED') ? 'online'
+    : st.some(s => s === 'PUBLISHED') ? 'teilweise'
+    : st.some(s => ['ERROR', 'FAILED', 'REJECTED'].includes(s)) ? 'fehler' : 'geplant'
+  return { ...p, status }
+}
+
 // Kennzahlen eines Kunden für einen Monat
-export function auswerten(kunde, posts, monat, drehs = []) {
+// Monatsziel/Balken/Verlauf: nur Videos (siehe alsVideo). Freigaben: ALLE Beiträge (auch LinkedIn).
+export function auswerten(kunde, alle, monat, drehs = []) {
+  const posts = alle.map(p => alsVideo(p, kunde)).filter(Boolean)
   const jetzt = new Date()
   const mStart = new Date(monat.getFullYear(), monat.getMonth(), 1)
   const mEnde = new Date(monat.getFullYear(), monat.getMonth() + 1, 0, 23, 59, 59)
@@ -25,8 +44,10 @@ export function auswerten(kunde, posts, monat, drehs = []) {
   const geplant = imMonat.filter(p => p.status === 'geplant' && alsDatum(p.datum) >= jetzt)
   const verpasst = imMonat.filter(p => p.status === 'geplant' && alsDatum(p.datum) < jetzt)   // Termin vorbei, aber nicht online
   const offenAlle = posts.filter(p => p.status === 'geplant' && alsDatum(p.datum) >= new Date(jetzt.getTime() - 86400000))
-  const freigabeOffen = offenAlle.filter(p => p.freigabe === 'pending')
-  const abgelehnt = offenAlle.filter(p => p.freigabe === 'rejected')
+  // Freigaben: alle noch nicht veröffentlichten Beiträge, egal ob Video oder LinkedIn-Text
+  const ungepostet = alle.filter(p => p.status === 'geplant' && alsDatum(p.datum) >= new Date(jetzt.getTime() - 86400000))
+  const freigabeOffen = ungepostet.filter(p => p.freigabe === 'pending')
+  const abgelehnt = ungepostet.filter(p => p.freigabe === 'rejected')
   // Jede fehlende Freigabe ist rot – egal wie weit der Termin noch weg ist (Wunsch Felix, 2026-11-12).
   // (freigabe_vorlauf_tage bleibt in der DB, wird aber nicht mehr genutzt.)
   const dringend = [...freigabeOffen].sort((x, y) => alsDatum(x.datum) - alsDatum(y.datum))   // frühester zuerst
@@ -39,7 +60,7 @@ export function auswerten(kunde, posts, monat, drehs = []) {
   const inProduktion = drehs.filter(d => d.kunde_id === kunde.id && ['cutting', 'posting'].includes(d.status))
     .reduce((s, d) => s + (Array.isArray(d.videos) ? d.videos.filter(v => !v.erledigt).length : 0), 0)
   return {
-    imMonat, online, geplant, fehler, verpasst, freigabeOffen, abgelehnt, dringend,
+    imMonat, alleImMonat: alle.filter(p => { const d = alsDatum(p.datum); return d && d >= mStart && d <= mEnde }), online, geplant, fehler, verpasst, freigabeOffen, abgelehnt, dringend,
     ziel, summe, fehlt: ziel != null ? Math.max(0, ziel - summe) : null, ueber: ziel != null ? Math.max(0, summe - ziel) : 0,
     reichtBis, naechsterDreh, inProduktion,
   }

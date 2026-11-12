@@ -46,6 +46,7 @@ Das Schema `os_backup` (Stände 11.11. und 12.11.2026) bleibt mindestens bis **1
 - Ab Status „Cutting“ muss `raw_gesichert` gesetzt sein (App-Regel).
 
 ## Kundenvideos (Metricool)
+- Zählregel Monatsziel: nur Video-Beiträge auf Instagram/TikTok/YouTube/Facebook (je Beitrag einmal), reine LinkedIn-Beiträge nie; pro Kunde einschränkbar über `proj_kunden.zaehl_netzwerke` (Bierschneider = nur TikTok). Freigabe-Warnungen zählen ALLE Beiträge (auch LinkedIn). Logik in `src/lib/kundenvideos.js` (`alsVideo`, `auswerten`).
 - `api/metricool.js` liest Metricool (nur lesend) mit `METRICOOL_USER_TOKEN` (Vercel-Env, nie im Browser). Zuordnung + Monatsziel in `proj_kunden` (`metricool_brand_ids`, `videos_pro_monat`, `freigabe_vorlauf_tage`; nur Admin änderbar).
 
 ## Notfall: alten Stand wiederherstellen

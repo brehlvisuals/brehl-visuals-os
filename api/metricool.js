@@ -36,12 +36,18 @@ function schlank(p) {
     : st.some(s => ['ERROR', 'FAILED', 'REJECTED'].includes(s)) ? 'fehler'
     : 'geplant'
   const freigabe = p.postApprovalData?.approvalStatus || null   // pending | approved | rejected | null (ohne Freigabe-Prozess)
+  // Video? (Datei-Endung oder Reel/Short/Video-Typ) – nur Videos zählen fürs Monatsziel
+  const media = Array.isArray(p.media) ? p.media : []
+  const video = media.some(m => /\.(mp4|mov|m4v|webm|avi)(\?|#|$)/i.test(String(m || '')) || /\/video\//i.test(String(m || '')))
+    || ['REEL', 'TRIAL_REEL'].includes(String(p.instagramData?.type || '').toUpperCase())
+    || String(p.facebookData?.type || '').toUpperCase() === 'REEL'
+    || prov.some(x => ['youtube', 'tiktok'].includes(x.network)) && media.length > 0
   return {
     id: p.id, uuid: p.uuid,
     datum: p.publicationDate?.dateTime || null,        // Ortszeit Berlin, ohne Offset
     text: String(p.text || '').split('\n')[0].slice(0, 140),
     titel: p.instagramData?.type ? (p.facebookData?.title || p.tiktokData?.title || p.youtubeData?.title || null) : (p.youtubeData?.title || null),
-    status, freigabe,
+    status, freigabe, video,
     entwurf: !!p.draft,
     netzwerke: prov.map(x => ({ netz: x.network, status: x.status, url: x.publicUrl || null })),
     notizen: Array.isArray(p.notes) ? p.notes.filter(n => !n.deleted).length : 0,
