@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { Avatar, AvatarUpload } from '../components/Avatar'
 
 /* ═══════════════════════════════════════
    TASKS
@@ -654,9 +655,7 @@ export function Team() {
               <tr key={m.id} className="border-b border-black/[0.04] hover:bg-white/70/50 transition-all">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-[#ff6b01]/10 flex items-center justify-center text-xs font-semibold text-[#ff6b01]">
-                      {(m.full_name || m.email || '?')[0].toUpperCase()}
-                    </div>
+                    <AvatarUpload person={m} size={34} onDone={url => setMembers(prev => prev.map(x => x.id === m.id ? { ...x, avatar_url: url } : x))} />
                     <div>
                       <p className="text-sm font-medium text-ink">{m.full_name || '—'}</p>
                       <p className="text-xs text-ink-3">{m.email}</p>
@@ -868,7 +867,7 @@ export function Team() {
    EINSTELLUNGEN
 ═══════════════════════════════════════ */
 export function Einstellungen() {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, profilNeuLaden } = useAuth()
   const [newPw, setNewPw] = useState('')
   const [msg, setMsg] = useState('')
 
@@ -884,6 +883,15 @@ export function Einstellungen() {
       <h1 className="page-title">Einstellungen</h1>
       <div className="card p-5">
         <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-4">Mein Profil</h3>
+        {profile?.role !== 'extern' && (
+          <div className="flex items-center gap-4 mb-4">
+            <AvatarUpload person={profile} size={64} onDone={() => profilNeuLaden?.()} />
+            <div>
+              <p className="text-[15px] font-semibold text-ink">{profile?.full_name}</p>
+              <p className="text-xs text-ink-2">Bild antippen, um dein Profilbild zu ändern</p>
+            </div>
+          </div>
+        )}
         <div className="space-y-0.5">
           {[['E-Mail', profile?.email], ['Rolle', profile?.role === 'admin' ? 'Administrator' : profile?.role === 'videograph' ? 'Videograph' : profile?.role === 'extern' ? 'Extern' : 'Mitarbeiter']].map(([l, v]) => (
             <div key={l} className="flex items-center gap-3 py-2.5 border-b border-black/[0.04] last:border-0">

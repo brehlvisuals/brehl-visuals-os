@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { useLiveDatensatz } from '../lib/useLiveDatensatz'
+import { Avatar } from '../components/Avatar'
 
 const STATUSES = [
   { id: 'planung',        label: 'Planung',         color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  text: '#b45309' },
@@ -349,7 +350,7 @@ export default function Projekte() {
       supabase.from('proj_intern').select('*').order('created_at', { ascending: false }),
       supabase.from('proj_kunden').select('*').order('name'),
       supabase.from('crm_darsteller').select('id, name').order('name'),
-      supabase.from('profiles').select('id, full_name, email, role, aktiv').order('full_name'),
+      supabase.from('profiles').select('id, full_name, email, role, aktiv, avatar_url').order('full_name'),
     ])
     if (d.data) setDrehs(d.data)
     if (i.data) setIntern(i.data)
@@ -526,12 +527,18 @@ export default function Projekte() {
                                 const raw = ['planung', 'abnahme_kunde', 'dreh'].includes(dreh.status) ? deadlineInfo(dreh.deadline_raw, dreh.raw_gesichert) : null
                                 const cut = ['dreh', 'cutting'].includes(dreh.status) ? deadlineInfo(dreh.deadline_cutting, false) : null
                                 const cutter = profiles.find(p => p.id === dreh.cutter_id)
-                                if (!raw && !cut && !cutter) return null
+                                const vg = profiles.find(p => p.id === dreh.zustaendig_id)
+                                if (!raw && !cut && !cutter && !vg) return null
                                 return (
                                   <div className="flex flex-wrap items-center gap-1 mt-2">
                                     {raw && <span className={`text-[10.5px] font-medium px-2 py-0.5 rounded-full ${TON[raw.ton]}`}>RAW {raw.text}</span>}
                                     {cut && <span className={`text-[10.5px] font-medium px-2 py-0.5 rounded-full ${TON[cut.ton]}`}>Cut {cut.text}</span>}
-                                    {cutter && <span title={`Cutter: ${cutter.full_name}`} className="ml-auto w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#38b6ff,#ff6b01 55%,#7c3aed)' }}>{(cutter.full_name || '?')[0]}</span>}
+                                    {(vg || cutter) && (
+                                      <span className="ml-auto flex items-center">
+                                        {vg && <span title={`Videograph: ${vg.full_name}`}><Avatar person={vg} size={22} ring /></span>}
+                                        {cutter && <span title={`Cutter: ${cutter.full_name}`} className={vg ? '-ml-1.5' : ''}><Avatar person={cutter} size={22} ring /></span>}
+                                      </span>
+                                    )}
                                   </div>
                                 )
                               })()}

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from './AuthProvider'
 import { supabase } from '../lib/supabase'
 import { BrandMark, BrandWordmark } from './BrandMark'
+import { Avatar } from './Avatar'
 
 // Tasks, Prozess Kunde und Kunden-Journal sind bewusst ausgeblendet (werden nicht genutzt, Daten bleiben erhalten)
 const NAV = [
@@ -143,10 +144,7 @@ export default function Sidebar() {
 
           {/* Nutzer */}
           <div className="m-3 mt-0 p-2.5 rounded-2xl bg-white/50 flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#38b6ff,#ff6b01 55%,#7c3aed)' }}>
-              {name[0].toUpperCase()}
-            </div>
+            <Avatar person={profile} size={34} />
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-medium text-ink truncate">{name}</div>
               <div className="text-[11px] text-ink-3">{rolle}</div>
@@ -209,9 +207,7 @@ export default function Sidebar() {
             </div>
             <div className="mt-3 pt-3 border-t hairline flex items-center justify-between px-1">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white" style={{ background: 'linear-gradient(135deg,#38b6ff,#ff6b01 55%,#7c3aed)' }}>
-                  {name[0].toUpperCase()}
-                </div>
+                <Avatar person={profile} size={34} />
                 <div>
                   <div className="text-[13px] font-medium text-ink">{name}</div>
                   <div className="text-[11px] text-ink-3">{rolle}</div>

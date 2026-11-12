@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { BrandMark } from '../components/BrandMark'
 import KundenvideosWarnungen from '../components/KundenvideosWarnungen'
+import { Avatar } from '../components/Avatar'
 
 // Dashboard
 // – Admin (Felix): Master-Dashboard mit den Aufgaben aller Personen mit Dashboard-Zugang, Liste oder Kalender,
@@ -65,7 +66,7 @@ export default function Dashboard() {
     const q = supabase.from('os_aufgaben').select('*').or(`erledigt.eq.false,erledigt_am.gte.${seit}`).order('faellig_am', { ascending: true, nullsFirst: false })
     const [a, p, d] = await Promise.all([
       isAdmin ? q : q.eq('assignee_id', profile.id),
-      supabase.from('profiles').select('id, full_name, role, dashboard, aktiv').order('full_name'),
+      supabase.from('profiles').select('id, full_name, role, dashboard, aktiv, avatar_url').order('full_name'),
       supabase.from('proj_drehs').select('id, kunde_name, datum'),
     ])
     if (a.data) setAufgaben(a.data)
@@ -163,7 +164,7 @@ export default function Dashboard() {
           {personen.map(p => {
             const n = aufgaben.filter(a => a.assignee_id === p.id && !a.erledigt).length
             return (
-              <FilterChip key={p.id} an={filterPerson === p.id} onClick={() => setFilterPerson(p.id)} farbe={farbeVon(p.id, personen)}>
+              <FilterChip key={p.id} an={filterPerson === p.id} onClick={() => setFilterPerson(p.id)} person={p}>
                 {p.full_name?.split(' ')[0]} {n > 0 && <span className="opacity-60 tabular-nums">{n}</span>}
               </FilterChip>
             )
@@ -198,11 +199,11 @@ export default function Dashboard() {
   )
 }
 
-function FilterChip({ an, onClick, farbe, children }) {
+function FilterChip({ an, onClick, farbe, person, children }) {
   return (
     <button onClick={onClick}
       className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-all duration-200 active:scale-95 ${an ? 'bg-white text-ink shadow-[0_3px_10px_-3px_rgba(0,0,0,0.18)]' : 'bg-white/45 text-ink-2 hover:bg-white/70'}`}>
-      {farbe && <span className="w-2 h-2 rounded-full" style={{ background: farbe }} />}
+      {person ? <Avatar person={person} size={20} className="-ml-1.5" /> : farbe && <span className="w-2 h-2 rounded-full" style={{ background: farbe }} />}
       {children}
     </button>
   )
@@ -271,7 +272,7 @@ function AufgabenListe({ aufgaben, personen, zeigePerson, personVon, drehVon, on
                   </div>
                   {zeigePerson && p && (
                     <span className="flex items-center gap-1.5 text-[11px] font-medium text-ink-2 whitespace-nowrap flex-shrink-0 pt-0.5">
-                      <span className="w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center" style={{ background: farbeVon(p.id, personen) }}>{(p.full_name || '?')[0]}</span>
+                      <Avatar person={p} size={24} />
                       <span className="hidden sm:inline">{p.full_name?.split(' ')[0]}</span>
                     </span>
                   )}

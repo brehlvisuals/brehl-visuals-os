@@ -84,6 +84,7 @@ export function AuthProvider({ children }) {
   return (
     <Ctx.Provider value={{
       user, profile, isAdmin, isExtern, isVideograph, isRestricted, isMinijob, canAccess, canDashboard, loading,
+      profilNeuLaden: () => user && loadProfile(user.id, user.email),
       signIn: (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }),
       signOut: () => supabase.auth.signOut(),
     }}>
