@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { useLiveDatensatz } from '../lib/useLiveDatensatz'
 import { Avatar } from '../components/Avatar'
+import { metricool, auswerten } from '../lib/kundenvideos'
 
 const STATUSES = [
   { id: 'planung',        label: 'Planung',         color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  text: '#b45309' },
@@ -1135,6 +1136,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                     fertig={['posting', 'abgeschlossen'].includes(form.status)} disabled={ro}
                     onChange={v => set('deadline_cutting', v)} />
                 </div>
+                {!ro && <VideosFehlen kunde={kunden.find(k => k.id === form.kunde_id)} deadline={form.deadline_cutting} />}
                 <p className="text-[11px] text-ink-3 mt-1.5 pl-0.5">Deadlines erscheinen automatisch als Aufgabe im Dashboard der zuständigen Person.</p>
               </div>
               <div>
@@ -1382,6 +1384,58 @@ function DeadlineZeile({ titel, unter, wert, fertig, onChange, disabled }) {
       {info && <span className={`hidden sm:inline text-[10.5px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${TON[info.ton]}`}>{fertig ? '✓ erledigt' : info.ton === 'ueber' ? 'überfällig' : info.ton === 'bald' ? 'bald fällig' : 'offen'}</span>}
       <input type="datetime-local" disabled={disabled} className="input text-xs !w-[11.5rem] !py-1.5 flex-shrink-0"
         value={zuLokal(wert)} onChange={e => onChange(ausLokal(e.target.value))} />
+    </div>
+  )
+}
+
+// Unter den Deadlines: wie viele Videos fehlen dem Kunden noch für den Monat (live aus Metricool, gleiche Zählregel wie „Kundenvideos“).
+// Aktueller Monat – und zusätzlich der Monat der Cutting-Deadline, falls der später liegt.
+function VideosFehlen({ kunde, deadline }) {
+  const [daten, setDaten] = useState(null)
+  const [fehler, setFehler] = useState(null)
+  const jetzt = new Date()
+  const monate = [new Date(jetzt.getFullYear(), jetzt.getMonth(), 1)]
+  if (deadline) {
+    const d = new Date(deadline), m = new Date(d.getFullYear(), d.getMonth(), 1)
+    if (m > monate[0]) monate.push(m)
+  }
+  const z = n => String(n).padStart(2, '0')
+  const tag = d => `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
+  const letzter = monate[monate.length - 1]
+  const bis = new Date(letzter.getFullYear(), letzter.getMonth() + 1, 0)
+  const marken = (kunde?.metricool_brand_ids || []).join(',')
+  useEffect(() => {
+    if (!marken) return
+    let alive = true
+    setDaten(null); setFehler(null)
+    metricool({ aktion: 'posts', marken, von: tag(monate[0]), bis: tag(bis) })
+      .then(r => { if (alive) setDaten(Object.values(r.posts || {}).flat()) })
+      .catch(e => { if (alive) setFehler(e.message) })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marken, tag(bis)])
+
+  if (!kunde) return null
+  if (!marken) return <p className="text-[11px] text-ink-3 mt-2 pl-0.5">{kunde.name} ist noch keiner Metricool-Marke zugeordnet (Kundenvideos → Einstellungen).</p>
+  if (fehler) return null
+  return (
+    <div className="mt-2 rounded-2xl bg-white/60 border hairline divide-y divide-black/[0.06]">
+      {monate.map(m => {
+        const name = m.toLocaleDateString('de-DE', { month: 'long' })
+        if (!daten) return <div key={+m} className="px-3.5 py-2.5 text-[12px] text-ink-3">{kunde.name} · {name}: wird geladen…</div>
+        const a = auswerten(kunde, daten, m)
+        const ton = a.ziel == null ? 'text-ink-2' : a.fehlt > 0 ? 'text-[#c2410c]' : 'text-[#248a3d]'
+        return (
+          <div key={+m} className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+            <span className="text-[13px] text-ink"><b>{kunde.name}</b> · {name}</span>
+            <span className={`text-[13px] font-semibold whitespace-nowrap ${ton}`}>
+              {a.ziel == null ? `${a.summe} Videos (kein Ziel)`
+                : a.fehlt > 0 ? `noch ${a.fehlt} fehlen (${a.summe}/${a.ziel})`
+                : a.ueber > 0 ? `Ziel erreicht (+${a.ueber})` : `Ziel erreicht (${a.summe}/${a.ziel})`}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
