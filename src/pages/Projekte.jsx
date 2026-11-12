@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { useLiveDatensatz } from '../lib/useLiveDatensatz'
@@ -56,6 +56,28 @@ function kundeStyle(name) {
 }
 // Ein Dreh gilt als vollständig gesichert, wenn RAW UND FINAL auf NAS liegen
 const istGesichert = d => !!(d?.raw_gesichert && d?.final_gesichert)
+// Ab „Cutting“ muss das RAW-Material gesichert sein
+const BRAUCHT_RAW = ['cutting', 'posting', 'abgeschlossen']
+const RAW_HINWEIS = 'Erst „RAW auf NAS gesichert“ anhaken (im Dreh unter Info) – dann kann der Dreh ins Cutting.'
+
+// Deadline-Anzeige (Berliner Zeit aus dem Browser)
+function deadlineInfo(ts, fertig) {
+  if (!ts) return null
+  const d = new Date(ts), jetzt = new Date()
+  const tage = Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate())) / 86400000)
+  const text = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  const ton = fertig ? 'ok' : d < jetzt ? 'ueber' : tage <= 1 ? 'bald' : 'normal'
+  return { text, ton }
+}
+const TON = {
+  ok: 'bg-[#34c759]/12 text-[#248a3d]',
+  ueber: 'bg-[#ff3b30]/12 text-[#d70015]',
+  bald: 'bg-[#ff9f0a]/15 text-[#9a5b00]',
+  normal: 'bg-black/[0.05] text-ink-2',
+}
+// datetime-local <-> timestamptz
+const zuLokal = ts => { if (!ts) return ''; const d = new Date(ts); const z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}` }
+const ausLokal = v => v ? new Date(v).toISOString() : null
 
 // Plaintext (z.B. aus Airtable-Migration) sicher in HTML wandeln, sonst HTML unverändert lassen
 function toHtml(v) {
@@ -296,6 +318,16 @@ export default function Projekte() {
   const [geloeschte, setGeloeschte] = useState([])   // gelöschte Drehs (Papierkorb)
 
   useEffect(() => { fetchAll() }, [])
+  // Direkt-Link aus dem Dashboard: /projekte?dreh=<id> öffnet den Dreh
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    const id = params.get('dreh')
+    if (!id || loading) return
+    const d = drehs.find(x => x.id === id)
+    if (d) { setSelected(d); setTab('kunden') }
+    params.delete('dreh'); setParams(params, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, drehs.length])
 
   // Live-Aktualisierung: Änderungen anderer Nutzer sofort ins Board holen (leicht entprellt)
   useEffect(() => {
@@ -317,7 +349,7 @@ export default function Projekte() {
       supabase.from('proj_intern').select('*').order('created_at', { ascending: false }),
       supabase.from('proj_kunden').select('*').order('name'),
       supabase.from('crm_darsteller').select('id, name').order('name'),
-      supabase.from('profiles').select('id, full_name, email').order('full_name'),
+      supabase.from('profiles').select('id, full_name, email, role, aktiv').order('full_name'),
     ])
     if (d.data) setDrehs(d.data)
     if (i.data) setIntern(i.data)
@@ -343,9 +375,10 @@ export default function Projekte() {
     setDrehs(prev => prev.map(d => d.id === id ? { ...d, status } : d))
   }
 
+  // Löschen läuft über dreh_loeschen (Löschsperre in der DB) – Dreh + Kommentare landen im Papierkorb
   async function deleteDreh(id) {
-    await supabase.from('proj_notizen').delete().eq('dreh_id', id)
-    await supabase.from('proj_drehs').delete().eq('id', id)
+    const { error } = await supabase.rpc('dreh_loeschen', { p_dreh_id: id, p_codewort: 'LOESCHEN' })
+    if (error) { alert('Dreh konnte nicht gelöscht werden: ' + error.message); return }
     setSelected(null)
     fetchAll()
   }
@@ -357,6 +390,7 @@ export default function Projekte() {
     if (!id) return
     const dreh = drehs.find(d => d.id === id)
     if (!dreh || dreh.status === status) return
+    if (BRAUCHT_RAW.includes(status) && !dreh.raw_gesichert) { alert(RAW_HINWEIS); return }
     if (status === 'abgeschlossen' && !istGesichert(dreh)) {
       alert('Erst RAW und Final auf NAS sichern (beide Häkchen im Dreh öffnen), dann auf „Abgeschlossen" ziehen.')
       return
@@ -489,6 +523,19 @@ export default function Projekte() {
                                 </div>
                                 <span className="text-[11px] text-ink-2 tabular-nums">{done}/{total}</span>
                               </div>
+                              {(() => {
+                                const raw = ['planung', 'abnahme_kunde', 'dreh'].includes(dreh.status) ? deadlineInfo(dreh.deadline_raw, dreh.raw_gesichert) : null
+                                const cut = ['dreh', 'cutting'].includes(dreh.status) ? deadlineInfo(dreh.deadline_cutting, false) : null
+                                const cutter = profiles.find(p => p.id === dreh.cutter_id)
+                                if (!raw && !cut && !cutter) return null
+                                return (
+                                  <div className="flex flex-wrap items-center gap-1 mt-2">
+                                    {raw && <span className={`text-[10.5px] font-medium px-2 py-0.5 rounded-full ${TON[raw.ton]}`}>RAW {raw.text}</span>}
+                                    {cut && <span className={`text-[10.5px] font-medium px-2 py-0.5 rounded-full ${TON[cut.ton]}`}>Cut {cut.text}</span>}
+                                    {cutter && <span title={`Cutter: ${cutter.full_name}`} className="ml-auto w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#38b6ff,#ff6b01 55%,#7c3aed)' }}>{(cutter.full_name || '?')[0]}</span>}
+                                  </div>
+                                )
+                              })()}
                             </>)
                           })()}
                           {(( !gesichert && ['dreh','cutting','posting'].includes(dreh.status)) || gesichert || (dreh.status === 'abnahme_kunde' && dreh.abnahme_bestaetigt)) && (
@@ -894,33 +941,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
           )}
           {tab === 'videos' && (
             <>
-              {(() => {
-                // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
-                const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
-                return ord.map((i, p) => { const v = videos[i]; return (
-                <div key={v.id || i} className={`rounded-[20px] p-3.5 border transition-all duration-300 ${v.erledigt ? 'bg-[#34c759]/[0.06] border-[#34c759]/15' : 'bg-white/70 border-white shadow-[0_6px_20px_-12px_rgba(30,30,60,0.25)]'}`}>
-                  <div className="flex items-center justify-between mb-2.5">
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                      <Haken an={!!v.erledigt} onClick={() => toggleVideoDone(v)} />
-                      <span className={`text-[13px] font-semibold tracking-tight ${v.erledigt ? 'text-[#248a3d]' : 'text-ink'}`}>{v.erledigt ? 'Erledigt' : `Video ${p + 1}`}</span>
-                    </label>
-                    {!ro && <div className="flex items-center gap-0.5">
-                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▲</button>
-                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▼</button>
-                      <button onClick={() => removeVideo(v, p + 1)} title="Video entfernen" className="w-7 h-7 rounded-full text-ink-3 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 active:scale-90 transition flex items-center justify-center"><TrashIcon size={14} /></button>
-                    </div>}
-                  </div>
-                  <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''}
-                    onFocus={() => live.setFokus(`v:${v.id}:titel`, true)} onBlur={() => live.setFokus(`v:${v.id}:titel`, false)}
-                    onChange={e => live.setVideoFeld(v.id, 'titel', e.target.value)} placeholder="Video-Titel..." />
-                  <div className="mb-2"><RichText readOnly={ro} value={v.planung || ''}
-                    onChange={val => live.setVideoFeld(v.id, 'planung', val)}
-                    onCommit={val => live.setVideoFeld(v.id, 'planung', val, { sofort: true })}
-                    placeholder="Video-Planung / Konzept..." /></div>
-                  <FileAttach readOnly={ro} files={v.dateien || []} prefix={`${item.id}/${v.id}`}
-                    onAdd={d => live.dateiAnhaengen(v.id, d)} onRemove={d => live.dateiEntfernen(v.id, d.path)} />
-                </div>
-              )})})()}
+              <VideoListe videos={videos} live={live} ro={ro} datensatzId={item.id} onToggleDone={toggleVideoDone} onRemove={removeVideo} onMove={moveVideo} />
               {!ro && <button onClick={addVideo} className="dashed-add">＋ Video hinzufügen</button>}
             </>
           )}
@@ -942,6 +963,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   const [notes, setNotes] = useState([])
   const [noteText, setNoteText] = useState('')
   const [nasWarn, setNasWarn] = useState(false)
+  const [rawWarn, setRawWarn] = useState(false)
   const [recruitingOn, setRecruitingOn] = useState(!!(dreh.recruiting && String(dreh.recruiting).trim()))
   const backdropDown = useRef(false)      // nur schließen, wenn der Klick auch auf dem Hintergrund begann
   // Texte verzögert speichern, Auswahlfelder/Häkchen sofort
@@ -983,6 +1005,8 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   }
 
   function handleStatusChange(status) {
+    if (BRAUCHT_RAW.includes(status) && !form.raw_gesichert) { setRawWarn(true); return }
+    setRawWarn(false)
     if (status === 'abgeschlossen' && !(form.raw_gesichert && form.final_gesichert)) {
       // Ohne RAW+Final-Sicherung nicht abschließbar -> zurück auf Posting
       setNasWarn(true); live.setFelder({ status: 'posting' }); onStatusChange('posting'); return
@@ -1052,6 +1076,9 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
         </div>
         )}
 
+        {rawWarn && (
+          <div className="mx-5 mb-3 bg-[#ff9f0a]/15 rounded-2xl px-3.5 py-2.5 text-xs text-[#9a5b00] flex-shrink-0 fade-up">🔒 {RAW_HINWEIS}</div>
+        )}
         {nasWarn && (
           <div className="mx-5 mb-3 bg-[#ff3b30]/10 rounded-2xl px-3.5 py-2.5 text-xs text-[#d70015] flex-shrink-0">
             🔒 Erst RAW und Final auf NAS sichern (beide Häkchen), dann „Abgeschlossen". Zurück auf Posting gesetzt.
@@ -1083,11 +1110,26 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                 </div>
                 <div><label className="label">Datum</label><input type="date" className="input text-xs" value={form.datum || ''} onChange={e => set('datum', e.target.value)} /></div>
               </div>
-              <div><label className="label">Videograph</label>
-                <select className="input text-xs" value={form.zustaendig_id || ''} onChange={e => set('zustaendig_id', e.target.value)}>
-                  <option value="">—</option>
-                  {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label">Videograph (Dreh)</label>
+                  <PersonAuswahl value={form.zustaendig_id} profiles={profiles} rollen={['videograph', 'admin']} disabled={ro}
+                    onChange={v => set('zustaendig_id', v)} />
+                </div>
+                <div><label className="label">Cutter</label>
+                  <PersonAuswahl value={form.cutter_id} profiles={profiles} rollen={['mitarbeiter', 'admin']} disabled={ro}
+                    onChange={v => set('cutter_id', v)} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Deadlines</label>
+                <div className="rounded-2xl bg-white/60 border hairline divide-y divide-black/[0.06]">
+                  <DeadlineZeile titel="RAW hochgeladen" unter="Videograph" wert={form.deadline_raw} fertig={!!form.raw_gesichert} disabled={ro}
+                    onChange={v => set('deadline_raw', v)} />
+                  <DeadlineZeile titel="Videos fertig & bei Metricool" unter="Cutter · an Kunden verschickt + vorgeladen" wert={form.deadline_cutting}
+                    fertig={['posting', 'abgeschlossen'].includes(form.status)} disabled={ro}
+                    onChange={v => set('deadline_cutting', v)} />
+                </div>
+                <p className="text-[11px] text-ink-3 mt-1.5 pl-0.5">Deadlines erscheinen automatisch als Aufgabe im Dashboard der zuständigen Person.</p>
               </div>
               <div>
                 <label className="label">Sicherung</label>
@@ -1118,33 +1160,7 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
 
           {tab === 'videos' && (
             <>
-              {(() => {
-                // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
-                const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
-                return ord.map((i, p) => { const v = videos[i]; return (
-                <div key={v.id || i} className={`rounded-[20px] p-3.5 border transition-all duration-300 ${v.erledigt ? 'bg-[#34c759]/[0.06] border-[#34c759]/15' : 'bg-white/70 border-white shadow-[0_6px_20px_-12px_rgba(30,30,60,0.25)]'}`}>
-                  <div className="flex items-center justify-between mb-2.5">
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                      <Haken an={!!v.erledigt} onClick={() => toggleVideoDone(v)} />
-                      <span className={`text-[13px] font-semibold tracking-tight ${v.erledigt ? 'text-[#248a3d]' : 'text-ink'}`}>{v.erledigt ? 'Erledigt' : `Video ${p + 1}`}</span>
-                    </label>
-                    {!ro && <div className="flex items-center gap-0.5">
-                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▲</button>
-                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▼</button>
-                      <button onClick={() => removeVideo(v, p + 1)} title="Video entfernen" className="w-7 h-7 rounded-full text-ink-3 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 active:scale-90 transition flex items-center justify-center"><TrashIcon size={14} /></button>
-                    </div>}
-                  </div>
-                  <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''}
-                    onFocus={() => live.setFokus(`v:${v.id}:titel`, true)} onBlur={() => live.setFokus(`v:${v.id}:titel`, false)}
-                    onChange={e => live.setVideoFeld(v.id, 'titel', e.target.value)} placeholder="Video-Titel..." />
-                  <div className="mb-2"><RichText readOnly={ro} value={v.planung || ''}
-                    onChange={val => live.setVideoFeld(v.id, 'planung', val)}
-                    onCommit={val => live.setVideoFeld(v.id, 'planung', val, { sofort: true })}
-                    placeholder="Video-Planung / Konzept..." /></div>
-                  <FileAttach readOnly={ro} files={v.dateien || []} prefix={`${dreh.id}/${v.id}`}
-                    onAdd={d => live.dateiAnhaengen(v.id, d)} onRemove={d => live.dateiEntfernen(v.id, d.path)} />
-                </div>
-              )})})()}
+              <VideoListe videos={videos} live={live} ro={ro} datensatzId={dreh.id} onToggleDone={toggleVideoDone} onRemove={removeVideo} onMove={moveVideo} />
               {!ro && <button onClick={addVideo} className="dashed-add">＋ Video hinzufügen</button>}
 
               {recruitingOn ? (
@@ -1243,5 +1259,105 @@ function SchalterZeile({ label, an, onChange }) {
           style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }} />
       </span>
     </button>
+  )
+}
+
+// Videoliste: feste Nummern (Position im Dreh – Video 7 bleibt 7, auch abgehakt), erledigte unten,
+// jedes Video einzeln ein-/ausklappbar (Zustand pro Dreh im Browser gemerkt)
+function VideoListe({ videos, live, ro, datensatzId, onToggleDone, onRemove, onMove }) {
+  const key = `os-zu-${datensatzId}`
+  const [zu, setZu] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() } })
+  const merken = n => { setZu(n); try { localStorage.setItem(key, JSON.stringify([...n])) } catch { /* egal */ } }
+  const umschalten = id => { const n = new Set(zu); n.has(id) ? n.delete(id) : n.add(id); merken(n) }
+  const alleZu = videos.length > 0 && videos.every(v => zu.has(v.id))
+  // Anzeige: offene zuerst, erledigte unten – jeweils in fester Reihenfolge
+  const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0) || a - b)
+  const offen = videos.filter(v => !v.erledigt).length
+  return (
+    <>
+      {videos.length > 0 && (
+        <div className="flex items-center justify-between px-0.5">
+          <span className="text-xs text-ink-2">{offen} offen · {videos.length - offen} erledigt</span>
+          <button onClick={() => merken(alleZu ? new Set() : new Set(videos.map(v => v.id)))}
+            className="text-xs font-medium text-[#ff6b01] hover:text-[#e05f00] px-2 py-1 rounded-full hover:bg-[#ff6b01]/8 transition">
+            {alleZu ? 'Alle ausklappen' : 'Alle einklappen'}
+          </button>
+        </div>
+      )}
+      {ord.map((i, p) => {
+        const v = videos[i]
+        const nr = i + 1
+        const eingeklappt = zu.has(v.id)
+        // ▲▼ nur innerhalb der gleichen Gruppe (offen/erledigt)
+        const vor = ord[p - 1] != null && !!videos[ord[p - 1]].erledigt === !!v.erledigt ? videos[ord[p - 1]] : null
+        const nach = ord[p + 1] != null && !!videos[ord[p + 1]].erledigt === !!v.erledigt ? videos[ord[p + 1]] : null
+        return (
+          <div key={v.id || i} className={`rounded-[20px] border transition-all duration-300 ${eingeklappt ? 'px-3.5 py-2.5' : 'p-3.5'} ${v.erledigt ? 'bg-[#34c759]/[0.06] border-[#34c759]/15' : 'bg-white/70 border-white shadow-[0_6px_20px_-12px_rgba(30,30,60,0.25)]'}`}>
+            <div className={`flex items-center justify-between gap-2 ${eingeklappt ? '' : 'mb-2.5'}`}>
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <Haken an={!!v.erledigt} onClick={() => onToggleDone(v)} />
+                <button type="button" onClick={() => umschalten(v.id)} className="flex items-center gap-2 min-w-0 flex-1 text-left" title={eingeklappt ? 'Ausklappen' : 'Einklappen'}>
+                  <span className={`text-[13px] font-semibold tracking-tight whitespace-nowrap ${v.erledigt ? 'text-[#248a3d]' : 'text-ink'}`}>Video {nr}</span>
+                  {v.erledigt && <span className="text-[10px] font-semibold text-[#248a3d] bg-[#34c759]/12 px-1.5 py-0.5 rounded-full">✓</span>}
+                  {eingeklappt && <span className="text-[13px] text-ink-2 truncate">{v.titel || <span className="text-ink-3">Ohne Titel</span>}</span>}
+                </button>
+              </div>
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                {!ro && !eingeklappt && <>
+                  <button onClick={() => onMove(v.id, vor?.id)} disabled={!vor} title="Nach oben" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▲</button>
+                  <button onClick={() => onMove(v.id, nach?.id)} disabled={!nach} title="Nach unten" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▼</button>
+                  <button onClick={() => onRemove(v, nr)} title="Video entfernen" className="w-7 h-7 rounded-full text-ink-3 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 active:scale-90 transition flex items-center justify-center"><TrashIcon size={14} /></button>
+                </>}
+                <button onClick={() => umschalten(v.id)} title={eingeklappt ? 'Ausklappen' : 'Einklappen'}
+                  className="w-7 h-7 rounded-full text-ink-3 hover:bg-black/5 active:scale-90 transition flex items-center justify-center">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                    className={`transition-transform duration-300 ${eingeklappt ? '-rotate-90' : ''}`}><path d="m6 9 6 6 6-6" /></svg>
+                </button>
+              </div>
+            </div>
+            {!eingeklappt && (
+              <div className="fade-up">
+                <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''}
+                  onFocus={() => live.setFokus(`v:${v.id}:titel`, true)} onBlur={() => live.setFokus(`v:${v.id}:titel`, false)}
+                  onChange={e => live.setVideoFeld(v.id, 'titel', e.target.value)} placeholder="Video-Titel..." />
+                <div className="mb-2"><RichText readOnly={ro} value={v.planung || ''}
+                  onChange={val => live.setVideoFeld(v.id, 'planung', val)}
+                  onCommit={val => live.setVideoFeld(v.id, 'planung', val, { sofort: true })}
+                  placeholder="Video-Planung / Konzept..." /></div>
+                <FileAttach readOnly={ro} files={v.dateien || []} prefix={`${datensatzId}/${v.id}`}
+                  onAdd={d => live.dateiAnhaengen(v.id, d)} onRemove={d => live.dateiEntfernen(v.id, d.path)} />
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+// Auswahl einer Person nach Rolle (aktuelle Zuordnung bleibt sichtbar, auch wenn die Rolle nicht passt)
+function PersonAuswahl({ value, profiles, rollen, onChange, disabled }) {
+  const liste = profiles.filter(p => (rollen.includes(p.role) && p.aktiv !== false) || p.id === value)
+  return (
+    <select className="input text-xs" value={value || ''} disabled={disabled} onChange={e => onChange(e.target.value || null)}>
+      <option value="">—</option>
+      {liste.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
+    </select>
+  )
+}
+
+// Deadline mit Datum + Uhrzeit
+function DeadlineZeile({ titel, unter, wert, fertig, onChange, disabled }) {
+  const info = deadlineInfo(wert, fertig)
+  return (
+    <div className="px-3.5 py-2.5 flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] text-ink">{titel}</p>
+        <p className="text-[11px] text-ink-3 truncate">{unter}</p>
+      </div>
+      {info && <span className={`hidden sm:inline text-[10.5px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${TON[info.ton]}`}>{fertig ? '✓ erledigt' : info.ton === 'ueber' ? 'überfällig' : info.ton === 'bald' ? 'bald fällig' : 'offen'}</span>}
+      <input type="datetime-local" disabled={disabled} className="input text-xs !w-[11.5rem] !py-1.5 flex-shrink-0"
+        value={zuLokal(wert)} onChange={e => onChange(ausLokal(e.target.value))} />
+    </div>
   )
 }
