@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
@@ -32,7 +33,7 @@ function cleanDreh(data) {
 function Pill({ status, statuses = STATUSES }) {
   const s = statuses.find(x => x.id === status)
   if (!s) return null
-  return <span className="inline-flex text-xs font-medium px-2 py-0.5 rounded-md" style={{ background: s.bg, color: s.text }}>{s.label}</span>
+  return <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: s.bg, color: s.text }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{s.label}</span>
 }
 
 // Feste Farbpalette – jeder Kunde bekommt anhand seines Namens stabil eine Farbe
@@ -117,14 +118,14 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
     geaendert.current = true
     if (ref.current) onChange(ref.current.innerHTML)
   }
-  const B = 'w-7 h-7 rounded text-xs text-gray-600 hover:bg-gray-100 flex items-center justify-center'
+  const B = 'w-7 h-7 rounded-lg text-xs text-ink-2 hover:bg-black/5 active:scale-90 transition flex items-center justify-center'
   if (readOnly) {
-    return <div className="rt-edit text-xs text-gray-700 leading-relaxed px-2.5 py-2 border border-gray-100 bg-gray-50/50 rounded-lg min-h-[2.5rem]"
+    return <div className="rt-edit text-xs text-ink leading-relaxed px-3 py-2.5 border hairline bg-white/50 rounded-xl min-h-[2.5rem]"
       dangerouslySetInnerHTML={{ __html: toHtml(value) || '<span class="text-gray-300">—</span>' }} />
   }
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:border-[#ff6b01]">
-      <div className="flex items-center gap-0.5 border-b border-gray-100 bg-gray-50 px-1 py-1">
+    <div className="border hairline bg-white/70 rounded-xl overflow-hidden transition-shadow focus-within:border-[#ff6b01]/50 focus-within:shadow-[0_0_0_4px_rgba(255,107,1,0.12)] focus-within:bg-white">
+      <div className="flex items-center gap-0.5 border-b hairline bg-white/40 px-1 py-1">
         <button type="button" title="Fett" onMouseDown={e => { e.preventDefault(); exec('bold') }} className={B} style={{ fontWeight: 700 }}>B</button>
         <button type="button" title="Kursiv" onMouseDown={e => { e.preventDefault(); exec('italic') }} className={B} style={{ fontStyle: 'italic' }}>I</button>
         <button type="button" title="Unterstreichen" onMouseDown={e => { e.preventDefault(); exec('underline') }} className={B} style={{ textDecoration: 'underline' }}>U</button>
@@ -140,7 +141,7 @@ function RichText({ value, onChange, onCommit, placeholder, readOnly }) {
           else e.currentTarget.innerHTML = toHtml(valueRef.current)   // nichts getippt → neuesten Stand anzeigen
         }}
         data-ph={placeholder || ''}
-        className="rt-edit text-xs text-gray-700 leading-relaxed px-2.5 py-2 outline-none min-h-[2.5rem]" />
+        className="rt-edit text-xs text-ink leading-relaxed px-3 py-2.5 outline-none min-h-[2.5rem]" />
     </div>
   )
 }
@@ -227,28 +228,28 @@ function FileAttach({ files, onAdd, onRemove, prefix, readOnly }) {
           {files.map((f, i) => (
             <div key={f.path || f.url || i} className="relative">
               {isImg(f.name) ? (
-                <button type="button" onClick={() => setPreview(f)}><img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-lg border border-gray-200" /></button>
+                <button type="button" onClick={() => setPreview(f)}><img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-xl border border-white shadow-[0_4px_12px_-6px_rgba(0,0,0,0.35)]" /></button>
               ) : (
-                <button type="button" onClick={() => setPreview(f)} className="flex items-center gap-1 text-xs text-[#ff6b01] bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5 pr-6 max-w-[9rem] truncate">📄 {f.name}</button>
+                <button type="button" onClick={() => setPreview(f)} className="flex items-center gap-1 text-xs text-[#c2410c] bg-[#ff6b01]/10 rounded-xl px-2.5 py-1.5 pr-6 max-w-[9rem] truncate">📄 {f.name}</button>
               )}
-              <button onClick={() => download(f)} title="Herunterladen" className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-gray-200 text-gray-600 rounded-full text-[9px] leading-none flex items-center justify-center shadow-sm hover:bg-gray-50">⬇</button>
-              {!readOnly && <button onClick={() => remove(i)} title="Entfernen" className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] leading-none flex items-center justify-center">×</button>}
+              <button onClick={() => download(f)} title="Herunterladen" className="absolute -bottom-1.5 -right-1.5 w-5 h-5 bg-white text-ink-2 rounded-full text-[9px] leading-none flex items-center justify-center shadow-[0_2px_6px_rgba(0,0,0,0.18)] hover:text-ink">⬇</button>
+              {!readOnly && <button onClick={() => remove(i)} title="Entfernen" className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#ff3b30] text-white rounded-full text-[11px] leading-none flex items-center justify-center shadow-[0_2px_6px_rgba(255,59,48,0.4)]">×</button>}
             </div>
           ))}
         </div>
       )}
-      {!readOnly && <label className="block border border-dashed border-gray-300 rounded-lg py-2 text-center text-xs text-gray-400 cursor-pointer hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
+      {!readOnly && <label className="dashed-add block text-center cursor-pointer !py-2 !rounded-xl">
         {busy ? 'Lädt hoch...' : '📎 Bild / Datei hinzufügen'}
         <input type="file" multiple className="hidden" onChange={upload} />
       </label>}
 
       {/* In-App-Vorschau (öffnet sich in der App, nicht im Browser) */}
-      {preview && (
-        <div className="fixed inset-0 z-[80] bg-black/90 flex flex-col" onClick={() => setPreview(null)}>
+      {preview && createPortal(
+        <div className="fixed inset-0 z-[80] bg-black/90 flex flex-col fade-up" onClick={() => setPreview(null)}>
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
             <span className="text-sm text-white/90 truncate mr-3">{preview.name}</span>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button onClick={() => download(preview)} className="text-xs bg-white/15 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/25">⬇ Herunterladen</button>
+              <button onClick={() => download(preview)} className="text-xs bg-white/15 text-white px-3 py-1.5 rounded-full font-medium hover:bg-white/25">⬇ Herunterladen</button>
               <a href={preview.url} target="_blank" rel="noreferrer" className="text-xs text-white/70 underline">Im Browser</a>
               <button onClick={() => setPreview(null)} className="w-8 h-8 rounded-full bg-white/15 text-white text-lg flex items-center justify-center">×</button>
             </div>
@@ -257,7 +258,7 @@ function FileAttach({ files, onAdd, onRemove, prefix, readOnly }) {
             {isImg(preview.name) ? (
               <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain" />
             ) : isPdf(preview.name) ? (
-              <iframe src={preview.url} title={preview.name} className="w-full h-full bg-white rounded-lg" />
+              <iframe src={preview.url} title={preview.name} className="w-full h-full bg-white rounded-2xl" />
             ) : (
               <div className="text-center text-white/80 text-sm px-6">
                 <p className="mb-4">Für diesen Dateityp gibt es keine Vorschau.</p>
@@ -265,7 +266,8 @@ function FileAttach({ files, onAdd, onRemove, prefix, readOnly }) {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -371,14 +373,16 @@ export default function Projekte() {
   // Statusspalten/-buttons: Videograph ohne "Abgeschlossen"
   const visStatuses = isVideograph ? STATUSES.filter(s => s.id !== 'abgeschlossen') : STATUSES
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-7 h-7 border-[2.5px] border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
 
   // Externe (Videograf/Darsteller): aufgeräumte Liste ihrer anstehenden Drehs (Status "Dreh")
   if (isExtern) {
     return (
-      <div className="p-4 md:p-6 space-y-3 max-w-2xl mx-auto">
-        <h2 className="text-base font-semibold text-gray-900">Deine Drehs</h2>
-        <p className="text-xs text-gray-400">Anstehende Drehs (Status „Dreh") deiner Kunden. Tippe einen Dreh für Details & Video-Planung.</p>
+      <div className="px-4 pt-6 pb-4 md:p-8 space-y-4 max-w-2xl mx-auto">
+        <div>
+          <h1 className="page-title">Deine Drehs</h1>
+          <p className="text-[13px] text-ink-2 mt-1.5">Anstehende Drehs deiner Kunden. Tippe einen Dreh für Details & Video-Planung.</p>
+        </div>
         {drehs.length === 0 ? (
           <div className="card p-10 text-center text-sm text-gray-400">Aktuell keine Drehs für dich.</div>
         ) : (
@@ -387,12 +391,12 @@ export default function Projekte() {
               const ks = kundeStyle(dreh.kunde_name)
               return (
                 <div key={dreh.id} onClick={() => setSelected(dreh)}
-                  className="bg-white border border-gray-100 rounded-xl p-3.5 cursor-pointer hover:shadow-sm transition-all">
+                  className="tile p-4 cursor-pointer">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
-                    <span className="text-xs text-gray-400">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '—'}</span>
+                    <span className="inline-flex text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
+                    <span className="text-[13px] font-medium text-ink">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '—'}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1.5">📹 {(dreh.videos?.length || dreh.video_count || 0)} Videos</p>
+                  <p className="text-xs text-ink-2 mt-2">{(dreh.videos?.length || dreh.video_count || 0)} Videos</p>
                 </div>
               )
             })}
@@ -410,15 +414,18 @@ export default function Projekte() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      {/* Tabs */}
-      <div className="flex bg-gray-100 rounded-lg p-1 w-fit gap-0.5 overflow-x-auto">
-        {[['kunden','Kunden-Drehs'],['intern','Intern'],['verwalten','Verwalten']].filter(([id]) => !(isVideograph && id === 'verwalten')).map(([id,label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${tab === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
-            {label}
-          </button>
-        ))}
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-5">
+      {/* Kopf + Tabs */}
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="page-title">Projekte</h1>
+          <p className="text-[13px] text-ink-2 mt-1.5">{sichtbar.filter(d => d.status !== 'abgeschlossen').length} laufende Drehs</p>
+        </div>
+        <div className="seg overflow-x-auto max-w-full">
+          {[['kunden','Kunden-Drehs'],['intern','Intern'],['verwalten','Verwalten']].filter(([id]) => !(isVideograph && id === 'verwalten')).map(([id,label]) => (
+            <button key={id} onClick={() => setTab(id)} className={`seg-btn ${tab === id ? 'is-active' : ''}`}>{label}</button>
+          ))}
+        </div>
       </div>
 
       {/* KUNDEN */}
@@ -426,19 +433,16 @@ export default function Projekte() {
         <>
           <div className="flex items-center gap-2 flex-wrap">
             <select value={kundeFilter} onChange={e => setKundeFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white text-gray-700 outline-none focus:border-[#ff6b01]">
+              className="input !w-auto !rounded-full !py-1.5 !pl-3.5 text-xs">
               <option value="">Alle Kunden</option>
               {kunden.map(k => <option key={k.id} value={k.name}>{k.name}</option>)}
             </select>
-            <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
-              {['kanban','tabelle'].map(v => (
-                <button key={v} onClick={() => setView(v)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-all ${view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
-                  {v}
-                </button>
+            <div className="seg">
+              {[['kanban','Board'],['tabelle','Liste']].map(([v, l]) => (
+                <button key={v} onClick={() => setView(v)} className={`seg-btn ${view === v ? 'is-active' : ''}`}>{l}</button>
               ))}
             </div>
-            <button onClick={() => setShowAdd(true)} className="ml-auto btn-primary text-xs py-1.5 px-3">+ Neuer Dreh</button>
+            <button onClick={() => setShowAdd(true)} className="ml-auto btn-primary text-xs !py-2 !px-4">＋ Neuer Dreh</button>
           </div>
 
           {view === 'kanban' && (
@@ -449,13 +453,13 @@ export default function Projekte() {
                   <div key={st.id}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverCol !== st.id) setDragOverCol(st.id) }}
                     onDrop={() => handleDrop(st.id)}
-                    className={`w-full md:w-52 md:flex-shrink-0 rounded-xl transition-colors ${dragOverCol === st.id && draggingId ? 'bg-[#ff6b01]/5 ring-1 ring-[#ff6b01]/30' : ''}`}>
-                    <div className="flex items-center justify-between mb-2 px-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full" style={{ background: st.color }} />
-                        <span className="text-xs font-semibold text-gray-500">{st.label}</span>
+                    className={`lane w-full md:w-60 md:flex-shrink-0 ${dragOverCol === st.id && draggingId ? 'is-over' : ''}`}>
+                    <div className="flex items-center justify-between mb-2.5 px-1.5 pt-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.8)]" style={{ background: st.color }} />
+                        <span className="text-[13px] font-semibold text-ink">{st.label}</span>
                       </div>
-                      <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{cols.length}</span>
+                      <span className="text-[11px] font-semibold text-ink-2 bg-white/70 min-w-[22px] text-center px-1.5 py-0.5 rounded-full">{cols.length}</span>
                     </div>
                     <div className="space-y-2 min-h-8">
                       {cols.map(dreh => {
@@ -467,33 +471,43 @@ export default function Projekte() {
                           onDragStart={e => { setDraggingId(dreh.id); e.dataTransfer.effectAllowed = 'move' }}
                           onDragEnd={() => { setDraggingId(null); setDragOverCol(null) }}
                           onClick={() => setSelected(dreh)}
-                          className={`bg-white border rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-sm hover:-translate-y-0.5 transition-all ${selected?.id === dreh.id ? 'border-[#ff6b01] shadow-sm' : 'border-gray-100'} ${draggingId === dreh.id ? 'opacity-40' : ''}`}>
-                          <p className="text-xs font-semibold text-gray-800 mb-1">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE') : '—'}</p>
-                          {kundeFilter ? (
-                            <>
-                              <p className="text-xs text-gray-400 mb-2">{dreh.kunde_name}</p>
-                              <Pill status={dreh.status} />
-                            </>
-                          ) : (
-                            <span className="inline-flex text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>
-                          )}
-                          <p className="text-xs text-gray-400 mt-1.5">📹 {(dreh.videos?.length || dreh.video_count || 0)} Videos</p>
-                          {!gesichert && ['dreh','cutting','posting'].includes(dreh.status) && (
-                            <div className="mt-1.5 text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-md inline-block">🔒 Sicherung fehlt</div>
-                          )}
-                          {gesichert && (
-                            <div className="mt-1.5 text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-md inline-block">✓ Gesichert</div>
-                          )}
-                          {dreh.status === 'abnahme_kunde' && dreh.abnahme_bestaetigt && (
-                            <div className="mt-1.5 text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md inline-block">✓ Abgenommen</div>
+                          className={`tile p-3.5 cursor-grab active:cursor-grabbing ${selected?.id === dreh.id ? '!border-[#ff6b01]/60' : ''} ${draggingId === dreh.id ? 'opacity-40' : ''}`}>
+                          {(() => {
+                            const vids = dreh.videos || []
+                            const done = vids.filter(v => v.erledigt).length
+                            const total = vids.length || dreh.video_count || 0
+                            return (<>
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                {kundeFilter
+                                  ? <p className="text-[13px] font-semibold text-ink leading-snug">{dreh.kunde_name}</p>
+                                  : <span className="inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full leading-snug" style={{ background: ks.bg, color: ks.text }}>{dreh.kunde_name}</span>}
+                              </div>
+                              <p className="text-[13px] font-semibold text-ink tracking-tight">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Kein Datum'}</p>
+                              <div className="flex items-center gap-2 mt-2.5">
+                                <div className="flex-1 h-1 rounded-full bg-black/[0.06] overflow-hidden">
+                                  <div className="h-full rounded-full transition-all duration-500" style={{ width: total ? `${Math.round(done / total * 100)}%` : 0, background: st.color }} />
+                                </div>
+                                <span className="text-[11px] text-ink-2 tabular-nums">{done}/{total}</span>
+                              </div>
+                            </>)
+                          })()}
+                          {(( !gesichert && ['dreh','cutting','posting'].includes(dreh.status)) || gesichert || (dreh.status === 'abnahme_kunde' && dreh.abnahme_bestaetigt)) && (
+                            <div className="flex flex-wrap gap-1 mt-2.5">
+                              {!gesichert && ['dreh','cutting','posting'].includes(dreh.status) && (
+                                <span className="text-[11px] font-medium bg-[#ff3b30]/10 text-[#d70015] px-2 py-0.5 rounded-full">Sicherung fehlt</span>
+                              )}
+                              {gesichert && (
+                                <span className="text-[11px] font-medium bg-[#34c759]/12 text-[#248a3d] px-2 py-0.5 rounded-full">✓ Gesichert</span>
+                              )}
+                              {dreh.status === 'abnahme_kunde' && dreh.abnahme_bestaetigt && (
+                                <span className="text-[11px] font-medium bg-indigo-500/10 text-indigo-600 px-2 py-0.5 rounded-full">✓ Abgenommen</span>
+                              )}
+                            </div>
                           )}
                         </div>
                         )
                       })}
-                      <button onClick={() => setShowAdd(true)}
-                        className="w-full border border-dashed border-gray-200 rounded-xl py-2 text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
-                        + Dreh
-                      </button>
+                      <button onClick={() => setShowAdd(true)} className="dashed-add">＋ Dreh</button>
                     </div>
                   </div>
                 )
@@ -502,25 +516,25 @@ export default function Projekte() {
           )}
 
           {view === 'tabelle' && (
-            <div className="bg-white border border-gray-100 rounded-xl table-scroll">
+            <div className="card table-scroll overflow-hidden">
               <table className="w-full min-w-max">
-                <thead className="bg-gray-50 border-b border-gray-100">
+                <thead className="border-b hairline">
                   <tr>
                     {['Datum','Kunde','Status','Videos','Darsteller','NAS'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                      <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-ink-3 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(dreh => (
                     <tr key={dreh.id} onClick={() => setSelected(dreh)}
-                      className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-all">
+                      className="border-b border-black/[0.04] last:border-0 hover:bg-white/60 cursor-pointer transition-colors">
                       <td className="px-4 py-3 text-sm font-semibold text-gray-800">{dreh.datum ? new Date(dreh.datum).toLocaleDateString('de-DE') : '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{dreh.kunde_name}</td>
                       <td className="px-4 py-3"><Pill status={dreh.status} /></td>
                       <td className="px-4 py-3 text-sm text-gray-600">{(dreh.videos?.length || dreh.video_count || 0)}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{dreh.darsteller_name || '—'}</td>
-                      <td className="px-4 py-3 text-sm">{dreh.nas_gesichert ? <span className="text-green-600">✓</span> : <span className="text-red-500">✗</span>}</td>
+                      <td className="px-4 py-3 text-sm">{dreh.nas_gesichert ? <span className="text-[#248a3d]">✓</span> : <span className="text-[#ff3b30]">✗</span>}</td>
                     </tr>
                   ))}
                   {filtered.length === 0 && <tr><td colSpan="6" className="text-center py-10 text-sm text-gray-400">Keine Drehs</td></tr>}
@@ -535,30 +549,28 @@ export default function Projekte() {
       {tab === 'intern' && (
         <>
           <div className="flex justify-end">
-            <button onClick={() => setShowAddIntern(true)} className="btn-primary text-xs py-1.5 px-3">+ Neues Konzept</button>
+            <button onClick={() => setShowAddIntern(true)} className="btn-primary text-xs !py-2 !px-4">＋ Neues Konzept</button>
           </div>
           <div className="kanban-scroll">
             {INTERN_STATUSES.map(st => {
               const cols = intern.filter(i => i.status === st.id)
               return (
-                <div key={st.id} className="w-full md:w-52 md:flex-shrink-0">
-                  <div className="flex items-center justify-between mb-2 px-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ background: st.color }} />
-                      <span className="text-xs font-semibold text-gray-500">{st.label}</span>
+                <div key={st.id} className="lane w-full md:w-60 md:flex-shrink-0">
+                  <div className="flex items-center justify-between mb-2.5 px-1.5 pt-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.8)]" style={{ background: st.color }} />
+                      <span className="text-[13px] font-semibold text-ink">{st.label}</span>
                     </div>
-                    <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{cols.length}</span>
+                    <span className="text-[11px] font-semibold text-ink-2 bg-white/70 min-w-[22px] text-center px-1.5 py-0.5 rounded-full">{cols.length}</span>
                   </div>
                   <div className="space-y-2 min-h-8">
                     {cols.map(item => (
-                      <div key={item.id} onClick={() => setSelectedIntern(item)} className="bg-white border border-gray-100 rounded-xl p-3 cursor-pointer hover:border-orange-200 hover:shadow-sm transition-all">
-                        <p className="text-xs font-semibold text-gray-800 mb-1">{item.titel}</p>
-                        <p className="text-xs text-gray-400">{item.drehtag ? new Date(item.drehtag).toLocaleDateString('de-DE') : 'Kein Drehtag'}{item.zustaendig ? ` · ${item.zustaendig}` : ''}</p>
+                      <div key={item.id} onClick={() => setSelectedIntern(item)} className="tile p-3.5 cursor-pointer">
+                        <p className="text-[13px] font-semibold text-ink mb-1 tracking-tight">{item.titel}</p>
+                        <p className="text-xs text-ink-2">{item.drehtag ? new Date(item.drehtag).toLocaleDateString('de-DE') : 'Kein Drehtag'}{item.zustaendig ? ` · ${item.zustaendig}` : ''}</p>
                       </div>
                     ))}
-                    <button onClick={() => setShowAddIntern(true)} className="w-full border border-dashed border-gray-200 rounded-xl py-2 text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
-                      + Konzept
-                    </button>
+                    <button onClick={() => setShowAddIntern(true)} className="dashed-add">＋ Konzept</button>
                   </div>
                 </div>
               )
@@ -570,20 +582,19 @@ export default function Projekte() {
       {/* VERWALTEN */}
       {tab === 'verwalten' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="card p-4">
+          <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Kunden</h3>
-              <button onClick={() => setShowAddKunde(true)} className="btn-primary text-xs py-1 px-2.5">+ Neu</button>
+              <h3 className="text-[15px] font-semibold text-ink">Kunden</h3>
+              <button onClick={() => setShowAddKunde(true)} className="btn-primary text-xs !py-1.5 !px-3">＋ Neu</button>
             </div>
             <div className="space-y-0.5">
               {kunden.map(k => (
-                <div key={k.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                <div key={k.id} className="flex items-center justify-between py-2.5 border-b border-black/[0.05] last:border-0">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{k.name}</p>
                     {k.kontakt && <p className="text-xs text-gray-400">{k.kontakt}</p>}
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => navigate('/journal', { state: { kundeId: k.id } })} className="text-xs text-[#ff6b01] hover:text-[#e05f00]">Journal</button>
                     <button className="text-xs text-gray-500 hover:text-gray-700">Bearbeiten</button>
                     <button onClick={async () => { await supabase.from('proj_kunden').delete().eq('id', k.id); fetchAll() }} className="text-xs text-red-400 hover:text-red-600">Löschen</button>
                   </div>
@@ -592,14 +603,14 @@ export default function Projekte() {
               {kunden.length === 0 && <p className="text-xs text-gray-400 py-4 text-center">Noch keine Kunden</p>}
             </div>
           </div>
-          <div className="card p-4">
+          <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Darsteller</h3>
-              <button onClick={() => setShowAddDarsteller(true)} className="btn-primary text-xs py-1 px-2.5">+ Neu</button>
+              <h3 className="text-[15px] font-semibold text-ink">Darsteller</h3>
+              <button onClick={() => setShowAddDarsteller(true)} className="btn-primary text-xs !py-1.5 !px-3">＋ Neu</button>
             </div>
             <div className="space-y-0.5">
               {darsteller.map(d => (
-                <div key={d.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                <div key={d.id} className="flex items-center justify-between py-2.5 border-b border-black/[0.05] last:border-0">
                   <p className="text-sm font-medium text-gray-800">{d.name}</p>
                   <div className="flex gap-2">
                     <button className="text-xs text-gray-500 hover:text-gray-700">Bearbeiten</button>
@@ -612,8 +623,9 @@ export default function Projekte() {
           </div>
 
           {/* Papierkorb: gelöschte Drehs wiederherstellen */}
-          <div className="card p-4 md:col-span-2">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">🗑 Gelöschte Drehs (wiederherstellbar)</h3>
+          <div className="card p-5 md:col-span-2">
+            <h3 className="text-[15px] font-semibold text-ink mb-1">Papierkorb</h3>
+            <p className="text-xs text-ink-2 mb-3">Gelöschte Drehs – mit einem Tipp wiederherstellbar.</p>
             {(() => {
               const seen = new Set()
               const list = geloeschte
@@ -626,12 +638,12 @@ export default function Projekte() {
                     const s = g.snapshot || {}
                     const anz = Array.isArray(s.videos) ? s.videos.length : 0
                     return (
-                      <div key={g.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                      <div key={g.id} className="flex items-center justify-between py-2.5 border-b border-black/[0.05] last:border-0">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{s.kunde_name || 'Dreh'}{s.datum ? ` · ${new Date(s.datum).toLocaleDateString('de-DE')}` : ''}</p>
                           <p className="text-[10px] text-gray-400">{anz} Video{anz === 1 ? '' : 's'} · gelöscht am {new Date(g.changed_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
-                        <button onClick={() => { if (window.confirm('Diesen Dreh wiederherstellen?')) restoreDreh(g.snapshot) }} className="text-xs bg-[#ff6b01]/10 text-[#c2410c] px-2.5 py-1 rounded-md font-medium hover:bg-[#ff6b01]/20 whitespace-nowrap flex-shrink-0">Wiederherstellen</button>
+                        <button onClick={() => { if (window.confirm('Diesen Dreh wiederherstellen?')) restoreDreh(g.snapshot) }} className="text-xs bg-[#ff6b01]/10 text-[#c2410c] px-3 py-1.5 rounded-full font-medium hover:bg-[#ff6b01]/20 active:scale-95 transition whitespace-nowrap flex-shrink-0">Wiederherstellen</button>
                       </div>
                     )
                   })}
@@ -701,11 +713,11 @@ export default function Projekte() {
 
 function Modal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+    <div className="fixed inset-0 scrim z-[70] flex items-end sm:items-center justify-center p-3 sm:p-4" onClick={onClose}>
+      <div className="glass-strong rounded-[28px] w-full max-w-sm max-h-[90vh] overflow-y-auto pop-in" onClick={e => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-2 flex items-center justify-between">
+          <h3 className="text-[17px] font-semibold text-ink tracking-tight">{title}</h3>
+          <button onClick={onClose} className="btn-icon w-7 h-7 text-base leading-none">×</button>
         </div>
         <div className="p-5">{children}</div>
       </div>
@@ -830,30 +842,33 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
   }
 
   return (
-    <div className="fixed inset-0 bg-black/10 z-[60] flex"
+    <div className="fixed inset-0 scrim z-[60] flex md:p-3"
       onMouseDown={e => { backdropDown.current = e.target === e.currentTarget }}
       onClick={e => { if (e.target === e.currentTarget && backdropDown.current) onClose() }}>
-      <div className="ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <div>
-            <p className="font-bold text-gray-900">{form.titel || 'Konzept'}</p>
-            <p className="text-xs text-gray-400">Intern{form.drehtag ? ' · ' + new Date(form.drehtag).toLocaleDateString('de-DE') : ''}</p>
+      <div className="sheet-right glass-strong ml-auto w-full md:max-w-[480px] mt-[calc(env(safe-area-inset-top)+14px)] md:mt-0 h-auto md:h-full flex flex-col rounded-t-[28px] md:rounded-[28px] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="md:hidden flex justify-center pt-2 pb-0.5 flex-shrink-0"><span className="w-9 h-[5px] rounded-full bg-black/15" /></div>
+        <div className="px-5 pt-3 md:pt-5 pb-3 flex items-start justify-between gap-3 flex-shrink-0">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-ink-3 uppercase tracking-wider">Intern{form.drehtag ? ' · ' + new Date(form.drehtag).toLocaleDateString('de-DE') : ''}</p>
+            <p className="text-[22px] font-bold text-ink tracking-tight leading-tight mt-0.5 truncate">{form.titel || 'Konzept'}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
-            {!videograph && <button onClick={() => onDelete?.()} title="Konzept löschen" className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>}
-            <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <SpeicherStatus saving={saving} />
+            {!videograph && <button onClick={() => onDelete?.()} title="Konzept löschen" className="btn-icon !text-[#ff3b30] hover:!bg-[#ff3b30]/10"><TrashIcon /></button>}
+            <button onClick={onClose} title="Schließen" className="btn-icon text-base">×</button>
           </div>
         </div>
-        <div className="flex border-b border-gray-100 flex-shrink-0">
-          {['Info', 'Videos'].map(t => (
-            <button key={t} onClick={() => setTab(t.toLowerCase())}
-              className={`flex-1 py-2.5 text-xs font-medium transition-all border-b-2 ${tab === t.toLowerCase() ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>{t}</button>
-          ))}
+        <div className="px-5 pb-3 flex-shrink-0">
+          <div className="tabbar">
+            {['Info', 'Videos'].map(t => (
+              <button key={t} onClick={() => setTab(t.toLowerCase())} className={tab === t.toLowerCase() ? 'is-active' : ''}>{t}</button>
+            ))}
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-5 pt-1 pb-[calc(20px+env(safe-area-inset-bottom))] space-y-4 border-t hairline">
+          <div className="h-2" />
           {live.hinweis && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">{live.hinweis}</div>
+            <div className="bg-[#ff9f0a]/12 rounded-2xl px-3.5 py-2.5 text-xs text-[#9a5b00]">{live.hinweis}</div>
           )}
           {tab === 'info' && (
             <>
@@ -883,16 +898,16 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
                 // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
                 const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
                 return ord.map((i, p) => { const v = videos[i]; return (
-                <div key={v.id || i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(v)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${p + 1}`}</span>
+                <div key={v.id || i} className={`rounded-[20px] p-3.5 border transition-all duration-300 ${v.erledigt ? 'bg-[#34c759]/[0.06] border-[#34c759]/15' : 'bg-white/70 border-white shadow-[0_6px_20px_-12px_rgba(30,30,60,0.25)]'}`}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <Haken an={!!v.erledigt} onClick={() => toggleVideoDone(v)} />
+                      <span className={`text-[13px] font-semibold tracking-tight ${v.erledigt ? 'text-[#248a3d]' : 'text-ink'}`}>{v.erledigt ? 'Erledigt' : `Video ${p + 1}`}</span>
                     </label>
-                    {!ro && <div className="flex items-center gap-1">
-                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
-                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
-                      <button onClick={() => removeVideo(v, p + 1)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
+                    {!ro && <div className="flex items-center gap-0.5">
+                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▲</button>
+                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▼</button>
+                      <button onClick={() => removeVideo(v, p + 1)} title="Video entfernen" className="w-7 h-7 rounded-full text-ink-3 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 active:scale-90 transition flex items-center justify-center"><TrashIcon size={14} /></button>
                     </div>}
                   </div>
                   <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''}
@@ -906,9 +921,7 @@ function InternDetail({ item, profiles, onClose, onRefresh, onDelete, videograph
                     onAdd={d => live.dateiAnhaengen(v.id, d)} onRemove={d => live.dateiEntfernen(v.id, d.path)} />
                 </div>
               )})})()}
-              {!ro && <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
-                + Video hinzufügen
-              </button>}
+              {!ro && <button onClick={addVideo} className="dashed-add">＋ Video hinzufügen</button>}
             </>
           )}
         </div>
@@ -1003,58 +1016,62 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
   }
 
   return (
-    <div className="fixed inset-0 bg-black/10 z-[60] flex"
+    <div className="fixed inset-0 scrim z-[60] flex md:p-3"
       onMouseDown={e => { backdropDown.current = e.target === e.currentTarget }}
       onClick={e => { if (e.target === e.currentTarget && backdropDown.current) onClose() }}>
-      <div className="ml-auto bg-white w-full max-w-md h-full flex flex-col shadow-2xl border-l border-gray-100" onClick={e => e.stopPropagation()}>
+      <div className="sheet-right glass-strong ml-auto w-full md:max-w-[480px] mt-[calc(env(safe-area-inset-top)+14px)] md:mt-0 h-auto md:h-full flex flex-col rounded-t-[28px] md:rounded-[28px] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="md:hidden flex justify-center pt-2 pb-0.5 flex-shrink-0"><span className="w-9 h-[5px] rounded-full bg-black/15" /></div>
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <div>
-            <p className="font-bold text-gray-900">{form.datum ? new Date(form.datum).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Dreh'}</p>
-            <p className="text-xs text-gray-400">{form.kunde_name}</p>
+        <div className="px-5 pt-3 md:pt-5 pb-3 flex items-start justify-between gap-3 flex-shrink-0">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-ink-3 uppercase tracking-wider truncate">{form.kunde_name}</p>
+            <p className="text-[22px] font-bold text-ink tracking-tight leading-tight mt-0.5">{form.datum ? new Date(form.datum).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Dreh'}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 px-1 whitespace-nowrap">{saving ? 'Speichert…' : '✓ gespeichert'}</span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <SpeicherStatus saving={saving} />
             {!extern && !videograph && <button onClick={() => { if (window.confirm(`Dreh „${dreh.kunde_name || ''}"${dreh.datum ? ' vom ' + new Date(dreh.datum).toLocaleDateString('de-DE') : ''} löschen?\n\nEr landet im Papierkorb (Tab „Verwalten") und kann wiederhergestellt werden.`)) onDelete?.() }}
               title="Dreh löschen"
-              className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 text-sm">🗑</button>}
-            <button onClick={onClose} className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 text-sm">×</button>
+              className="btn-icon !text-[#ff3b30] hover:!bg-[#ff3b30]/10"><TrashIcon /></button>}
+            <button onClick={onClose} title="Schließen" className="btn-icon text-base">×</button>
           </div>
         </div>
 
         {/* Status row – für Darsteller (extern) ausgeblendet; Videograph ohne "Abgeschlossen" */}
         {!ro && (
-        <div className="px-4 py-2.5 border-b border-gray-100 flex gap-1.5 flex-wrap flex-shrink-0">
-          {(videograph ? STATUSES.filter(s => s.id !== 'abgeschlossen') : STATUSES).map(s => (
-            <button key={s.id} onClick={() => handleStatusChange(s.id)}
-              className={`text-xs font-medium px-2.5 py-1 rounded-full transition-all border ${form.status === s.id ? 'border-current shadow-sm' : 'border-transparent opacity-50 hover:opacity-80'}`}
-              style={{ background: s.bg, color: s.text, borderColor: form.status === s.id ? s.color : 'transparent' }}>
-              {s.label}
-            </button>
-          ))}
+        <div className="px-5 pb-3 flex gap-1.5 overflow-x-auto flex-shrink-0 [scrollbar-width:none]">
+          {(videograph ? STATUSES.filter(s => s.id !== 'abgeschlossen') : STATUSES).map(s => {
+            const an = form.status === s.id
+            return (
+              <button key={s.id} onClick={() => handleStatusChange(s.id)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap transition-all duration-300 active:scale-95"
+                style={an ? { background: s.color, color: '#fff', boxShadow: `0 6px 14px -6px ${s.color}` } : { background: s.bg, color: s.text }}>
+                {s.label}
+              </button>
+            )
+          })}
         </div>
         )}
 
         {nasWarn && (
-          <div className="mx-4 mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 flex-shrink-0">
+          <div className="mx-5 mb-3 bg-[#ff3b30]/10 rounded-2xl px-3.5 py-2.5 text-xs text-[#d70015] flex-shrink-0">
             🔒 Erst RAW und Final auf NAS sichern (beide Häkchen), dann „Abgeschlossen". Zurück auf Posting gesetzt.
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-100 flex-shrink-0">
-          {['Info','Videos','Kommentare',...(ro ? [] : ['Verlauf'])].map(t => (
-            <button key={t} onClick={() => setTab(t.toLowerCase())}
-              className={`flex-1 py-2.5 text-xs font-medium transition-all border-b-2 ${tab === t.toLowerCase() ? 'text-[#ff6b01] border-[#ff6b01]' : 'text-gray-400 border-transparent'}`}>
-              {t}
-            </button>
-          ))}
+        <div className="px-5 pb-3 flex-shrink-0">
+          <div className="tabbar">
+            {['Info','Videos','Kommentare',...(ro ? [] : ['Verlauf'])].map(t => (
+              <button key={t} onClick={() => setTab(t.toLowerCase())} className={tab === t.toLowerCase() ? 'is-active' : ''}>{t}</button>
+            ))}
+          </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-5 pt-1 pb-[calc(20px+env(safe-area-inset-bottom))] space-y-4 border-t hairline">
+          <div className="h-2" />
           {live.hinweis && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">{live.hinweis}</div>
+            <div className="bg-[#ff9f0a]/12 rounded-2xl px-3.5 py-2.5 text-xs text-[#9a5b00]">{live.hinweis}</div>
           )}
           {tab === 'info' && (
             <>
@@ -1074,19 +1091,13 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
               </div>
               <div>
                 <label className="label">Sicherung</label>
-                <div className="space-y-1 mt-1">
-                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                    <input type="checkbox" checked={!!form.raw_gesichert} onChange={e => toggleSicherung('raw_gesichert', e.target.checked)} className="rounded" />
-                    RAW auf NAS gesichert
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                    <input type="checkbox" checked={!!form.final_gesichert} onChange={e => toggleSicherung('final_gesichert', e.target.checked)} className="rounded" />
-                    Final auf NAS gesichert
-                  </label>
+                <div className="rounded-2xl bg-white/60 border hairline divide-y divide-black/[0.06]">
+                  <SchalterZeile label="RAW auf NAS gesichert" an={!!form.raw_gesichert} onChange={v => toggleSicherung('raw_gesichert', v)} />
+                  <SchalterZeile label="Final auf NAS gesichert" an={!!form.final_gesichert} onChange={v => toggleSicherung('final_gesichert', v)} />
                 </div>
               </div>
               {form.status === 'abnahme_kunde' && (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                <div className="bg-indigo-500/[0.07] rounded-2xl p-3.5">
                   <p className="text-xs font-medium text-indigo-800 mb-1">Abnahme Kunde</p>
                   <p className="text-xs text-indigo-600 mb-2">Kunden-E-Mail für Abnahme auswählen:</p>
                   <select className="input text-xs mb-2">
@@ -1111,16 +1122,16 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                 // Anzeige: erledigte Videos immer unten (stabil); ▲▼ ordnen innerhalb der Anzeige
                 const ord = videos.map((_, k) => k).sort((a, b) => (videos[a].erledigt ? 1 : 0) - (videos[b].erledigt ? 1 : 0))
                 return ord.map((i, p) => { const v = videos[i]; return (
-                <div key={v.id || i} className={`border rounded-lg p-3 transition-all ${v.erledigt ? 'bg-green-50/50 border-green-100 opacity-70' : 'bg-gray-50 border-gray-100'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input type="checkbox" checked={!!v.erledigt} onChange={() => toggleVideoDone(v)} className="rounded accent-[#ff6b01] w-3.5 h-3.5" />
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${v.erledigt ? 'text-green-600' : 'text-gray-400'}`}>{v.erledigt ? '✓ Erledigt' : `Video ${p + 1}`}</span>
+                <div key={v.id || i} className={`rounded-[20px] p-3.5 border transition-all duration-300 ${v.erledigt ? 'bg-[#34c759]/[0.06] border-[#34c759]/15' : 'bg-white/70 border-white shadow-[0_6px_20px_-12px_rgba(30,30,60,0.25)]'}`}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <Haken an={!!v.erledigt} onClick={() => toggleVideoDone(v)} />
+                      <span className={`text-[13px] font-semibold tracking-tight ${v.erledigt ? 'text-[#248a3d]' : 'text-ink'}`}>{v.erledigt ? 'Erledigt' : `Video ${p + 1}`}</span>
                     </label>
-                    {!ro && <div className="flex items-center gap-1">
-                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▲</button>
-                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-6 h-6 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-xs">▼</button>
-                      <button onClick={() => removeVideo(v, p + 1)} className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-1">Entfernen</button>
+                    {!ro && <div className="flex items-center gap-0.5">
+                      <button onClick={() => moveVideo(v.id, videos[ord[p - 1]]?.id)} disabled={p === 0} title="Nach oben" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▲</button>
+                      <button onClick={() => moveVideo(v.id, videos[ord[p + 1]]?.id)} disabled={p === ord.length - 1} title="Nach unten" className="w-7 h-7 rounded-full text-ink-2 hover:bg-black/5 active:scale-90 transition disabled:opacity-25 disabled:hover:bg-transparent flex items-center justify-center text-[10px]">▼</button>
+                      <button onClick={() => removeVideo(v, p + 1)} title="Video entfernen" className="w-7 h-7 rounded-full text-ink-3 hover:text-[#ff3b30] hover:bg-[#ff3b30]/10 active:scale-90 transition flex items-center justify-center"><TrashIcon size={14} /></button>
                     </div>}
                   </div>
                   <AutoTextarea readOnly={ro} className="input text-xs mb-2" value={v.titel || ''}
@@ -1134,22 +1145,18 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                     onAdd={d => live.dateiAnhaengen(v.id, d)} onRemove={d => live.dateiEntfernen(v.id, d.path)} />
                 </div>
               )})})()}
-              {!ro && <button onClick={addVideo} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
-                + Video hinzufügen
-              </button>}
+              {!ro && <button onClick={addVideo} className="dashed-add">＋ Video hinzufügen</button>}
 
               {recruitingOn ? (
-                <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Recruiting</span>
-                    <button onClick={() => { setRecruitingOn(false); set('recruiting', '') }} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Entfernen</button>
+                <div className="bg-white/70 border border-white rounded-[20px] p-3.5">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[13px] font-semibold text-ink">Recruiting</span>
+                    <button onClick={() => { setRecruitingOn(false); set('recruiting', '') }} className="text-xs text-ink-3 hover:text-[#ff3b30] transition-colors">Entfernen</button>
                   </div>
                   <RichText value={form.recruiting || ''} onChange={val => set('recruiting', val)} onCommit={val => persist({ recruiting: val })} placeholder="Recruiting / Casting-Bedarf..." />
                 </div>
               ) : (
-                <button onClick={() => setRecruitingOn(true)} className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-[#ff6b01] hover:text-[#ff6b01] transition-all">
-                  + Recruiting-Bereich
-                </button>
+                <button onClick={() => setRecruitingOn(true)} className="dashed-add">＋ Recruiting-Bereich</button>
               )}
             </>
           )}
@@ -1158,35 +1165,35 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
             <>
               {notes.map(n => (
                 <div key={n.id} className="flex gap-2">
-                  <div className="w-6 h-6 rounded-full bg-[#ff6b01]/10 flex items-center justify-center text-xs font-semibold text-[#ff6b01] flex-shrink-0">?</div>
-                  <div className="bg-gray-50 rounded-lg rounded-tl-none px-3 py-2 flex-1">
-                    <p className="text-xs text-gray-700 leading-relaxed">{n.text}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{new Date(n.created_at).toLocaleDateString('de-DE')}</p>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0" style={{ background: 'linear-gradient(145deg,#ffb37a,#ff6b01)' }}>✎</div>
+                  <div className="bg-white/75 border border-white rounded-[18px] rounded-tl-md px-3.5 py-2.5 flex-1 shadow-[0_4px_14px_-10px_rgba(30,30,60,0.3)]">
+                    <p className="text-[13px] text-ink leading-relaxed whitespace-pre-wrap">{n.text}</p>
+                    <p className="text-[11px] text-ink-3 mt-1">{new Date(n.created_at).toLocaleDateString('de-DE')}</p>
                   </div>
                 </div>
               ))}
-              {notes.length === 0 && <p className="text-xs text-gray-400 text-center py-4">Noch keine Kommentare</p>}
-              <div className="flex gap-2 mt-2">
-                <input className="input text-xs flex-1" value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Kommentar schreiben..." onKeyDown={e => e.key === 'Enter' && e.metaKey && addNote()} />
-                <button onClick={addNote} className="btn-primary text-xs px-3">+</button>
+              {notes.length === 0 && <p className="text-xs text-ink-3 text-center py-4">Noch keine Kommentare</p>}
+              <div className="flex gap-2 mt-2 items-center">
+                <input className="input text-xs flex-1 !rounded-full !px-4" value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Kommentar schreiben..." onKeyDown={e => e.key === 'Enter' && e.metaKey && addNote()} />
+                <button onClick={addNote} title="Senden" className="btn-primary !w-10 !h-10 !p-0 flex-shrink-0">↑</button>
               </div>
             </>
           )}
 
           {tab === 'verlauf' && (
             <>
-              <p className="text-[11px] text-gray-400 mb-1">Jede Änderung wird gesichert. Du kannst den Video-Stand eines früheren Zeitpunkts wiederherstellen.</p>
+              <p className="text-xs text-ink-2 mb-1">Jede Änderung wird gesichert. Du kannst den Video-Stand eines früheren Zeitpunkts wiederherstellen.</p>
               {verlauf.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-6">Noch keine Änderungen aufgezeichnet.</p>
               ) : verlauf.map(h => {
                 const anz = Array.isArray(h.videos) ? h.videos.length : 0
                 return (
-                  <div key={h.id} className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-2">
+                  <div key={h.id} className="flex items-center gap-2 bg-white/65 border border-white rounded-2xl px-3.5 py-2.5">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-700">{new Date(h.changed_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} Uhr</p>
                       <p className="text-[10px] text-gray-400">von {nameOf(h.changed_by)} · Stand: {anz} Video{anz === 1 ? '' : 's'}</p>
                     </div>
-                    <button onClick={() => restoreVideos(h.videos)} className="text-xs bg-[#ff6b01]/10 text-[#c2410c] px-2.5 py-1 rounded-md font-medium hover:bg-[#ff6b01]/20 whitespace-nowrap">Videos wiederherstellen</button>
+                    <button onClick={() => restoreVideos(h.videos)} className="text-xs bg-[#ff6b01]/10 text-[#c2410c] px-3 py-1.5 rounded-full font-medium hover:bg-[#ff6b01]/20 active:scale-95 transition whitespace-nowrap">Wiederherstellen</button>
                   </div>
                 )
               })}
@@ -1195,5 +1202,46 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
         </div>
       </div>
     </div>
+  )
+}
+
+// ── Kleine UI-Bausteine (Apple-Stil) ─────────────────────────
+function TrashIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12a2 2 0 0 0 2 1.8h7a2 2 0 0 0 2-1.8l1-12M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7" />
+    </svg>
+  )
+}
+
+function SpeicherStatus({ saving }) {
+  return (
+    <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition-colors duration-300 ${saving ? 'bg-[#ff9f0a]/12 text-[#9a5b00]' : 'bg-[#34c759]/12 text-[#248a3d]'}`}>
+      {saving ? 'Speichert…' : '✓ Gespeichert'}
+    </span>
+  )
+}
+
+// Runder Haken wie in Apple Erinnerungen
+function Haken({ an, onClick }) {
+  return (
+    <button type="button" role="checkbox" aria-checked={an} onClick={e => { e.preventDefault(); onClick?.() }}
+      className={`w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 active:scale-90 ${an ? 'bg-[#34c759] shadow-[0_3px_8px_-2px_rgba(52,199,89,0.6)]' : 'border-[1.5px] border-black/20 bg-white/60 hover:border-[#ff6b01]'}`}>
+      {an && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}
+    </button>
+  )
+}
+
+// iOS-Schalter-Zeile
+function SchalterZeile({ label, an, onChange }) {
+  return (
+    <button type="button" role="switch" aria-checked={an} onClick={() => onChange(!an)}
+      className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-left">
+      <span className="text-[13px] text-ink">{label}</span>
+      <span className={`relative w-[44px] h-[26px] rounded-full flex-shrink-0 transition-colors duration-300 ${an ? 'bg-[#34c759]' : 'bg-black/[0.12]'}`}>
+        <span className={`absolute top-[2px] left-[2px] w-[22px] h-[22px] rounded-full bg-white shadow-[0_2px_5px_rgba(0,0,0,0.25)] transition-transform duration-300 ${an ? 'translate-x-[18px]' : ''}`}
+          style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }} />
+      </span>
+    </button>
   )
 }

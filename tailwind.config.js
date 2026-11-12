@@ -7,7 +7,7 @@ export default {
         orange: { DEFAULT: '#ff6b01', light: '#ff8533', pale: '#fff4ee' },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Inter', 'system-ui', 'sans-serif'],
       },
     },
   },

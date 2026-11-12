@@ -119,12 +119,6 @@ export default function Dashboard() {
                   )
                 })}
               </div>
-              {tasksCount > tasks.length && (
-                <button onClick={() => navigate('/tasks')}
-                  className="mt-3 w-full text-center text-xs text-[#ff6b01] hover:text-[#e55f00] font-medium py-2 transition-colors">
-                  Alle {tasksCount} Tasks anzeigen →
-                </button>
-              )}
             </>
           )}
         </div>
@@ -138,7 +132,6 @@ export default function Dashboard() {
               {[
                 { to: '/projekte', icon: '▦', label: 'Projekte', show: true },
                 { to: '/crm', icon: '◉', label: 'CRM', show: canAccess('crm') },
-                { to: '/tasks', icon: '◷', label: 'Tasks', show: canAccess('crm') },
                 { to: '/kalender', icon: '◻', label: 'Kalender', show: true },
               ].filter(i => i.show).map(item => (
                 <button key={item.to} onClick={() => navigate(item.to)}

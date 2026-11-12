@@ -5,27 +5,28 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Projekte from './pages/Projekte'
 import CRM from './pages/CRM'
-import ProzessKunde from './pages/ProzessKunde'
-import KundenJournal from './pages/KundenJournal'
-import { Tasks, Kalender, Team, Einstellungen } from './pages/OtherPages'
+import { Kalender, Team, Einstellungen } from './pages/OtherPages'
 import { Zeiterfassung, Urlaub, Auswertung } from './pages/Zeiterfassung'
 import MeineStunden from './pages/MeineStunden'
 
 function Layout({ children }) {
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto main-content">
-        {children}
-      </main>
-    </div>
+    <>
+      <div className="app-bg" aria-hidden="true"><i /></div>
+      <div className="app-shell flex h-screen overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto main-content">
+          {children}
+        </main>
+      </div>
+    </>
   )
 }
 
 function Protected({ children, mod, anyMod, adminOnly, externOk, needsZeit }) {
   const { user, profile, loading, canAccess, isAdmin, isRestricted } = useAuth()
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-[#f2f2f7]">
       <div className="w-8 h-8 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" />
     </div>
   )
@@ -57,9 +58,10 @@ export default function App() {
           <Route path="/projekte" element={<Protected mod="projekte" externOk><Layout><Projekte /></Layout></Protected>} />
           <Route path="/meine-stunden" element={<Protected externOk needsZeit><Layout><MeineStunden /></Layout></Protected>} />
           <Route path="/crm" element={<Protected anyMod={['crm', 'crm_darsteller']}><Layout><CRM /></Layout></Protected>} />
-          <Route path="/prozess-kunde" element={<Protected mod="crm"><Layout><ProzessKunde /></Layout></Protected>} />
-          <Route path="/journal" element={<Protected mod="projekte"><Layout><KundenJournal /></Layout></Protected>} />
-          <Route path="/tasks" element={<Protected mod="crm"><Layout><Tasks /></Layout></Protected>} />
+          {/* Tasks, Prozess Kunde und Kunden-Journal sind ausgeblendet (Daten bleiben in der Datenbank) */}
+          <Route path="/prozess-kunde" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/journal" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/tasks" element={<Navigate to="/dashboard" replace />} />
           <Route path="/zeiterfassung" element={<Protected><Layout><Zeiterfassung /></Layout></Protected>} />
           <Route path="/urlaub" element={<Protected><Layout><Urlaub /></Layout></Protected>} />
           <Route path="/auswertung" element={<Protected><Layout><Auswertung /></Layout></Protected>} />
