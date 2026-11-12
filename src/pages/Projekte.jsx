@@ -1309,7 +1309,11 @@ function VideoListe({ videos, live, ro, datensatzId, onToggleDone, onRemove, onM
           <div key={v.id || i} className={`rounded-[20px] border transition-all duration-300 ${eingeklappt ? 'px-3.5 py-2.5' : 'p-3.5'} ${v.erledigt ? 'bg-[#34c759]/[0.06] border-[#34c759]/15' : 'bg-white/70 border-white shadow-[0_6px_20px_-12px_rgba(30,30,60,0.25)]'}`}>
             <div className={`flex items-center justify-between gap-2 ${eingeklappt ? '' : 'mb-2.5'}`}>
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <Haken an={!!v.erledigt} onClick={() => onToggleDone(v)} />
+                <Haken an={!!v.erledigt} onClick={() => {
+                  // Abhaken klappt das Video automatisch zu (erledigt = braucht man nicht mehr offen)
+                  if (!v.erledigt && aufRef.current.has(v.id)) { const n = new Set(aufRef.current); n.delete(v.id); merken(n) }
+                  onToggleDone(v)
+                }} />
                 <button type="button" onClick={() => umschalten(v.id)} className="flex items-center gap-2 min-w-0 flex-1 text-left" title={eingeklappt ? 'Ausklappen' : 'Einklappen'}>
                   <span className={`text-[13px] font-semibold tracking-tight whitespace-nowrap ${v.erledigt ? 'text-[#248a3d]' : 'text-ink'}`}>Video {nr}</span>
                   {v.erledigt && <span className="text-[10px] font-semibold text-[#248a3d] bg-[#34c759]/12 px-1.5 py-0.5 rounded-full">✓</span>}
