@@ -6,12 +6,15 @@ const BASE = 'https://brehl-visuals-os.vercel.app'
 
 const INSTRUCTIONS = `Brehl Visuals OS – Drehplanung der Videoagentur Brehl Visuals.
 Ablauf: Erst mit drehs_auflisten (z.B. nach kunde und Datum) den richtigen Dreh finden, dann dreh_lesen für die Details.
-Videos sind ab 1 nummeriert (video_nr) GENAU wie in der App: offene Videos zuerst, erledigte stehen unten – die Nummern können sich also verschieben, wenn jemand etwas abhakt. Jedes Video hat eine feste video_id (aus dreh_lesen): zum Bearbeiten, Dateien anhängen und Upload-Links IMMER video_id verwenden. Nur video_nr geht auch, dann aber zusätzlich video_titel mitgeben (der aktuelle Titel) – passt er nicht, wird abgebrochen statt das falsche Video zu bearbeiten. Texte dürfen einfache HTML-Formatierung enthalten (<b>, <i>, <u>, <ul><li>), normaler Text mit Zeilenumbrüchen geht auch.
-Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Es gibt bewusst keine Lösch-Funktionen.
+Videos sind ab 1 nummeriert (video_nr) GENAU wie in der App – die Nummer ist fest (Video 7 bleibt 7, auch wenn es abgehakt wird; sie ändert sich nur, wenn jemand Videos umsortiert, einfügt oder entfernt). Jedes Video hat eine feste video_id (aus dreh_lesen): zum Bearbeiten, Dateien anhängen und Upload-Links IMMER video_id verwenden. Nur video_nr geht auch, dann aber zusätzlich video_titel mitgeben (der aktuelle Titel) – passt er nicht, wird abgebrochen statt das falsche Video zu bearbeiten. Texte dürfen einfache HTML-Formatierung enthalten (<b>, <i>, <u>, <ul><li>), normaler Text mit Zeilenumbrüchen geht auch.
+Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Für Drehs/Videos gibt es bewusst keine Lösch-Funktionen.
+Pro Dreh gibt es Videograph (dreht), Cutter (schneidet) und zwei Deadlines: deadline_raw (bis wann der Videograph das RAW-Material hochgeladen hat) und deadline_cutting (bis wann die Videos fertig, an den Kunden verschickt und bei Metricool vorgeladen sind). Setzen mit deadlines_setzen – daraus entstehen automatisch Aufgaben im Dashboard der zuständigen Person.
+Aufgaben fürs Team-Dashboard: aufgaben_auflisten, aufgabe_anlegen, aufgabe_bearbeiten, aufgabe_loeschen (landet im Papierkorb). Personen per Vorname/Name (team_auflisten zeigt, wer ein Dashboard hat). Zeiten immer als Berliner Ortszeit "YYYY-MM-DD HH:MM" oder nur "YYYY-MM-DD" (ganztägig).
 Immer diese Werkzeuge nutzen – nicht direkt per SQL oder Supabase in die Datenbank schreiben.
 Dateien (PDF/Bilder), die der Nutzer im Chat schickt: ZUERST selbst hochladen – pro Datei upload_link_erstellen aufrufen und die Datei aus deiner Code-Umgebung mit curl -T "<datei>" "<upload_url>" hochladen (brehl-visuals-os.vercel.app ist freigegeben). Nur wenn das nicht klappt (Netzwerk gesperrt): EIN upload_sammellink_erstellen-Aufruf pro Dreh mit allen Dateien (inkl. original_dateiname = Name der Datei, wie der Nutzer sie hochgeladen hat, z.B. IMG_3818.jpeg) und dem Nutzer den EINEN Link geben. Er wählt dort alle Dateien auf einmal aus, sie werden per Dateiname dem richtigen Video zugeordnet. Das funktioniert immer, auch ohne Netzwerkzugriff deiner Code-Umgebung. Nur bei öffentlichen https-Links datei_anhaengen nutzen.`
 
-const vNr = { type: 'integer', minimum: 1, description: 'Video-Nummer wie in der App (offene zuerst, erledigte unten). Besser video_id verwenden.' }
+const vNr = { type: 'integer', minimum: 1, description: 'Feste Video-Nummer wie in der App. Besser video_id verwenden.' }
+const zeit = { type: 'string', description: 'Berliner Ortszeit "YYYY-MM-DD HH:MM" oder nur "YYYY-MM-DD"; leerer Text = entfernen' }
 const vId = { type: 'string', description: 'Feste video_id aus dreh_lesen – hat Vorrang vor video_nr' }
 const vTitel = { type: 'string', description: 'Nur nötig, wenn ohne video_id gearbeitet wird: aktueller Titel des Videos zur Kontrolle' }
 const drehId = { type: 'string', description: 'dreh_id aus drehs_auflisten' }
@@ -37,7 +40,7 @@ const TOOLS = [
     annotations: { readOnlyHint: true },
   },
   {
-    name: 'dreh_lesen', description: 'Alle Details eines Drehs: Infos, Videos (video_nr wie in der App + feste video_id + Titel, Planung, Dateinamen), Kommentare.',
+    name: 'dreh_lesen', description: 'Alle Details eines Drehs: Infos, Videograph, Cutter, Deadlines, Videos (feste video_nr wie in der App + video_id + Titel, Planung, Dateinamen), Kommentare.',
     inputSchema: { type: 'object', properties: { dreh_id: drehId }, required: ['dreh_id'] },
     annotations: { readOnlyHint: true },
   },
@@ -71,7 +74,7 @@ const TOOLS = [
       type: 'object', properties: {
         dreh_id: drehId, titel: { type: 'string' },
         planung: { type: 'string', description: 'Planung/Skript (Hook, Inhalt, CTA …)' },
-        video_nr: { ...vNr, description: 'Optional: vor dem Video einfügen, das in der App gerade diese Nummer hat' },
+        video_nr: { ...vNr, description: 'Optional: an dieser Nummer einfügen (die folgenden Videos rücken eins nach hinten)' },
       }, required: ['dreh_id', 'titel'],
     },
   },
@@ -126,6 +129,59 @@ const TOOLS = [
       required: ['dreh_id', 'dateiname'],
     },
   },
+  {
+    name: 'deadlines_setzen',
+    description: 'Videograph, Cutter und/oder Deadlines eines Drehs setzen. Nur die übergebenen Felder werden geändert. Erzeugt/aktualisiert automatisch die Deadline-Aufgaben im Dashboard.',
+    inputSchema: {
+      type: 'object', properties: {
+        dreh_id: drehId,
+        videograph: { type: 'string', description: 'Name, z.B. "Maurice" (leer = entfernen)' },
+        cutter: { type: 'string', description: 'Name, z.B. "Pia" oder "Ana" (leer = entfernen)' },
+        deadline_raw: { ...zeit, description: 'Bis wann RAW hochgeladen sein muss. ' + zeit.description },
+        deadline_cutting: { ...zeit, description: 'Bis wann Videos fertig, an Kunden verschickt und bei Metricool vorgeladen sein müssen. ' + zeit.description },
+      }, required: ['dreh_id'],
+    },
+  },
+  {
+    name: 'team_auflisten', description: 'Team (ohne Darsteller) mit Rolle und ob die Person ein Dashboard hat.',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'aufgaben_auflisten', description: 'Aufgaben im Dashboard (offene, sortiert nach Fälligkeit). Enthält auch automatische Deadline-Aufgaben aus den Drehs.',
+    inputSchema: {
+      type: 'object', properties: {
+        person: { type: 'string', description: 'Optional: nur Aufgaben dieser Person' },
+        ab_datum: { type: 'string', description: 'YYYY-MM-DD' },
+        bis_datum: { type: 'string', description: 'YYYY-MM-DD' },
+        erledigte_zeigen: { type: 'boolean' },
+      },
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'aufgabe_anlegen', description: 'Aufgabe für eine Person anlegen (erscheint in deren Dashboard).',
+    inputSchema: {
+      type: 'object', properties: {
+        titel: { type: 'string' }, person: { type: 'string', description: 'Name, z.B. "Pia"' },
+        faellig_am: zeit, beschreibung: { type: 'string' },
+      }, required: ['titel', 'person'],
+    },
+  },
+  {
+    name: 'aufgabe_bearbeiten', description: 'Aufgabe ändern (nur übergebene Felder) oder als erledigt markieren.',
+    inputSchema: {
+      type: 'object', properties: {
+        aufgabe_id: { type: 'string', description: 'aufgabe_id aus aufgaben_auflisten' },
+        titel: { type: 'string' }, person: { type: 'string' }, faellig_am: zeit, beschreibung: { type: 'string' }, erledigt: { type: 'boolean' },
+      }, required: ['aufgabe_id'],
+    },
+  },
+  {
+    name: 'aufgabe_loeschen', description: 'Aufgabe löschen (landet im Papierkorb, wiederherstellbar). Nur auf ausdrücklichen Wunsch.',
+    inputSchema: { type: 'object', properties: { aufgabe_id: { type: 'string' } }, required: ['aufgabe_id'] },
+    annotations: { destructiveHint: true },
+  },
 ]
 
 async function callTool(token, name, args = {}) {
@@ -138,6 +194,12 @@ async function callTool(token, name, args = {}) {
     case 'video_hinzufuegen':
     case 'video_bearbeiten':
     case 'kommentar_hinzufuegen':
+    case 'deadlines_setzen':
+    case 'team_auflisten':
+    case 'aufgaben_auflisten':
+    case 'aufgabe_anlegen':
+    case 'aufgabe_bearbeiten':
+    case 'aufgabe_loeschen':
       return osApi(token, name, args)
 
     case 'datei_anhaengen': {
@@ -194,7 +256,7 @@ async function handle(token, msg) {
       return reply(id, {
         protocolVersion: params?.protocolVersion || '2025-06-18',
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.1.0' },
+        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.2.0' },
         instructions: INSTRUCTIONS,
       })
     case 'ping':

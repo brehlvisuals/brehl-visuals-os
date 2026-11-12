@@ -9,6 +9,8 @@ import CRM from './pages/CRM'
 import { Kalender, Team, Einstellungen } from './pages/OtherPages'
 import { Zeiterfassung, Urlaub, Auswertung } from './pages/Zeiterfassung'
 import MeineStunden from './pages/MeineStunden'
+import Papierkorb from './pages/Papierkorb'
+import Kundenvideos from './pages/Kundenvideos'
 
 function Layout({ children }) {
   return (
@@ -24,8 +26,8 @@ function Layout({ children }) {
   )
 }
 
-function Protected({ children, mod, anyMod, adminOnly, externOk, needsZeit }) {
-  const { user, profile, loading, canAccess, isAdmin, isRestricted } = useAuth()
+function Protected({ children, mod, anyMod, adminOnly, externOk, needsZeit, dashboard }) {
+  const { user, profile, loading, canAccess, isAdmin, isRestricted, canDashboard } = useAuth()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#f2f2f7]">
       <div className="animate-pulse"><BrandMark size={44} /></div>
@@ -33,7 +35,9 @@ function Protected({ children, mod, anyMod, adminOnly, externOk, needsZeit }) {
   )
   if (!user) return <Navigate to="/login" replace />
   // Eingeschränkte Rollen (Videograf/Darsteller) dürfen nur ausdrücklich freigegebene Seiten (Projekte, Meine Stunden, Einstellungen)
-  if (isRestricted && !externOk) return <Navigate to="/projekte" replace />
+  // Dashboard nur mit Zugang (Team → Dashboard); ohne Zugang geht's zu den Projekten
+  if (dashboard && !canDashboard) return <Navigate to="/projekte" replace />
+  if (isRestricted && !externOk && !(dashboard && canDashboard)) return <Navigate to="/projekte" replace />
   // Reiner Planungszugang (zeiterfassung = false) hat keine Stunden-Seite
   if (needsZeit && profile?.zeiterfassung === false) return <Navigate to="/projekte" replace />
   if (adminOnly && !isAdmin) return (
@@ -55,7 +59,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Protected><Layout><Dashboard /></Layout></Protected>} />
+          <Route path="/dashboard" element={<Protected dashboard><Layout><Dashboard /></Layout></Protected>} />
+          <Route path="/kundenvideos" element={<Protected><Layout><Kundenvideos /></Layout></Protected>} />
+          <Route path="/papierkorb" element={<Protected adminOnly><Layout><Papierkorb /></Layout></Protected>} />
           <Route path="/projekte" element={<Protected mod="projekte" externOk><Layout><Projekte /></Layout></Protected>} />
           <Route path="/meine-stunden" element={<Protected externOk needsZeit><Layout><MeineStunden /></Layout></Protected>} />
           <Route path="/crm" element={<Protected anyMod={['crm', 'crm_darsteller']}><Layout><CRM /></Layout></Protected>} />

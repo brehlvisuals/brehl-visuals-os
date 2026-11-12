@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { BrandMark } from '../components/BrandMark'
 
 export default function Login() {
-  const { signIn, user, isRestricted } = useAuth()
+  const { signIn, user, canDashboard, profile } = useAuth()
   const navigate = useNavigate()
   // Recovery-Link erkennen (einmalig beim Mount, bevor Supabase den Hash aus der URL entfernt)
   const [recovery] = useState(() => {
@@ -25,8 +25,8 @@ export default function Login() {
   useEffect(() => {
     // Im Reset-Modus NICHT automatisch in die App springen – Pia soll erst ein neues Passwort setzen
     if (recovery) return
-    if (user) navigate(isRestricted ? '/projekte' : '/dashboard')
-  }, [user, recovery])
+    if (user && profile) navigate(canDashboard ? '/dashboard' : '/projekte')
+  }, [user, profile, recovery])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -63,7 +63,7 @@ export default function Login() {
     setLoading(true); setError('')
     const { error } = await supabase.auth.updateUser({ password: newPw })
     if (error) { setError('Fehler: ' + error.message); setLoading(false) }
-    else navigate(isRestricted ? '/projekte' : '/dashboard')
+    else navigate(canDashboard ? '/dashboard' : '/projekte')
   }
 
   return (

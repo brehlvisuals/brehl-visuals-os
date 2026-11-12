@@ -601,6 +601,13 @@ export function Team() {
     await supabase.from('profiles').update({ arbeitstage: next }).eq('id', m.id)
   }
 
+  async function toggleDashboard(m) {
+    const neu = !m.dashboard
+    setMembers(prev => prev.map(x => x.id === m.id ? { ...x, dashboard: neu } : x))
+    const { error } = await supabase.from('profiles').update({ dashboard: neu }).eq('id', m.id)
+    if (error) { setErr('Dashboard-Zugang konnte nicht gespeichert werden: ' + error.message); fetchMembers() }
+  }
+
   async function togglePermission(memberId, mod, currentPerms) {
     const perms = currentPerms || []
     let newPerms
@@ -637,6 +644,7 @@ export function Team() {
               <th className="text-left px-4 py-3 text-xs font-semibold text-ink-3 uppercase tracking-wider">Person</th>
               <th className="text-left px-3 py-3 text-xs font-semibold text-ink-3 uppercase tracking-wider">Rolle</th>
               {MODULES.map(m => <th key={m.id} className="text-center px-2 py-3 text-xs font-semibold text-ink-3 uppercase tracking-wider">{m.label}</th>)}
+              <th className="text-center px-2 py-3 text-xs font-semibold text-ink-3 uppercase tracking-wider">Dashboard</th>
               <th className="px-3 py-3"></th>
             </tr>
           </thead>
@@ -691,6 +699,16 @@ export function Team() {
                     )}
                   </td>
                 ))}
+                <td className="px-2 py-3 text-center">
+                  {m.role === 'admin' ? (
+                    <span className="text-[11px] font-semibold text-[#ff6b01]">Master</span>
+                  ) : (
+                    <button onClick={() => toggleDashboard(m)} role="switch" aria-checked={!!m.dashboard} title={m.dashboard ? 'Dashboard-Zugang aus' : 'Dashboard-Zugang an'}
+                      className={`relative inline-block w-[38px] h-[22px] rounded-full transition-colors duration-300 align-middle ${m.dashboard ? 'bg-[#34c759]' : 'bg-black/[0.12]'}`}>
+                      <span className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-300 ${m.dashboard ? 'translate-x-[16px]' : ''}`} />
+                    </button>
+                  )}
+                </td>
                 <td className="px-3 py-3 whitespace-nowrap text-right">
                   <button onClick={() => resetPw(m.id, m.email)} className="text-xs text-ink-3 hover:text-ink mr-3">Passwort</button>
                   {m.id !== user?.id && <button onClick={() => removeUser(m.id, m.email)} className="text-xs text-red-400 hover:text-red-600">Löschen</button>}
