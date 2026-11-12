@@ -47,9 +47,9 @@ export function Tasks() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-2xl">
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-4 max-w-2xl">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">{tasks.length} offene Tasks</p>
+        <p className="text-xs text-ink-3">{tasks.length} offene Tasks</p>
         <button onClick={() => setShowAdd(!showAdd)} className="btn-primary text-xs py-1.5 px-3">+ Neuer Task</button>
       </div>
 
@@ -73,14 +73,14 @@ export function Tasks() {
 
       {thisWeek.length > 0 && (
         <div className="card p-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Diese Woche</h3>
+          <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Diese Woche</h3>
           <TaskList tasks={thisWeek} onComplete={complete} />
         </div>
       )}
 
       {later.length > 0 && (
         <div className="card p-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Später</h3>
+          <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Später</h3>
           <TaskList tasks={later} onComplete={complete} />
         </div>
       )}
@@ -88,7 +88,7 @@ export function Tasks() {
       {tasks.length === 0 && (
         <div className="card p-12 text-center">
           <p className="text-2xl mb-2">🎉</p>
-          <p className="text-sm text-gray-400">Keine offenen Tasks!</p>
+          <p className="text-sm text-ink-3">Keine offenen Tasks!</p>
         </div>
       )}
     </div>
@@ -102,11 +102,11 @@ function TaskList({ tasks, onComplete }) {
         const overdue = t.faellig_am && new Date(t.faellig_am) < new Date()
         const linkedName = t.crm_leads?.name || t.crm_darsteller?.name
         return (
-          <div key={t.id} className={`flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0`}>
+          <div key={t.id} className={`flex items-start gap-3 py-2.5 border-b border-black/[0.04] last:border-0`}>
             <button onClick={() => onComplete(t.id)} className="w-4 h-4 rounded-full border-2 border-gray-300 hover:border-[#ff6b01] flex-shrink-0 mt-0.5 transition-colors" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">{t.titel}</p>
-              <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-gray-400'}`}>
+              <p className="text-sm font-medium text-ink">{t.titel}</p>
+              <p className={`text-xs mt-0.5 ${overdue ? 'text-red-500' : 'text-ink-3'}`}>
                 {linkedName && `${linkedName} · `}
                 {overdue ? '⚠ Überfällig' : t.faellig_am ? new Date(t.faellig_am).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
               </p>
@@ -154,11 +154,11 @@ export function Funnels() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex bg-gray-100 rounded-lg p-1 w-fit gap-0.5">
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-4">
+      <div className="seg w-fit max-w-full overflow-x-auto">
         {[['kunden','Kunden LPs & Funnels'],['intern','Interner Funnel']].map(([id,label]) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${tab === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
+            className={`seg-btn ${tab === id ? 'is-active' : ''}`}>
             {label}
           </button>
         ))}
@@ -167,7 +167,7 @@ export function Funnels() {
       {tab === 'kunden' && (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">{lps.length} Landing Pages & Funnels</p>
+            <p className="text-xs text-ink-3">{lps.length} Landing Pages & Funnels</p>
             <button onClick={() => setShowAdd(true)} className="btn-primary text-xs py-1.5 px-3">+ Neue LP/Funnel</button>
           </div>
 
@@ -199,10 +199,10 @@ export function Funnels() {
               <div key={lp.id} className="card p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">{lp.name}</p>
-                    {lp.kunde && <p className="text-xs text-gray-400">{lp.kunde}</p>}
+                    <p className="text-sm font-semibold text-ink">{lp.name}</p>
+                    {lp.kunde && <p className="text-xs text-ink-3">{lp.kunde}</p>}
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor[lp.status] || 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor[lp.status] || 'bg-black/[0.05] text-ink-2'}`}>
                     {lp.status === 'in_bau' ? 'In Bau' : lp.status?.charAt(0).toUpperCase() + lp.status?.slice(1)}
                   </span>
                 </div>
@@ -211,9 +211,9 @@ export function Funnels() {
                     🔗 {lp.url}
                   </a>
                 )}
-                {lp.notizen && <p className="text-xs text-gray-500 leading-relaxed">{lp.notizen}</p>}
+                {lp.notizen && <p className="text-xs text-ink-2 leading-relaxed">{lp.notizen}</p>}
                 <div className="flex gap-2 mt-3">
-                  <button className="text-xs text-gray-400 hover:text-gray-600">Bearbeiten</button>
+                  <button className="text-xs text-ink-3 hover:text-ink-2">Bearbeiten</button>
                   <button onClick={async () => { await supabase.from('funnel_lps').delete().eq('id', lp.id); fetchAll() }} className="text-xs text-red-400 hover:text-red-600">Löschen</button>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export function Funnels() {
           {lps.length === 0 && !showAdd && (
             <div className="card p-12 text-center">
               <p className="text-2xl mb-2">🔗</p>
-              <p className="text-sm text-gray-400 mb-3">Noch keine Landing Pages eingetragen</p>
+              <p className="text-sm text-ink-3 mb-3">Noch keine Landing Pages eingetragen</p>
               <button onClick={() => setShowAdd(true)} className="btn-primary text-xs py-1.5 px-4">Erste LP hinzufügen</button>
             </div>
           )}
@@ -233,8 +233,8 @@ export function Funnels() {
       {tab === 'intern' && (
         <>
           <div className="bg-[#ff6b01]/5 border border-[#ff6b01]/20 rounded-xl p-4 mb-4">
-            <p className="text-sm font-semibold text-gray-800 mb-1">Euer interner Funnel</p>
-            <p className="text-xs text-gray-500 leading-relaxed">Hier tragt ihr ein woher eure Leads kommen und wie gut jeder Kanal konvertiert. Hilft euch zu verstehen welcher Content am meisten bringt.</p>
+            <p className="text-sm font-semibold text-ink mb-1">Euer interner Funnel</p>
+            <p className="text-xs text-ink-2 leading-relaxed">Hier tragt ihr ein woher eure Leads kommen und wie gut jeder Kanal konvertiert. Hilft euch zu verstehen welcher Content am meisten bringt.</p>
           </div>
 
           <div className="flex justify-end mb-2">
@@ -258,12 +258,12 @@ export function Funnels() {
               <div key={k.id} className="card p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">{k.kanal}</p>
+                    <p className="text-sm font-semibold text-ink">{k.kanal}</p>
                     <div className="flex gap-4 mt-1">
-                      {k.leads_monat && <span className="text-xs text-gray-500"><span className="font-semibold text-[#ff6b01]">{k.leads_monat}</span> Leads/Monat</span>}
-                      {k.conversion && <span className="text-xs text-gray-500"><span className="font-semibold text-green-600">{k.conversion}%</span> Conversion</span>}
+                      {k.leads_monat && <span className="text-xs text-ink-2"><span className="font-semibold text-[#ff6b01]">{k.leads_monat}</span> Leads/Monat</span>}
+                      {k.conversion && <span className="text-xs text-ink-2"><span className="font-semibold text-green-600">{k.conversion}%</span> Conversion</span>}
                     </div>
-                    {k.notizen && <p className="text-xs text-gray-400 mt-1 leading-relaxed">{k.notizen}</p>}
+                    {k.notizen && <p className="text-xs text-ink-3 mt-1 leading-relaxed">{k.notizen}</p>}
                   </div>
                   <button onClick={async () => { await supabase.from('funnel_intern').delete().eq('id', k.id); fetchAll() }} className="text-xs text-red-400 hover:text-red-600">Löschen</button>
                 </div>
@@ -274,7 +274,7 @@ export function Funnels() {
           {intern.length === 0 && (
             <div className="card p-12 text-center">
               <p className="text-2xl mb-2">📊</p>
-              <p className="text-sm text-gray-400">Noch keine Kanäle eingetragen</p>
+              <p className="text-sm text-ink-3">Noch keine Kanäle eingetragen</p>
             </div>
           )}
         </>
@@ -364,36 +364,36 @@ export function Kalender() {
   const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8">
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-base font-semibold text-gray-900">{month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</h2>
+        <h1 className="page-title">{month.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</h1>
         <div className="flex gap-2">
           <button onClick={() => setMonth(new Date(year, mon - 1, 1))} className="btn-secondary text-xs px-3">‹</button>
           <button onClick={() => setMonth(new Date())} className="btn-secondary text-xs px-3">Heute</button>
           <button onClick={() => setMonth(new Date(year, mon + 1, 1))} className="btn-secondary text-xs px-3">›</button>
         </div>
       </div>
-      <p className="text-xs text-gray-400 mb-4">{eigene ? 'Tippe einen Tag, um deine Verfügbarkeit einzutragen.' : 'Drehs & Verfügbarkeiten der Videografen. Tippe einen Tag für Details.'}</p>
+      <p className="text-xs text-ink-3 mb-4">{eigene ? 'Tippe einen Tag, um deine Verfügbarkeit einzutragen.' : 'Drehs & Verfügbarkeiten der Videografen. Tippe einen Tag für Details.'}</p>
 
       <div className="grid grid-cols-7 gap-0.5 mb-1">
-        {days.map(d => <div key={d} className="text-center text-xs font-semibold text-gray-400 py-2">{d}</div>)}
+        {days.map(d => <div key={d} className="text-center text-xs font-semibold text-ink-3 py-2">{d}</div>)}
       </div>
 
       <div className="grid grid-cols-7 gap-0.5">
-        {Array(startPad).fill(null).map((_, i) => <div key={`pad-${i}`} className="min-h-16 rounded-lg" />)}
+        {Array(startPad).fill(null).map((_, i) => <div key={`pad-${i}`} className="min-h-16 rounded-xl" />)}
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
           const ds = K_toStr(new Date(year, mon, day))
           const dayDrehs = drehsForDay(ds)
           const dayVfb = vfbForDay(ds)
           const isToday = today.getDate() === day && today.getMonth() === mon && today.getFullYear() === year
           return (
-            <button key={day} onClick={() => openDay(ds)} className={`min-h-16 rounded-lg p-1 border text-left transition-all ${isToday ? 'bg-[#ff6b01]/6 border-[#ff6b01]/30' : 'border-transparent hover:bg-gray-50 hover:border-gray-200'}`}>
-              <p className={`text-xs font-medium mb-1 ${isToday ? 'text-[#ff6b01]' : 'text-gray-600'}`}>{day}</p>
+            <button key={day} onClick={() => openDay(ds)} className={`min-h-16 rounded-xl p-1 border text-left transition-all ${isToday ? 'bg-[#ff6b01]/6 border-[#ff6b01]/30' : 'border-transparent hover:bg-white/55 hover:border-black/[0.08]'}`}>
+              <p className={`text-xs font-medium mb-1 ${isToday ? 'text-[#ff6b01]' : 'text-ink-2'}`}>{day}</p>
               {dayDrehs.slice(0, 2).map((d, i) => {
                 const sc = statusColor[d.status] || { bg: '#f3f4f6', text: '#6b7280' }
                 return <div key={i} className="text-[9px] font-medium px-1 py-0.5 rounded mb-0.5 truncate" style={{ background: sc.bg, color: sc.text }}>{d.kunde_name}</div>
               })}
-              {dayDrehs.length > 2 && <div className="text-[9px] text-gray-400 mb-0.5">+{dayDrehs.length - 2}</div>}
+              {dayDrehs.length > 2 && <div className="text-[9px] text-ink-3 mb-0.5">+{dayDrehs.length - 2}</div>}
               {dayVfb.map((v, i) => {
                 const st = VFB_STYLE[v.typ] || VFB_STYLE.verfuegbar
                 const nm = v.profiles?.full_name ? v.profiles.full_name.split(' ')[0] + ': ' : ''
@@ -407,23 +407,23 @@ export function Kalender() {
       </div>
 
       <div className="flex flex-wrap gap-3 mt-4 px-1">
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ background: VFB_STYLE.verfuegbar.bg, border: `1px solid ${VFB_STYLE.verfuegbar.text}` }} /><span className="text-xs text-gray-400">Verfügbar</span></div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ background: VFB_STYLE.blockiert.bg, border: `1px solid ${VFB_STYLE.blockiert.text}` }} /><span className="text-xs text-gray-400">Blockiert</span></div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ background: VFB_STYLE.verfuegbar.bg, border: `1px solid ${VFB_STYLE.verfuegbar.text}` }} /><span className="text-xs text-ink-3">Verfügbar</span></div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ background: VFB_STYLE.blockiert.bg, border: `1px solid ${VFB_STYLE.blockiert.text}` }} /><span className="text-xs text-ink-3">Blockiert</span></div>
         {Object.entries(statusColor).map(([k, v]) => (
           <div key={k} className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-sm" style={{ background: v.bg, border: `1px solid ${v.text}` }} />
-            <span className="text-xs text-gray-400 capitalize">{k.replace('_', ' ')}</span>
+            <span className="text-xs text-ink-3 capitalize">{k.replace('_', ' ')}</span>
           </div>
         ))}
       </div>
 
       {/* Tages-Panel */}
       {selDay && (
-        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setSelDay(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 scrim z-[70] flex items-end sm:items-center justify-center p-3 sm:p-4" onClick={() => setSelDay(null)}>
+          <div className="glass-strong rounded-[28px] w-full max-w-sm p-5 pop-in" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900">{new Date(selDay).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</h3>
-              <button onClick={() => setSelDay(null)} className="text-gray-400 text-xl">×</button>
+              <h3 className="font-semibold text-ink">{new Date(selDay).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</h3>
+              <button onClick={() => setSelDay(null)} className="text-ink-3 text-xl">×</button>
             </div>
 
             {/* Drehs des Tages */}
@@ -431,7 +431,7 @@ export function Kalender() {
               <div className="mb-3 space-y-1">
                 {drehsForDay(selDay).map((d, i) => {
                   const sc = statusColor[d.status] || { bg: '#f3f4f6', text: '#6b7280' }
-                  return <div key={i} className="text-xs font-medium px-2 py-1 rounded-lg inline-block mr-1" style={{ background: sc.bg, color: sc.text }}>🎬 {d.kunde_name}</div>
+                  return <div key={i} className="text-xs font-medium px-2 py-1 rounded-xl inline-block mr-1" style={{ background: sc.bg, color: sc.text }}>🎬 {d.kunde_name}</div>
                 })}
               </div>
             )}
@@ -441,7 +441,7 @@ export function Kalender() {
                 <div className="flex gap-2">
                   {['verfuegbar', 'blockiert'].map(t => (
                     <button key={t} onClick={() => setForm(p => ({ ...p, typ: t }))}
-                      className={`flex-1 text-sm font-medium py-2 rounded-lg border transition-all ${form.typ === t ? '' : 'opacity-50'}`}
+                      className={`flex-1 text-sm font-medium py-2 rounded-xl border transition-all ${form.typ === t ? '' : 'opacity-50'}`}
                       style={{ background: VFB_STYLE[t].bg, color: VFB_STYLE[t].text, borderColor: form.typ === t ? VFB_STYLE[t].text : 'transparent' }}>
                       {VFB_STYLE[t].label}
                     </button>
@@ -451,7 +451,7 @@ export function Kalender() {
                   <div><label className="label">Von (optional)</label><input type="time" className="input text-sm" value={form.von} onChange={e => setForm(p => ({ ...p, von: e.target.value }))} /></div>
                   <div><label className="label">Bis (optional)</label><input type="time" className="input text-sm" value={form.bis} onChange={e => setForm(p => ({ ...p, bis: e.target.value }))} /></div>
                 </div>
-                <p className="text-[10px] text-gray-400">Ohne Uhrzeit = ganztags. Beispiel „nur bis 13 Uhr": Bis = 13:00 lassen, Von leer.</p>
+                <p className="text-[10px] text-ink-3">Ohne Uhrzeit = ganztags. Beispiel „nur bis 13 Uhr": Bis = 13:00 lassen, Von leer.</p>
                 <div><label className="label">Notiz (optional)</label><input className="input text-sm" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} placeholder="z.B. nur vormittags" /></div>
                 <div className="flex gap-2 pt-1">
                   <button onClick={saveVfb} className="btn-primary flex-1 text-sm">Speichern</button>
@@ -461,11 +461,11 @@ export function Kalender() {
             ) : (
               <div className="space-y-1.5">
                 <p className="section-title mb-1">Verfügbarkeiten</p>
-                {vfbForDay(selDay).length === 0 ? <p className="text-xs text-gray-400">Niemand hat für diesen Tag etwas eingetragen.</p>
+                {vfbForDay(selDay).length === 0 ? <p className="text-xs text-ink-3">Niemand hat für diesen Tag etwas eingetragen.</p>
                   : vfbForDay(selDay).map((v, i) => {
                     const st = VFB_STYLE[v.typ] || VFB_STYLE.verfuegbar
                     return <div key={i} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="text-gray-700">{v.profiles?.full_name || 'Unbekannt'}</span>
+                      <span className="text-ink">{v.profiles?.full_name || 'Unbekannt'}</span>
                       <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: st.bg, color: st.text }}>{st.label} · {vfbZeitText(v)}{v.notiz ? ` · ${v.notiz}` : ''}</span>
                     </div>
                   })}
@@ -614,47 +614,50 @@ export function Team() {
     fetchMembers()
   }
 
-  if (!isAdmin) return <div className="p-6 text-center text-sm text-gray-400">Kein Zugriff.</div>
+  if (!isAdmin) return <div className="p-6 text-center text-sm text-ink-3">Kein Zugriff.</div>
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">{members.length} Zugänge</p>
-        <button onClick={() => { setShowAdd(true); setErr(''); setMsg('') }} className="btn-primary text-xs py-1.5 px-3">+ Zugang anlegen</button>
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-4 max-w-3xl">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="page-title">Team</h1>
+          <p className="text-[13px] text-ink-2 mt-1.5">{members.length} Zugänge</p>
+        </div>
+        <button onClick={() => { setShowAdd(true); setErr(''); setMsg('') }} className="btn-primary text-xs !py-2 !px-4">＋ Zugang anlegen</button>
       </div>
 
-      {msg && <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl px-4 py-3">{msg}</div>}
-      {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl px-4 py-3">{err}</div>}
+      {msg && <div className="bg-[#34c759]/12 text-[#248a3d] text-xs rounded-2xl px-4 py-3">{msg}</div>}
+      {err && <div className="bg-[#ff3b30]/10 text-[#d70015] text-xs rounded-2xl px-4 py-3">{err}</div>}
 
       <div className="card overflow-hidden table-scroll">
         <table className="w-full min-w-[560px]">
-          <thead className="bg-gray-50 border-b border-gray-100">
+          <thead className="bg-white/55 border-b border-black/[0.06]">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Person</th>
-              <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Rolle</th>
-              {MODULES.map(m => <th key={m.id} className="text-center px-2 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{m.label}</th>)}
+              <th className="text-left px-4 py-3 text-xs font-semibold text-ink-3 uppercase tracking-wider">Person</th>
+              <th className="text-left px-3 py-3 text-xs font-semibold text-ink-3 uppercase tracking-wider">Rolle</th>
+              {MODULES.map(m => <th key={m.id} className="text-center px-2 py-3 text-xs font-semibold text-ink-3 uppercase tracking-wider">{m.label}</th>)}
               <th className="px-3 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {members.map(m => (
-              <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-all">
+              <tr key={m.id} className="border-b border-black/[0.04] hover:bg-white/70/50 transition-all">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-[#ff6b01]/10 flex items-center justify-center text-xs font-semibold text-[#ff6b01]">
                       {(m.full_name || m.email || '?')[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">{m.full_name || '—'}</p>
-                      <p className="text-xs text-gray-400">{m.email}</p>
+                      <p className="text-sm font-medium text-ink">{m.full_name || '—'}</p>
+                      <p className="text-xs text-ink-3">{m.email}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-3 py-3">
                   <select value={m.role || 'mitarbeiter'} disabled={m.id === user?.id}
                     onChange={e => changeRole(m.id, e.target.value)}
-                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white outline-none focus:border-[#ff6b01] disabled:opacity-50">
+                    className="text-xs border border-black/[0.08] rounded-xl px-2 py-1 bg-white outline-none focus:border-[#ff6b01] disabled:opacity-50">
                     <option value="admin">Admin</option>
                     <option value="mitarbeiter">Mitarbeiter</option>
                     <option value="videograph">Videograph</option>
@@ -666,7 +669,7 @@ export function Team() {
                     {m.role === 'admin' ? (
                       <span className="text-[#ff6b01] text-sm">✓</span>
                     ) : ['extern', 'videograph'].includes(m.role) ? (
-                      mod.id === 'projekte' ? <span className="text-green-600 text-sm">✓</span> : <span className="text-gray-300 text-sm">–</span>
+                      mod.id === 'projekte' ? <span className="text-green-600 text-sm">✓</span> : <span className="text-ink-3 text-sm">–</span>
                     ) : mod.id === 'tasks' ? (
                       <button
                         onClick={() => togglePermission(m.id, 'tasks', m.permissions)}
@@ -676,7 +679,7 @@ export function Team() {
                             ? 'bg-[#ff6b01] border-[#ff6b01]'
                             : (m.permissions || []).includes('crm')
                             ? 'border-gray-300 hover:border-[#ff6b01]'
-                            : 'border-gray-200 opacity-30 cursor-not-allowed'
+                            : 'border-black/[0.08] opacity-30 cursor-not-allowed'
                         }`}>
                         {(m.permissions || []).includes('tasks') && (m.permissions || []).includes('crm') && <span className="text-white text-[10px]">✓</span>}
                       </button>
@@ -689,7 +692,7 @@ export function Team() {
                   </td>
                 ))}
                 <td className="px-3 py-3 whitespace-nowrap text-right">
-                  <button onClick={() => resetPw(m.id, m.email)} className="text-xs text-gray-400 hover:text-gray-700 mr-3">Passwort</button>
+                  <button onClick={() => resetPw(m.id, m.email)} className="text-xs text-ink-3 hover:text-ink mr-3">Passwort</button>
                   {m.id !== user?.id && <button onClick={() => removeUser(m.id, m.email)} className="text-xs text-red-400 hover:text-red-600">Löschen</button>}
                 </td>
               </tr>
@@ -704,16 +707,16 @@ export function Team() {
 
       {/* Soll-Stunden, Arbeitstage & Urlaubsanspruch */}
       <div className="card p-4">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Soll-Stunden, Arbeitstage & Urlaub</h3>
+        <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Soll-Stunden, Arbeitstage & Urlaub</h3>
         <div className="space-y-3">
           {members.map(m => {
             const at = Array.isArray(m.arbeitstage) && m.arbeitstage.length ? m.arbeitstage : [1, 2, 3, 4, 5]
             return (
-              <div key={m.id} className="py-2 border-b border-gray-50 last:border-0 space-y-2">
+              <div key={m.id} className="py-2 border-b border-black/[0.04] last:border-0 space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex-1 min-w-[120px]">
-                    <p className="text-sm font-medium text-gray-800 truncate">{m.full_name || '—'}</p>
-                    <p className="text-xs text-gray-400 truncate">{m.email}</p>
+                    <p className="text-sm font-medium text-ink truncate">{m.full_name || '—'}</p>
+                    <p className="text-xs text-ink-3 truncate">{m.email}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <input type="number" step="0.5" inputMode="decimal" className="input text-xs w-16 text-center px-1"
@@ -728,16 +731,16 @@ export function Team() {
                     <input type="number" step="1" inputMode="decimal" className="input text-xs w-16 text-center px-1"
                       value={m.urlaub_anspruch_tage ?? ''} onChange={e => setLocalStamm(m.id, { urlaub_anspruch_tage: e.target.value })}
                       onBlur={e => saveStamm(m.id, 'urlaub_anspruch_tage', e.target.value)} placeholder="–" />
-                    <span className="text-[10px] text-gray-400 w-14">Urlaubst.</span>
+                    <span className="text-[10px] text-ink-3 w-14">Urlaubst.</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-1">Arbeitstage</span>
+                  <span className="text-[10px] text-ink-3 uppercase tracking-wider mr-1">Arbeitstage</span>
                   {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((lbl, i) => {
                     const tag = i + 1, on = at.includes(tag)
                     return (
                       <button key={tag} onClick={() => toggleArbeitstag(m, tag)}
-                        className={`w-7 h-7 rounded-md text-[10px] font-semibold transition-all ${on ? 'bg-[#ff6b01] text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
+                        className={`w-7 h-7 rounded-md text-[10px] font-semibold transition-all ${on ? 'bg-[#ff6b01] text-white' : 'bg-black/[0.05] text-ink-3 hover:bg-black/[0.09]'}`}>
                         {lbl}
                       </button>
                     )
@@ -747,28 +750,28 @@ export function Team() {
             )
           })}
         </div>
-        <p className="text-[10px] text-gray-400 mt-3">Soll-Stunden (pro Woche oder Monat) & Urlaubstage/Jahr — leer lassen = keine Vorgabe (z.B. für dich als Chef). Arbeitstage steuern Soll & Feiertagsberechnung. Wird automatisch gespeichert.</p>
+        <p className="text-[10px] text-ink-3 mt-3">Soll-Stunden (pro Woche oder Monat) & Urlaubstage/Jahr — leer lassen = keine Vorgabe (z.B. für dich als Chef). Arbeitstage steuern Soll & Feiertagsberechnung. Wird automatisch gespeichert.</p>
       </div>
 
       {/* Externe / Minijob: Stundenlohn & Kundenzuordnung */}
       <div className="card p-4">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Externe / Minijob – Stundenlohn & Kunden</h3>
+        <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Externe / Minijob – Stundenlohn & Kunden</h3>
         {members.filter(m => ['extern', 'videograph'].includes(m.role)).length === 0 ? (
-          <p className="text-xs text-gray-400">Noch keine Zugänge mit Rolle „Extern" oder „Videograph".</p>
+          <p className="text-xs text-ink-3">Noch keine Zugänge mit Rolle „Extern" oder „Videograph".</p>
         ) : (
           <div className="space-y-4">
             {members.filter(m => ['extern', 'videograph'].includes(m.role)).map(m => {
               const h = stundenMap[m.id] || 0
               const lohn = Number(lohnMap[m.id]) || 0
               return (
-                <div key={m.id} className="py-2 border-b border-gray-50 last:border-0 space-y-2">
+                <div key={m.id} className="py-2 border-b border-black/[0.04] last:border-0 space-y-2">
                   <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex-1 min-w-[120px]">
-                      <p className="text-sm font-medium text-gray-800 truncate">{m.full_name || '—'}</p>
-                      <p className="text-xs text-gray-400 truncate">{m.email}</p>
+                      <p className="text-sm font-medium text-ink truncate">{m.full_name || '—'}</p>
+                      <p className="text-xs text-ink-3 truncate">{m.email}</p>
                     </div>
                     <button onClick={() => toggleZeiterfassung(m)} title="Antippen zum Umschalten"
-                      className="flex items-center gap-2 text-[11px] text-gray-600 whitespace-nowrap">
+                      className="flex items-center gap-2 text-[11px] text-ink-2 whitespace-nowrap">
                       <span className={`relative inline-block w-8 h-[18px] rounded-full transition-colors ${m.zeiterfassung !== false ? 'bg-[#ff6b01]' : 'bg-gray-300'}`}>
                         <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-all ${m.zeiterfassung !== false ? 'left-[16px]' : 'left-[2px]'}`} />
                       </span>
@@ -779,29 +782,29 @@ export function Team() {
                         <input type="number" step="0.5" inputMode="decimal" className="input text-xs w-20 text-center px-1"
                           value={lohnMap[m.id] ?? ''} onChange={e => setLohnMap(p => ({ ...p, [m.id]: e.target.value }))}
                           onBlur={e => saveLohn(m.id, e.target.value)} placeholder="€/h" />
-                        <span className="text-[10px] text-gray-400">€/Std.</span>
+                        <span className="text-[10px] text-ink-3">€/Std.</span>
                       </div>
-                      <div className="text-xs text-gray-500 whitespace-nowrap">
-                        {new Date().toLocaleDateString('de-DE', { month: 'long' })}: <span className="font-semibold text-gray-800">{(Math.round(h * 100) / 100).toLocaleString('de-DE')} Std.</span>
+                      <div className="text-xs text-ink-2 whitespace-nowrap">
+                        {new Date().toLocaleDateString('de-DE', { month: 'long' })}: <span className="font-semibold text-ink">{(Math.round(h * 100) / 100).toLocaleString('de-DE')} Std.</span>
                         {' · '}<span className="font-semibold text-[#c2410c]">{(h * lohn).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                       </div>
                     </>}
                   </div>
                   {m.role === 'videograph' ? (
-                    <p className="text-[10px] text-gray-400">Videograph – sieht alle Drehs außer „Abgeschlossen" (keine Kundenzuordnung nötig).</p>
+                    <p className="text-[10px] text-ink-3">Videograph – sieht alle Drehs außer „Abgeschlossen" (keine Kundenzuordnung nötig).</p>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-1 self-center">Kunden</span>
+                      <span className="text-[10px] text-ink-3 uppercase tracking-wider mr-1 self-center">Kunden</span>
                       {kundenList.map(k => {
                         const on = zuordnung[m.id]?.has(k.id)
                         return (
                           <button key={k.id} onClick={() => toggleKunde(m.id, k.id)}
-                            className={`text-xs px-2 py-1 rounded-md transition-all ${on ? 'bg-[#ff6b01] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                            className={`text-xs px-2 py-1 rounded-md transition-all ${on ? 'bg-[#ff6b01] text-white' : 'bg-black/[0.05] text-ink-2 hover:bg-black/[0.09]'}`}>
                             {k.name}
                           </button>
                         )
                       })}
-                      {kundenList.length === 0 && <span className="text-xs text-gray-400">Keine Kunden angelegt.</span>}
+                      {kundenList.length === 0 && <span className="text-xs text-ink-3">Keine Kunden angelegt.</span>}
                     </div>
                   )}
                 </div>
@@ -809,15 +812,15 @@ export function Team() {
             })}
           </div>
         )}
-        <p className="text-[10px] text-gray-400 mt-3">Stundenlohn wird automatisch gespeichert (nur du & die Person sehen ihn). Zugeordnete Kunden bestimmen, welche Drehs (Status „Dreh") der/die Externe sieht. „Stunden" = laufender Monat. „Nur Planungszugang" blendet Stunden & Vergütung für die Person komplett aus.</p>
+        <p className="text-[10px] text-ink-3 mt-3">Stundenlohn wird automatisch gespeichert (nur du & die Person sehen ihn). Zugeordnete Kunden bestimmen, welche Drehs (Status „Dreh") der/die Externe sieht. „Stunden" = laufender Monat. „Nur Planungszugang" blendet Stunden & Vergütung für die Person komplett aus.</p>
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 bg-black/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-gray-100 p-5" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 scrim z-[70] flex items-end sm:items-center justify-center p-3 sm:p-4" onClick={() => setShowAdd(false)}>
+          <div className="glass-strong rounded-[28px] w-full max-w-sm p-5 pop-in" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Zugang anlegen</h3>
-              <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl">×</button>
+              <h3 className="font-semibold text-ink">Zugang anlegen</h3>
+              <button onClick={() => setShowAdd(false)} className="text-ink-3 text-xl">×</button>
             </div>
             <div className="space-y-3">
               <div><label className="label">Name</label><input className="input" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Max Mustermann" /></div>
@@ -832,8 +835,8 @@ export function Team() {
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              {err && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</div>}
-              <p className="text-xs text-gray-400">Die Person meldet sich direkt mit E-Mail + Passwort an – keine Bestätigungs-Mail nötig.</p>
+              {err && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{err}</div>}
+              <p className="text-xs text-ink-3">Die Person meldet sich direkt mit E-Mail + Passwort an – keine Bestätigungs-Mail nötig.</p>
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1">Abbrechen</button>
@@ -862,21 +865,22 @@ export function Einstellungen() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-lg">
+    <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-4 max-w-lg">
+      <h1 className="page-title">Einstellungen</h1>
       <div className="card p-5">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Mein Profil</h3>
+        <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-4">Mein Profil</h3>
         <div className="space-y-0.5">
           {[['E-Mail', profile?.email], ['Rolle', profile?.role === 'admin' ? 'Administrator' : profile?.role === 'videograph' ? 'Videograph' : profile?.role === 'extern' ? 'Extern' : 'Mitarbeiter']].map(([l, v]) => (
-            <div key={l} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
-              <span className="text-xs text-gray-400 w-24">{l}</span>
-              <span className="text-sm text-gray-700">{v}</span>
+            <div key={l} className="flex items-center gap-3 py-2.5 border-b border-black/[0.04] last:border-0">
+              <span className="text-xs text-ink-3 w-24">{l}</span>
+              <span className="text-sm text-ink">{v}</span>
             </div>
           ))}
         </div>
       </div>
 
       <div className="card p-5">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Passwort ändern</h3>
+        <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-4">Passwort ändern</h3>
         <div className="space-y-3">
           <div><label className="label">Neues Passwort</label><input type="password" className="input" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Min. 8 Zeichen" /></div>
           {msg && <p className={`text-xs ${msg.includes('Fehler') ? 'text-red-500' : 'text-green-600'}`}>{msg}</p>}
@@ -885,7 +889,7 @@ export function Einstellungen() {
       </div>
 
       <div className="card p-5">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Account</h3>
+        <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-4">Account</h3>
         <button onClick={signOut} className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors">Ausloggen</button>
       </div>
     </div>

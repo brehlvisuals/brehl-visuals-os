@@ -65,7 +65,7 @@ export function MeineSpesen({ month, userId }) {
           <>
             <div><label className="label">Strecke</label><input className="input text-xs" value={form.strecke} onChange={e => setForm(p => ({ ...p, strecke: e.target.value }))} placeholder="Ort A – Ort B" /></div>
             <div><label className="label">km</label><input type="number" inputMode="decimal" className="input text-xs" value={form.km} onChange={e => setForm(p => ({ ...p, km: e.target.value }))} /></div>
-            <div className="flex items-end"><div className="text-xs text-gray-500 pb-2.5">{kmPreview > 0 ? `= ${eur(kmPreview)}` : '0,30 €/km'}</div></div>
+            <div className="flex items-end"><div className="text-xs text-ink-2 pb-2.5">{kmPreview > 0 ? `= ${eur(kmPreview)}` : '0,30 €/km'}</div></div>
           </>
         ) : (
           <>
@@ -76,18 +76,18 @@ export function MeineSpesen({ month, userId }) {
       </div>
       <button onClick={add} disabled={saving} className="btn-primary text-sm w-full">{saving ? 'Speichert...' : '+ Hinzufügen'}</button>
       {list.length > 0 && (
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-black/[0.05]">
           {list.map(s => (
             <div key={s.id} className="flex items-center gap-2 py-2 text-sm">
-              <span className="w-12 text-gray-500 text-xs flex-shrink-0">{new Date(s.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
-              <span className="flex-1 text-gray-700 truncate">{s.art === 'fahrt' ? `🚗 ${s.strecke || ''} · ${fmtDe(s.km)} km` : `• ${s.beschreibung || 'Umkosten'}`}</span>
-              <span className="font-medium text-gray-800 flex-shrink-0">{eur(s.betrag)}</span>
-              <button onClick={() => del(s.id)} className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">×</button>
+              <span className="w-12 text-ink-2 text-xs flex-shrink-0">{new Date(s.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+              <span className="flex-1 text-ink truncate">{s.art === 'fahrt' ? `🚗 ${s.strecke || ''} · ${fmtDe(s.km)} km` : `• ${s.beschreibung || 'Umkosten'}`}</span>
+              <span className="font-medium text-ink flex-shrink-0">{eur(s.betrag)}</span>
+              <button onClick={() => del(s.id)} className="text-xs text-ink-3 hover:text-red-500 flex-shrink-0">×</button>
             </div>
           ))}
         </div>
       )}
-      <p className="text-[10px] text-gray-400">Fahrtkosten werden mit 0,30 €/km automatisch berechnet und gespeichert.</p>
+      <p className="text-[10px] text-ink-3">Fahrtkosten werden mit 0,30 €/km automatisch berechnet und gespeichert.</p>
     </div>
   )
 }
@@ -136,16 +136,16 @@ export function PersonSpesen({ month, userId, name }) {
     <>
       {/* Kennzahlen der Person */}
       <div className="grid grid-cols-3 gap-3">
-        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Stunden (genehmigt)</p><p className="text-lg font-bold text-gray-900">{fmtDe(hSum)}</p>{offenH > 0 && <p className="text-[10px] text-yellow-600 mt-0.5">+ {fmtDe(offenH)} offen</p>}</div>}
-        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Entgelt ({eur(lohn)}/h)</p><p className="text-lg font-bold text-[#c2410c]">{eur(hSum * lohn)}</p></div>}
-        <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Fahrtkosten</p><p className="text-lg font-bold text-[#c2410c]">{eur(sSum)}</p></div>
+        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-ink-3 mb-1">Stunden (genehmigt)</p><p className="text-lg font-bold text-ink">{fmtDe(hSum)}</p>{offenH > 0 && <p className="text-[10px] text-yellow-600 mt-0.5">+ {fmtDe(offenH)} offen</p>}</div>}
+        {hatMinijob && <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-ink-3 mb-1">Entgelt ({eur(lohn)}/h)</p><p className="text-lg font-bold text-[#c2410c]">{eur(hSum * lohn)}</p></div>}
+        <div className="card p-4"><p className="text-[10px] uppercase tracking-wider text-ink-3 mb-1">Fahrtkosten</p><p className="text-lg font-bold text-[#c2410c]">{eur(sSum)}</p></div>
       </div>
 
       {/* Kalender: wann hat {name} was eingetragen */}
       <div className="card p-4">
         <h3 className="section-title">Eintragungen {name ? `– ${name}` : ''} (Tag antippen)</h3>
         <div className="grid grid-cols-7 gap-1 mb-1">
-          {WD.map(d => <div key={d} className="text-center text-[10px] font-semibold text-gray-300 py-1">{d}</div>)}
+          {WD.map(d => <div key={d} className="text-center text-[10px] font-semibold text-ink-3 py-1">{d}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-1">
           {cells.map((ds, i) => {
@@ -156,8 +156,8 @@ export function PersonSpesen({ month, userId, name }) {
             const active = tag === ds
             return (
               <button key={i} onClick={() => setTag(active ? null : ds)}
-                className={`min-h-[46px] rounded-md p-1 text-left border transition-all ${active ? 'border-[#ff6b01] bg-[#ff6b01]/5' : items.length ? 'border-gray-100 bg-gray-50 hover:border-[#ff6b01]/40' : 'border-transparent'}`}>
-                <div className="text-[10px] text-gray-500">{parseInt(ds.slice(-2))}</div>
+                className={`min-h-[46px] rounded-md p-1 text-left border transition-all ${active ? 'border-[#ff6b01] bg-[#ff6b01]/5' : items.length ? 'border-black/[0.06] bg-white/55 hover:border-[#ff6b01]/40' : 'border-transparent'}`}>
+                <div className="text-[10px] text-ink-2">{parseInt(ds.slice(-2))}</div>
                 {dh > 0 && <div className="text-[9px] font-semibold text-[#ff6b01] leading-tight">{fmtDe(dh)} Std</div>}
                 {de > 0 && <div className="text-[9px] font-semibold text-[#c2410c] leading-tight">{eur(de)}</div>}
               </button>
@@ -166,25 +166,25 @@ export function PersonSpesen({ month, userId, name }) {
         </div>
 
         {tag && (
-          <div className="mt-3 border-t border-gray-100 pt-3">
-            <p className="text-xs font-semibold text-gray-600 mb-2">{new Date(tag).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
-            {(byDay[tag] || []).length === 0 ? <p className="text-xs text-gray-400">Nichts eingetragen.</p> : (
+          <div className="mt-3 border-t border-black/[0.06] pt-3">
+            <p className="text-xs font-semibold text-ink-2 mb-2">{new Date(tag).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
+            {(byDay[tag] || []).length === 0 ? <p className="text-xs text-ink-3">Nichts eingetragen.</p> : (
               <div className="space-y-1.5">
                 {(byDay[tag] || []).map((it, k) => (
-                  <div key={k} className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
+                  <div key={k} className="flex items-center gap-2 text-sm bg-white/55 rounded-xl px-3 py-2">
                     {it.kind === 'std' ? (
-                      <span className="flex-1 text-gray-600 text-xs">🕒 {hhmm(it.start_zeit)}–{hhmm(it.end_zeit)} Uhr{it.notiz ? ` · ${it.notiz}` : ''}</span>
+                      <span className="flex-1 text-ink-2 text-xs">🕒 {hhmm(it.start_zeit)}–{hhmm(it.end_zeit)} Uhr{it.notiz ? ` · ${it.notiz}` : ''}</span>
                     ) : (
-                      <span className="flex-1 text-gray-600 text-xs">{it.art === 'fahrt' ? `🚗 ${it.strecke || ''} · ${fmtDe(it.km)} km` : `• ${it.beschreibung || 'Umkosten'}`}</span>
+                      <span className="flex-1 text-ink-2 text-xs">{it.art === 'fahrt' ? `🚗 ${it.strecke || ''} · ${fmtDe(it.km)} km` : `• ${it.beschreibung || 'Umkosten'}`}</span>
                     )}
-                    <span className="font-medium text-gray-800 flex-shrink-0">{it.kind === 'std' ? `${fmtDe(it.stunden)} Std` : eur(it.betrag)}</span>
+                    <span className="font-medium text-ink flex-shrink-0">{it.kind === 'std' ? `${fmtDe(it.stunden)} Std` : eur(it.betrag)}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
-        {stunden.length === 0 && spesen.length === 0 && <p className="text-sm text-gray-400 py-2 text-center">Keine Einträge in diesem Monat.</p>}
+        {stunden.length === 0 && spesen.length === 0 && <p className="text-sm text-ink-3 py-2 text-center">Keine Einträge in diesem Monat.</p>}
       </div>
     </>
   )

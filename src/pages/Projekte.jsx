@@ -453,7 +453,7 @@ export default function Projekte() {
                   <div key={st.id}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverCol !== st.id) setDragOverCol(st.id) }}
                     onDrop={() => handleDrop(st.id)}
-                    className={`lane w-full md:w-60 md:flex-shrink-0 ${dragOverCol === st.id && draggingId ? 'is-over' : ''}`}>
+                    className={`lane w-full md:flex-1 md:min-w-[200px] md:max-w-[320px] ${dragOverCol === st.id && draggingId ? 'is-over' : ''}`}>
                     <div className="flex items-center justify-between mb-2.5 px-1.5 pt-0.5">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.8)]" style={{ background: st.color }} />
@@ -555,7 +555,7 @@ export default function Projekte() {
             {INTERN_STATUSES.map(st => {
               const cols = intern.filter(i => i.status === st.id)
               return (
-                <div key={st.id} className="lane w-full md:w-60 md:flex-shrink-0">
+                <div key={st.id} className="lane w-full md:flex-1 md:min-w-[200px] md:max-w-[320px]">
                   <div className="flex items-center justify-between mb-2.5 px-1.5 pt-0.5">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.8)]" style={{ background: st.color }} />
