@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useAuth } from './AuthProvider'
 import { supabase } from '../lib/supabase'
+import { BrandMark, BrandWordmark } from './BrandMark'
 
 // Tasks, Prozess Kunde und Kunden-Journal sind bewusst ausgeblendet (werden nicht genutzt, Daten bleiben erhalten)
 const NAV = [
@@ -104,13 +105,8 @@ export default function Sidebar() {
       <aside className="desktop-sidebar w-60 flex-shrink-0 h-screen sticky top-0 p-3 pr-0">
         <div className="glass h-full rounded-[28px] flex flex-col overflow-hidden">
           {/* Logo */}
-          <div className="px-5 pt-5 pb-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[11px] flex items-center justify-center text-white font-bold text-[15px] flex-shrink-0 shadow-[0_6px_14px_-6px_rgba(255,107,1,0.7)]"
-              style={{ background: 'linear-gradient(145deg,#ff9a4d,#ff6b01 60%,#e85a00)' }}>B</div>
-            <div className="min-w-0">
-              <div className="font-semibold text-[15px] text-ink tracking-tight leading-tight">Brehl Visuals</div>
-              <div className="text-[11px] text-ink-3">OS</div>
-            </div>
+          <div className="px-5 pt-6 pb-4">
+            <BrandWordmark markSize={34} textClass="text-[#333]" />
           </div>
 
           {/* Nav */}
@@ -141,7 +137,7 @@ export default function Sidebar() {
           {/* Nutzer */}
           <div className="m-3 mt-0 p-2.5 rounded-2xl bg-white/50 flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(145deg,#ffb37a,#ff6b01)' }}>
+              style={{ background: 'linear-gradient(135deg,#38b6ff,#ff6b01 55%,#7c3aed)' }}>
               {name[0].toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
@@ -203,7 +199,7 @@ export default function Sidebar() {
             </div>
             <div className="mt-3 pt-3 border-t hairline flex items-center justify-between px-1">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white" style={{ background: 'linear-gradient(145deg,#ffb37a,#ff6b01)' }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white" style={{ background: 'linear-gradient(135deg,#38b6ff,#ff6b01 55%,#7c3aed)' }}>
                   {name[0].toUpperCase()}
                 </div>
                 <div>

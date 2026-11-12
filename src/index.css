@@ -12,6 +12,9 @@
 :root {
   --accent: #ff6b01;
   --accent-strong: #f25f00;
+  --brand-blue: #38b6ff;
+  --brand-purple: #7c3aed;
+  --brand-gradient: linear-gradient(120deg, #38b6ff 0%, #ff6b01 50%, #7c3aed 100%);
   --ink: #1d1d1f;            /* Apple-Textschwarz */
   --ink-2: #6e6e73;          /* sekundär */
   --ink-3: #a1a1a6;          /* tertiär */
@@ -164,9 +167,9 @@
 .app-bg::before, .app-bg::after, .app-bg > i {
   content: ''; position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.85;
 }
-.app-bg::before { width: 46vw; height: 46vw; left: -12vw; top: -14vw; background: radial-gradient(circle, #ffb27a 0%, rgba(255, 178, 122, 0) 70%); }
-.app-bg::after  { width: 52vw; height: 52vw; right: -16vw; top: 18vh; background: radial-gradient(circle, #b4c6ff 0%, rgba(180, 198, 255, 0) 70%); }
-.app-bg > i     { width: 40vw; height: 40vw; left: 22vw; bottom: -20vw; background: radial-gradient(circle, #ffc9dc 0%, rgba(255, 201, 220, 0) 70%); display: block; }
+.app-bg::before { width: 46vw; height: 46vw; left: -12vw; top: -14vw; background: radial-gradient(circle, #ffad70 0%, rgba(255, 173, 112, 0) 70%); }
+.app-bg::after  { width: 52vw; height: 52vw; right: -16vw; top: 18vh; background: radial-gradient(circle, #9fd9ff 0%, rgba(159, 217, 255, 0) 70%); }
+.app-bg > i     { width: 40vw; height: 40vw; left: 22vw; bottom: -20vw; background: radial-gradient(circle, #c9b0ff 0%, rgba(201, 176, 255, 0) 70%); display: block; }
 @media (max-width: 768px) {
   .app-bg::before { width: 110vw; height: 110vw; left: -40vw; top: -40vw; }
   .app-bg::after  { width: 120vw; height: 120vw; right: -60vw; top: 30vh; }
@@ -279,3 +282,7 @@
 .rt-edit ul { list-style: disc; padding-left: 1.15rem; margin: 0.2rem 0; }
 .rt-edit ol { list-style: decimal; padding-left: 1.15rem; margin: 0.2rem 0; }
 .rt-edit a { color: #ff6b01; text-decoration: underline; }
+
+/* Marken-Verlauf (aus dem Logo) für kleine Akzente */
+.brand-text { background: var(--brand-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand-bar { background: var(--brand-gradient); }

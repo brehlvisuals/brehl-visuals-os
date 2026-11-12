@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../components/AuthProvider'
 import { supabase } from '../lib/supabase'
+import { BrandMark } from '../components/BrandMark'
 
 export default function Login() {
   const { signIn, user, isRestricted } = useAuth()
@@ -71,12 +72,14 @@ export default function Login() {
       <div className="app-shell min-h-full flex items-center justify-center p-4">
       <div className="w-full max-w-sm fade-up">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[20px] mb-5 shadow-[0_14px_30px_-12px_rgba(255,107,1,0.75)]"
-            style={{ background: 'linear-gradient(145deg,#ff9a4d,#ff6b01 60%,#e85a00)' }}>
-            <span className="text-white font-bold text-2xl">B</span>
+          <div className="inline-flex items-center justify-center w-[76px] h-[76px] rounded-[22px] mb-5 bg-white/80 border border-white shadow-[0_18px_40px_-16px_rgba(124,58,237,0.45),0_8px_20px_-10px_rgba(255,107,1,0.4)]">
+            <BrandMark size={48} />
           </div>
-          <h1 className="page-title">Brehl Visuals OS</h1>
-          <p className="text-[15px] text-ink-2 mt-2">Internes Betriebssystem</p>
+          <h1 className="leading-none" style={{ fontFamily: "'Poppins', -apple-system, system-ui, sans-serif" }}>
+            <span className="block text-[34px] font-bold tracking-[-0.03em] text-[#333]">brehl</span>
+            <span className="block text-[17px] font-light text-[#333] -mt-0.5">visuals <span className="brand-text font-bold">OS</span></span>
+          </h1>
+          <p className="text-[15px] text-ink-2 mt-3">Internes Betriebssystem</p>
         </div>
 
         <div className="glass rounded-[28px] p-6">

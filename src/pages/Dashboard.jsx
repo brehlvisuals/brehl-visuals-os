@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { BrandMark } from '../components/BrandMark'
 
 export default function Dashboard() {
   const { profile, isAdmin, canAccess } = useAuth()
@@ -62,6 +63,7 @@ export default function Dashboard() {
       {/* Greeting */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
+          <BrandMark size={30} className="mb-3 md:hidden" />
           <h1 className="page-title">{greeting}, {name.split(' ')[0]}</h1>
           <p className="text-sm text-ink-3 mt-0.5">
             {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

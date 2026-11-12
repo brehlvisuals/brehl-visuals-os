@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './components/AuthProvider'
 import Sidebar from './components/Sidebar'
+import { BrandMark } from './components/BrandMark'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Projekte from './pages/Projekte'
@@ -27,7 +28,7 @@ function Protected({ children, mod, anyMod, adminOnly, externOk, needsZeit }) {
   const { user, profile, loading, canAccess, isAdmin, isRestricted } = useAuth()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#f2f2f7]">
-      <div className="w-8 h-8 border-2 border-[#ff6b01] border-t-transparent rounded-full animate-spin" />
+      <div className="animate-pulse"><BrandMark size={44} /></div>
     </div>
   )
   if (!user) return <Navigate to="/login" replace />
