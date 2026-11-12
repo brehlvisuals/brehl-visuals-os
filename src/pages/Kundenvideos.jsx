@@ -119,6 +119,8 @@ export default function Kundenvideos() {
         </div>
       )}
 
+      <Legende />
+
       {ohne.length > 0 && (
         <div className="card p-4">
           <p className="text-[13px] font-semibold text-ink mb-1">Ohne Metricool-Verbindung</p>
@@ -133,6 +135,29 @@ export default function Kundenvideos() {
         <KundenDetail k={offen.k} a={offen.a} monat={monat} isAdmin={isAdmin} onClose={() => oeffnen(null)}
           onSpeichern={patch => kundeSpeichern(offen.k.id, patch)} onDreh={id => navigate(`/projekte?dreh=${id}`)} />
       )}
+    </div>
+  )
+}
+
+// Was bedeuten die Farben?
+function Legende() {
+  const Punkt = ({ f }) => <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-[3px]" style={{ background: f }} />
+  const Strich = ({ f, gestreift }) => <span className="w-5 h-2 rounded-full flex-shrink-0 mt-[4px]" style={{ background: gestreift ? `repeating-linear-gradient(45deg, ${f}88 0 3px, transparent 3px 6px)` : f }} />
+  return (
+    <div className="card p-4">
+      <p className="text-[13px] font-semibold text-ink mb-3">Legende</p>
+      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-xs text-ink-2">
+        <div className="flex gap-2"><Punkt f={GRUEN} /><span><b className="text-ink">Grün</b> – alles im Plan: Ziel erreicht bzw. auf Kurs, keine offenen Freigaben, nichts hängt.</span></div>
+        <div className="flex gap-2"><Punkt f={ORANGE} /><span><b className="text-ink">Gelb</b> – im Blick behalten: Beiträge warten auf Freigabe des Kunden oder es fehlen noch Videos bis zum Monatsziel.</span></div>
+        <div className="flex gap-2"><Punkt f={ROT} /><span><b className="text-ink">Rot</b> – handeln: Freigabe fehlt kurz vor dem Termin, Beitrag abgelehnt oder ein geplanter Beitrag ist nicht online gegangen.</span></div>
+        <div className="flex gap-2"><Strich f={GRUEN} /><span>Balken grün = schon online</span></div>
+        <div className="flex gap-2"><Strich f={BLAU} /><span>Balken blau = geplant, geht diesen Monat noch online</span></div>
+        <div className="flex gap-2"><Strich f={LILA} gestreift /><span>Gestreift lila = mehr Videos als das Monatsziel</span></div>
+        <div className="flex gap-2"><span className="w-[2px] h-3 bg-ink/70 flex-shrink-0 mt-[2px] mx-[9px]" /><span>Senkrechter Strich = Monatsziel</span></div>
+        <div className="flex gap-2"><span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#7c3aed]/10 text-[#6d28d9] whitespace-nowrap h-fit">Dreh 23.11.</span><span>nächster geplanter Dreh für den Kunden</span></div>
+        <div className="flex gap-2"><span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.05] text-ink-2 whitespace-nowrap h-fit">Content bis …</span><span>bis zu diesem Tag sind Beiträge eingeplant</span></div>
+        <div className="flex gap-2"><span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#ff9f0a]/15 text-[#9a5b00] whitespace-nowrap h-fit">Dreh planen</span><span>es fehlen Videos und es ist noch kein Dreh angesetzt</span></div>
+      </div>
     </div>
   )
 }

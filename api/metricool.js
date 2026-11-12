@@ -1,6 +1,6 @@
 // Metricool-Anbindung für die Seite „Kundenvideos“ (nur lesend).
 // Der Metricool-API-Schlüssel liegt ausschließlich als Vercel-Umgebungsvariable vor (METRICOOL_USER_TOKEN),
-// nie im Browser. Aufrufen darf nur, wer im OS als Admin oder Mitarbeiter angemeldet ist.
+// nie im Browser. Aufrufen darf nur, wer im OS als Admin, Mitarbeiter oder Videograph angemeldet ist.
 import { SB_URL, SB_KEY } from './_os.js'
 
 const MC = 'https://app.metricool.com/api'
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
   try {
     const wer = await angemeldetePerson(req)
     if (!wer) return res.status(401).json({ fehler: 'Nicht angemeldet' })
-    if (!['admin', 'mitarbeiter'].includes(wer.role)) return res.status(403).json({ fehler: 'Keine Berechtigung' })
+    if (!['admin', 'mitarbeiter', 'videograph'].includes(wer.role)) return res.status(403).json({ fehler: 'Keine Berechtigung' })
     if (!process.env.METRICOOL_USER_TOKEN) return res.status(503).json({ fehler: 'METRICOOL_TOKEN_FEHLT' })
 
     const aktion = req.query.aktion || 'posts'

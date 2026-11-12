@@ -70,7 +70,7 @@ function TabItem({ to, icon, label, active, badge }) {
 }
 
 export default function Sidebar() {
-  const { profile, isAdmin, isExtern, isVideograph, isRestricted, canAccess, canDashboard, signOut } = useAuth()
+  const { profile, isAdmin, isExtern, isVideograph, isRestricted, isMinijob, canAccess, canDashboard, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [badges, setBadges] = useState({ urlaub: 0, zeit: 0, minijob: 0 })
   const location = useLocation()
@@ -95,9 +95,11 @@ export default function Sidebar() {
 
   const sichtbar = item => {
     if (item.to === '/dashboard') return canDashboard
-    if (item.externOnly && !isRestricted) return false
+    if (item.externOnly && !isMinijob) return false
+    // Videograph erfasst Stunden über „Meine Stunden“ (Minijob) – Zeiterfassung/Urlaub/Auswertung gelten für Angestellte
+    if (isVideograph && ['/zeiterfassung', '/urlaub', '/auswertung'].includes(item.to)) return false
     if (item.to === '/meine-stunden' && profile?.zeiterfassung === false) return false   // reiner Planungszugang ohne Stunden
-    if (isRestricted && !item.externOnly && !['/projekte', '/einstellungen', ...(isVideograph ? ['/kalender'] : [])].includes(item.to)) return false
+    if (isRestricted && !item.externOnly && !['/projekte', '/einstellungen'].includes(item.to)) return false
     if (item.adminOnly && !isAdmin) return false
     if (item.mod && !canAccess(item.mod)) return false
     if (item.anyMod && !item.anyMod.some(m => canAccess(m))) return false
@@ -162,7 +164,6 @@ export default function Sidebar() {
               {canDashboard && <TabItem to="/dashboard" icon="home" label="Home" active={isActive('/dashboard')} />}
               <TabItem to="/projekte" icon="film" label="Drehs" active={isActive('/projekte')} />
               {profile?.zeiterfassung !== false && <TabItem to="/meine-stunden" icon="clock" label="Stunden" active={isActive('/meine-stunden')} />}
-              {isVideograph && <TabItem to="/kalender" icon="calendar" label="Kalender" active={isActive('/kalender')} />}
               <TabItem to="/einstellungen" icon="settings" label="Profil" active={isActive('/einstellungen')} />
               <button onClick={signOut} className="flex flex-col items-center justify-center gap-0.5 flex-1 text-[#6e6e73]">
                 <MIcon name="logout" size={21} />
@@ -171,7 +172,9 @@ export default function Sidebar() {
             </>
           ) : (
             <>
-              {MOBILE_NAV.map(i => (i.to === '/dashboard' && !canDashboard) ? { to: '/projekte', m: 'film', label: 'Projekte' } : i).map(item => <TabItem key={item.to} to={item.to} icon={item.m} label={item.label} active={isActive(item.to)} badge={badgeFor(item.to)} />)}
+              {(isVideograph
+                ? [{ to: '/dashboard', m: 'home', label: 'Home' }, { to: '/projekte', m: 'film', label: 'Drehs' }, ...(profile?.zeiterfassung !== false ? [{ to: '/meine-stunden', m: 'clock', label: 'Stunden' }] : []), { to: '/kalender', m: 'calendar', label: 'Kalender' }]
+                : MOBILE_NAV).map(i => (i.to === '/dashboard' && !canDashboard) ? { to: '/projekte', m: 'film', label: 'Projekte' } : i).map(item => <TabItem key={item.to} to={item.to} icon={item.m} label={item.label} active={isActive(item.to)} badge={badgeFor(item.to)} />)}
               <button onClick={() => setMobileMenuOpen(o => !o)}
                 className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 rounded-full transition-colors ${mobileMenuOpen ? 'text-[#ff6b01]' : 'text-[#6e6e73]'}`}>
                 {mobileMenuOpen && <span className="absolute inset-x-1 inset-y-1 rounded-full bg-white/80 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)]" />}
@@ -190,7 +193,7 @@ export default function Sidebar() {
             onClick={e => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { to: '/auswertung', icon: 'chart', label: 'Auswertung' },
+                ...(!isVideograph ? [{ to: '/auswertung', icon: 'chart', label: 'Auswertung' }] : []),
                 ...(canAccess('projekte') ? [{ to: '/projekte', icon: 'film', label: 'Projekte' }] : []),
                 { to: '/kundenvideos', icon: 'play', label: 'Kundenvideos' },
                 ...((canAccess('crm') || canAccess('crm_darsteller')) ? [{ to: '/crm', icon: 'people', label: 'CRM' }] : []),

@@ -495,10 +495,10 @@ export function Team() {
   const [zuordnung, setZuordnung] = useState({})   // user_id -> Set(kunde_id)
   const [stundenMap, setStundenMap] = useState({}) // user_id -> Stunden diesen Monat
 
+  // Schalter pro Person. Projekte, Kundenvideos, Kalender & Co. sehen alle Team-Mitglieder.
   const MODULES = [
-    { id: 'projekte', label: 'Projekte' },
-    { id: 'crm', label: 'CRM' },
-    { id: 'tasks', label: 'Tasks *' },
+    { id: 'crm', label: 'Kunden & Leads' },
+    { id: 'crm_darsteller', label: 'Darsteller' },
   ]
 
   useEffect(() => { if (isAdmin) { fetchMembers(); fetchExternData() } }, [isAdmin])
@@ -612,7 +612,8 @@ export function Team() {
     const perms = currentPerms || []
     let newPerms
     if (mod === 'crm' && perms.includes('crm')) {
-      newPerms = perms.filter(p => p !== 'crm' && p !== 'tasks')
+      // Kunden & Leads aus → Darsteller-Board bleibt erhalten
+      newPerms = [...new Set([...perms.filter(p => p !== 'crm' && p !== 'tasks'), 'crm_darsteller'])]
     } else {
       newPerms = perms.includes(mod) ? perms.filter(p => p !== mod) : [...perms, mod]
     }
@@ -672,33 +673,27 @@ export function Team() {
                     <option value="extern">Extern/Darsteller</option>
                   </select>
                 </td>
-                {MODULES.map(mod => (
-                  <td key={mod.id} className="px-2 py-3 text-center">
-                    {m.role === 'admin' ? (
-                      <span className="text-[#ff6b01] text-sm">✓</span>
-                    ) : ['extern', 'videograph'].includes(m.role) ? (
-                      mod.id === 'projekte' ? <span className="text-green-600 text-sm">✓</span> : <span className="text-ink-3 text-sm">–</span>
-                    ) : mod.id === 'tasks' ? (
-                      <button
-                        onClick={() => togglePermission(m.id, 'tasks', m.permissions)}
-                        disabled={!(m.permissions || []).includes('crm')}
-                        className={`w-5 h-5 rounded border-2 mx-auto block transition-all ${
-                          (m.permissions || []).includes('tasks') && (m.permissions || []).includes('crm')
-                            ? 'bg-[#ff6b01] border-[#ff6b01]'
-                            : (m.permissions || []).includes('crm')
-                            ? 'border-gray-300 hover:border-[#ff6b01]'
-                            : 'border-black/[0.08] opacity-30 cursor-not-allowed'
-                        }`}>
-                        {(m.permissions || []).includes('tasks') && (m.permissions || []).includes('crm') && <span className="text-white text-[10px]">✓</span>}
-                      </button>
-                    ) : (
-                      <button onClick={() => togglePermission(m.id, mod.id, m.permissions)}
-                        className={`w-5 h-5 rounded border-2 mx-auto block transition-all ${(m.permissions || []).includes(mod.id) ? 'bg-[#ff6b01] border-[#ff6b01]' : 'border-gray-300 hover:border-[#ff6b01]'}`}>
-                        {(m.permissions || []).includes(mod.id) && <span className="text-white text-[10px]">✓</span>}
-                      </button>
-                    )}
-                  </td>
-                ))}
+                {MODULES.map(mod => {
+                  const perms = m.permissions || []
+                  // „Kunden & Leads“ (crm) schließt Darsteller mit ein
+                  const an = mod.id === 'crm_darsteller' ? (perms.includes('crm_darsteller') || perms.includes('crm')) : perms.includes(mod.id)
+                  const gesperrt = mod.id === 'crm_darsteller' && perms.includes('crm')
+                  return (
+                    <td key={mod.id} className="px-2 py-3 text-center">
+                      {m.role === 'admin' ? (
+                        <span className="text-[#ff6b01] text-sm">✓</span>
+                      ) : m.role === 'extern' ? (
+                        <span className="text-ink-3 text-sm">–</span>
+                      ) : (
+                        <button onClick={() => !gesperrt && togglePermission(m.id, mod.id, perms)} role="switch" aria-checked={an} disabled={gesperrt}
+                          title={gesperrt ? 'Ist in „Kunden & Leads“ enthalten' : an ? 'Ausschalten' : 'Einschalten'}
+                          className={`relative inline-block w-[38px] h-[22px] rounded-full transition-colors duration-300 align-middle ${an ? 'bg-[#34c759]' : 'bg-black/[0.12]'} ${gesperrt ? 'opacity-50' : ''}`}>
+                          <span className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-300 ${an ? 'translate-x-[16px]' : ''}`} />
+                        </button>
+                      )}
+                    </td>
+                  )
+                })}
                 <td className="px-2 py-3 text-center">
                   {m.role === 'admin' ? (
                     <span className="text-[11px] font-semibold text-[#ff6b01]">Master</span>
@@ -719,8 +714,10 @@ export function Team() {
         </table>
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-xs text-yellow-700">
-        * Tasks nur mit CRM-Zugriff. „Extern" (Videograf/Darsteller) sieht ausschließlich Projekte – CRM &amp; Co. sind auch technisch (DB) gesperrt.
+      <div className="bg-white/55 rounded-2xl px-4 py-3 text-xs text-ink-2 leading-relaxed">
+        Mitarbeiter und Videograph sehen und können dasselbe (Dashboard, Projekte, Kundenvideos, Kalender …).
+        <b className="text-ink"> Kunden &amp; Leads</b> im CRM nur mit Schalter. <b className="text-ink">Darsteller</b> = CRM nur mit dem Darsteller-Board.
+        „Extern/Darsteller“ sieht ausschließlich eigene Drehs – auch technisch in der Datenbank gesperrt.
       </div>
 
       {/* Soll-Stunden, Arbeitstage & Urlaubsanspruch */}
@@ -847,7 +844,7 @@ export function Team() {
               <div>
                 <label className="label">Rolle</label>
                 <select className="input" value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
-                  <option value="videograph">Videograph – Projekte (alles außer Abgeschlossen)</option>
+                  <option value="videograph">Videograph – wie Mitarbeiter, Stunden als Minijob</option>
                   <option value="extern">Extern/Darsteller – nur eigene Drehs (Status „Dreh")</option>
                   <option value="mitarbeiter">Mitarbeiter</option>
                   <option value="admin">Admin</option>

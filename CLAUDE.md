@@ -25,7 +25,8 @@ Das Schema `os_backup` (Stände 11.11. und 12.11.2026) bleibt mindestens bis **1
 
 ## Rechte
 - **RLS-Policies, Grants und Rollenlogik nicht verändern, ohne Felix zu fragen.** Vorher/Nachher die Policies vergleichen (Snapshot z. B. in `os_backup.policies_vorher_*`).
-- Rollen: `admin`, `mitarbeiter`, `videograph` (bearbeiten, nicht löschen, nicht „Abgeschlossen“), `extern` = Darsteller (nur eigene Drehs im Status „Dreh“ lesen + abhaken).
+- Rollen: `admin`, `mitarbeiter`, `videograph` (seit 12.11.2026 gleiche Rechte wie Mitarbeiter, erfasst Stunden aber als Minijob über „Meine Stunden“), `extern` = Darsteller (nur eigene Drehs im Status „Dreh“ lesen + abhaken).
+- CRM „Kunden & Leads“ nur mit Berechtigung `crm` (Team-Schalter), Darsteller-Board mit `crm_darsteller` (oder `crm`).
 
 ## Schreibzugriffe auf Drehs/Konzepte (`proj_drehs`, `proj_intern`)
 - **Nur feldgenau über die RPC-Funktionen** schreiben – **nie das ganze `videos`-Array** (ein Trigger lehnt das aus dem Browser ab):

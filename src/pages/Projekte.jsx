@@ -297,7 +297,7 @@ function FileAttach({ files, onAdd, onRemove, prefix, readOnly }) {
 
 export default function Projekte() {
   const navigate = useNavigate()
-  const { isExtern, isVideograph } = useAuth()
+  const { isExtern } = useAuth()
   const [tab, setTab] = useState('kunden')
   const [view, setView] = useState('kanban')
   const [drehs, setDrehs] = useState([])
@@ -401,11 +401,10 @@ export default function Projekte() {
     fetchAll()
   }
 
-  // Videograph sieht keine abgeschlossenen Drehs (zusätzlich zur RLS-Sperre)
-  const sichtbar = isVideograph ? drehs.filter(d => d.status !== 'abgeschlossen') : drehs
+  // Alle Team-Rollen sehen alle Drehs (Darsteller filtert die Datenbank)
+  const sichtbar = drehs
   const filtered = kundeFilter ? sichtbar.filter(d => d.kunde_name === kundeFilter) : sichtbar
-  // Statusspalten/-buttons: Videograph ohne "Abgeschlossen"
-  const visStatuses = isVideograph ? STATUSES.filter(s => s.id !== 'abgeschlossen') : STATUSES
+  const visStatuses = STATUSES
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-7 h-7 border-[2.5px] border-[#ff6b01] border-t-transparent rounded-full animate-spin" /></div>
 
@@ -456,7 +455,7 @@ export default function Projekte() {
           <p className="text-[13px] text-ink-2 mt-1.5">{sichtbar.filter(d => d.status !== 'abgeschlossen').length} laufende Drehs</p>
         </div>
         <div className="seg overflow-x-auto max-w-full">
-          {[['kunden','Kunden-Drehs'],['intern','Intern'],['verwalten','Verwalten']].filter(([id]) => !(isVideograph && id === 'verwalten')).map(([id,label]) => (
+          {[['kunden','Kunden-Drehs'],['intern','Intern'],['verwalten','Verwalten']].map(([id,label]) => (
             <button key={id} onClick={() => setTab(id)} className={`seg-btn ${tab === id ? 'is-active' : ''}`}>{label}</button>
           ))}
         </div>
@@ -703,7 +702,7 @@ export default function Projekte() {
 
       {/* Detail Panel */}
       {selected && (
-        <DrehDetail key={selected.id} dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles} videograph={isVideograph}
+        <DrehDetail key={selected.id} dreh={selected} kunden={kunden} darsteller={darsteller} profiles={profiles}
           onClose={() => setSelected(null)}
           onStatusChange={s => updateDrehStatus(selected.id, s)}
           onRefresh={fetchAll}
@@ -748,7 +747,7 @@ export default function Projekte() {
       )}
 
       {selectedIntern && (
-        <InternDetail key={selectedIntern.id} item={selectedIntern} profiles={profiles} videograph={isVideograph}
+        <InternDetail key={selectedIntern.id} item={selectedIntern} profiles={profiles}
           onClose={() => setSelectedIntern(null)}
           onRefresh={fetchAll}
           onDelete={async () => { if (window.confirm('Konzept wirklich löschen?')) { await supabase.from('proj_intern').delete().eq('id', selectedIntern.id); setSelectedIntern(null); fetchAll() } }}

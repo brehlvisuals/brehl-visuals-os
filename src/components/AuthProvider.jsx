@@ -69,8 +69,10 @@ export function AuthProvider({ children }) {
   const isAdmin = profile?.role === 'admin'
   const isExtern = profile?.role === 'extern'
   const isVideograph = profile?.role === 'videograph'
-  // Eingeschränkte Rollen (Extern/Videograph): ausschließlich der Projekte-Bereich
-  const isRestricted = isExtern || isVideograph
+  // Eingeschränkt ist nur noch Extern (Darsteller): ausschließlich der Projekte-Bereich.
+  // Videograph sieht und kann dasselbe wie Mitarbeiter (Rechte über permissions), erfasst Stunden aber als Minijob.
+  const isRestricted = isExtern
+  const isMinijob = isExtern || isVideograph
   // Dashboard: Admin hat das Master-Dashboard, sonst nur mit freigeschaltetem Zugang (Team → Dashboard)
   const canDashboard = isAdmin || !!profile?.dashboard
   const canAccess = (mod) => {
@@ -81,7 +83,7 @@ export function AuthProvider({ children }) {
 
   return (
     <Ctx.Provider value={{
-      user, profile, isAdmin, isExtern, isVideograph, isRestricted, canAccess, canDashboard, loading,
+      user, profile, isAdmin, isExtern, isVideograph, isRestricted, isMinijob, canAccess, canDashboard, loading,
       signIn: (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }),
       signOut: () => supabase.auth.signOut(),
     }}>
