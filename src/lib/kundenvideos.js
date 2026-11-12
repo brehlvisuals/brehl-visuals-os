@@ -27,9 +27,9 @@ export function auswerten(kunde, posts, monat, drehs = []) {
   const offenAlle = posts.filter(p => p.status === 'geplant' && alsDatum(p.datum) >= new Date(jetzt.getTime() - 86400000))
   const freigabeOffen = offenAlle.filter(p => p.freigabe === 'pending')
   const abgelehnt = offenAlle.filter(p => p.freigabe === 'rejected')
-  const vorlauf = kunde.freigabe_vorlauf_tage ?? 3
-  const grenze = new Date(jetzt.getTime() + vorlauf * 86400000)
-  const dringend = freigabeOffen.filter(p => alsDatum(p.datum) <= grenze)
+  // Jede fehlende Freigabe ist rot – egal wie weit der Termin noch weg ist (Wunsch Felix, 2026-11-12).
+  // (freigabe_vorlauf_tage bleibt in der DB, wird aber nicht mehr genutzt.)
+  const dringend = [...freigabeOffen].sort((x, y) => alsDatum(x.datum) - alsDatum(y.datum))   // frühester zuerst
   const ziel = kunde.videos_pro_monat ?? null
   const summe = online.length + geplant.length
   const reichtBis = offenAlle.map(p => alsDatum(p.datum)).sort((a, b) => b - a)[0] || null
@@ -41,7 +41,7 @@ export function auswerten(kunde, posts, monat, drehs = []) {
   return {
     imMonat, online, geplant, fehler, verpasst, freigabeOffen, abgelehnt, dringend,
     ziel, summe, fehlt: ziel != null ? Math.max(0, ziel - summe) : null, ueber: ziel != null ? Math.max(0, summe - ziel) : 0,
-    reichtBis, naechsterDreh, inProduktion, vorlauf,
+    reichtBis, naechsterDreh, inProduktion,
   }
 }
 

@@ -45,7 +45,7 @@ export default function Kundenvideos() {
     if (!ids.length) { setLaden(false); return }
     setLaden(true); setFehler(null)
     const mEnde = new Date(monat.getFullYear(), monat.getMonth() + 1, 0)
-    const bis = new Date(Math.max(mEnde.getTime(), Date.now() + 35 * 86400000))
+    const bis = new Date(Math.max(mEnde.getTime(), Date.now() + 90 * 86400000))
     try {
       const r = await metricool({ aktion: 'posts', marken: ids.join(','), von: fmt(monat), bis: fmt(bis) })
       setPosts(r.posts || {}); setMFehler(r.fehler || {}); setStand(new Date())
@@ -172,7 +172,7 @@ function KundenKarte({ k, a, fehler, istAktMonat, onClick }) {
       </div>
       <div className="mt-2.5"><ZielBalken a={a} /></div>
       <div className="flex flex-wrap gap-1 mt-3">
-        {a.dringend.length > 0 && <Chip ton="rot">{a.dringend.length} Freigabe{a.dringend.length > 1 ? 'n' : ''} dringend</Chip>}
+        {a.dringend.length > 0 && <Chip ton="rot">{a.dringend.length} wartet auf Freigabe</Chip>}
         {a.freigabeOffen.length - a.dringend.length > 0 && <Chip ton="gelb">{a.freigabeOffen.length - a.dringend.length} wartet auf Freigabe</Chip>}
         {a.abgelehnt.length > 0 && <Chip ton="rot">{a.abgelehnt.length} abgelehnt</Chip>}
         {(a.verpasst.length + a.fehler.length) > 0 && <Chip ton="rot">{a.verpasst.length + a.fehler.length} nicht online</Chip>}
@@ -231,7 +231,6 @@ function Verlauf({ a, monat }) {
 
 function KundenDetail({ k, a, monat, isAdmin, onClose, onSpeichern, onDreh }) {
   const [ziel, setZiel] = useState(k.videos_pro_monat ?? '')
-  const [vorlauf, setVorlauf] = useState(k.freigabe_vorlauf_tage ?? 3)
   const [marken, setMarken] = useState(null)
   const [markenFehler, setMarkenFehler] = useState(null)
   useEffect(() => {
@@ -274,7 +273,7 @@ function KundenDetail({ k, a, monat, isAdmin, onClose, onSpeichern, onDreh }) {
 
           {a.dringend.length > 0 && (
             <div className="rounded-2xl px-4 py-3 bg-[#ff3b30]/10 text-[13px] text-[#b0000f]">
-              <b>Freigabe fehlt!</b> {a.dringend.length} Beitrag{a.dringend.length > 1 ? 'e gehen' : ' geht'} in den nächsten {a.vorlauf} Tagen online, {a.dringend.length > 1 ? 'sind' : 'ist'} aber vom Kunden noch nicht freigegeben. Bitte beim Kunden nachhaken.
+              <b>Freigabe fehlt!</b> {a.dringend.length} Beitrag{a.dringend.length > 1 ? 'e sind' : ' ist'} vom Kunden noch nicht freigegeben – der nächste geht am {alsDatum(a.dringend[0].datum).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} online. Bitte beim Kunden nachhaken.
             </div>
           )}
 
@@ -337,17 +336,10 @@ function KundenDetail({ k, a, monat, isAdmin, onClose, onSpeichern, onDreh }) {
           {isAdmin && (
             <div className="rounded-[20px] bg-white/70 border border-white p-3.5 space-y-3">
               <p className="text-[13px] font-semibold text-ink">Einstellungen</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Videos pro Monat</label>
-                  <input type="number" min="0" max="200" className="input" value={ziel} placeholder="z. B. 15"
-                    onChange={e => setZiel(e.target.value)} onBlur={() => onSpeichern({ videos_pro_monat: ziel === '' ? null : Math.max(0, parseInt(ziel) || 0) })} />
-                </div>
-                <div>
-                  <label className="label">Warnung … Tage vorher</label>
-                  <input type="number" min="0" max="30" className="input" value={vorlauf}
-                    onChange={e => setVorlauf(e.target.value)} onBlur={() => onSpeichern({ freigabe_vorlauf_tage: Math.min(30, Math.max(0, parseInt(vorlauf) || 0)) })} />
-                </div>
+              <div>
+                <label className="label">Videos pro Monat</label>
+                <input type="number" min="0" max="200" className="input max-w-[160px]" value={ziel} placeholder="z. B. 15"
+                  onChange={e => setZiel(e.target.value)} onBlur={() => onSpeichern({ videos_pro_monat: ziel === '' ? null : Math.max(0, parseInt(ziel) || 0) })} />
               </div>
               <div>
                 <label className="label">Metricool-Marke(n)</label>

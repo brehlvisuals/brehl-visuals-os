@@ -1,4 +1,4 @@
-// Warnkarte im Master-Dashboard: Freigaben, die bald fällig sind, und fehlgeschlagene Beiträge (aus Metricool)
+// Warnkarte im Master-Dashboard: alle offenen Freigaben (nächste 90 Tage), und fehlgeschlagene Beiträge (aus Metricool)
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -17,7 +17,7 @@ export default function KundenvideosWarnungen() {
         if (!mit.length) { if (alive) setListe([]); return }
         const heute = new Date(), z = n => String(n).padStart(2, '0')
         const fmt = d => `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
-        const r = await metricool({ aktion: 'posts', marken: mit.flatMap(k => k.metricool_brand_ids).join(','), von: fmt(new Date(heute.getTime() - 86400000)), bis: fmt(new Date(heute.getTime() + 30 * 86400000)) })
+        const r = await metricool({ aktion: 'posts', marken: mit.flatMap(k => k.metricool_brand_ids).join(','), von: fmt(new Date(heute.getTime() - 86400000)), bis: fmt(new Date(heute.getTime() + 90 * 86400000)) })
         const warn = []
         for (const k of mit) {
           const posts = k.metricool_brand_ids.flatMap(id => r.posts?.[id] || [])
