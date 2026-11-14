@@ -94,7 +94,7 @@ function useKonten() {
   useEffect(() => { supabase.from('proj_kunden').select('id, name').order('name').then(({ data }) => { if (data) setKunden(data) }) }, [])
   return kunden
 }
-const kontoLabel = e => e.ist_intern ? 'Intern' : (e.proj_kunden?.name ? kurz(e.proj_kunden.name) : '—')
+const kontoLabel = e => e.ist_intern ? 'Intern' : (e.proj_kunden?.name ? kurz(e.proj_kunden.name) : e.minijob ? 'Minijob (ohne Kunde)' : '—')
 const grenzeStr = () => toStr(addDays(new Date(), -7))
 const fmtDate = s => new Date(s).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
@@ -599,6 +599,7 @@ export function Auswertung() {
   const [loading, setLoading] = useState(true)
   const [showReport, setShowReport] = useState(false)
   const [pending, setPending] = useState([])   // offene Minijob-Stunden (alle Personen)
+  const [minijob, setMinijob] = useState([])   // Minijob-Stunden im Monat (Externe/Videographen)
 
   const y = month.getFullYear(), mo = month.getMonth()
   const von = toStr(new Date(y, mo, 1)), bis = toStr(new Date(y, mo + 1, 0))
@@ -617,12 +618,13 @@ export function Auswertung() {
 
   async function fetchData() {
     setLoading(true)
-    const [e, a] = await Promise.all([
+    const [e, a, mj] = await Promise.all([
       supabase.from('zeiteintraege').select('*, proj_kunden(name), profiles(full_name)').gte('datum', von).lte('datum', bis).order('datum'),
       supabase.from('urlaubsantraege').select('*, profiles!urlaubsantraege_user_id_fkey(full_name)').eq('status', 'genehmigt')
         .gte('von_datum', `${jahr}-01-01`).lte('bis_datum', `${jahr}-12-31`),
+      supabase.from('minijob_stunden').select('*, proj_kunden(name)').neq('status', 'abgelehnt').gte('datum', von).lte('datum', bis).order('datum'),
     ])
-    setEntries(e.data || []); setAbwesenheiten(a.data || []); setLoading(false)
+    setEntries(e.data || []); setAbwesenheiten(a.data || []); setMinijob(mj.data || []); setLoading(false)
   }
 
   // Offene Minijob-Stunden aller Externen/Videographen (rückwirkend möglich -> alle Monate)
@@ -640,10 +642,22 @@ export function Auswertung() {
   const einzel = selUser && selUser !== 'alle'
   const aktProfil = useMemo(() => einzel ? (isAdmin ? members.find(x => x.id === selUser) : profile) : null, [einzel, isAdmin, members, selUser, profile])
 
-  const filtered = useMemo(() => {
-    if (!isAdmin) return entries.filter(e => e.user_id === profile?.id)
-    return selUser === 'alle' || !selUser ? entries : entries.filter(e => e.user_id === selUser)
-  }, [entries, selUser, isAdmin, profile?.id])
+  // Minijob-Stunden zählen wie normale Einträge mit – aber nur genehmigte (offene werden im Kalender extra markiert)
+  const nachPerson = list => {
+    if (!isAdmin) return list.filter(e => e.user_id === profile?.id)
+    return selUser === 'alle' || !selUser ? list : list.filter(e => e.user_id === selUser)
+  }
+  const mjAlsEintrag = useMemo(() => minijob.filter(m => m.status === 'genehmigt').map(m => ({
+    ...m, minijob: true, beschreibung: m.notiz || 'Minijob',
+    profiles: { full_name: members.find(x => x.id === m.user_id)?.full_name || (m.user_id === profile?.id ? profile?.full_name : '—') },
+  })), [minijob, members, profile?.id, profile?.full_name])
+  const filtered = useMemo(() => nachPerson([...entries, ...mjAlsEintrag]).sort((a, b) => String(a.datum).localeCompare(String(b.datum))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, mjAlsEintrag, selUser, isAdmin, profile?.id])
+  const mjOffen = useMemo(() => nachPerson(minijob.filter(m => (m.status || 'offen') === 'offen')),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [minijob, selUser, isAdmin, profile?.id])
+  const offenForDay = ds => mjOffen.filter(m => m.datum === ds).reduce((s, m) => s + Number(m.stunden || 0), 0)
 
   const total = filtered.reduce((s, e) => s + Number(e.stunden || 0), 0)
   const perKunde = useMemo(() => { const map = {}; filtered.forEach(e => { const k = kontoLabel(e); map[k] = (map[k] || 0) + Number(e.stunden || 0) }); return Object.entries(map).sort((a, b) => b[1] - a[1]) }, [filtered])
@@ -740,7 +754,7 @@ export function Auswertung() {
           )}
 
           {/* Stundenkonto-Kalender (Einzel-MA) */}
-          {einzel && <KontoKalender y={y} mo={mo} ftMap={ftMap} daySum={daySumEff} abwForDay={abwForDay} arbeitstage={arbeitstageOf(aktProfil)} tSoll={tSoll} />}
+          {einzel && <KontoKalender y={y} mo={mo} ftMap={ftMap} daySum={daySumEff} offenForDay={offenForDay} abwForDay={abwForDay} arbeitstage={arbeitstageOf(aktProfil)} tSoll={tSoll} />}
 
           {/* Nach Konto */}
           <div className="card p-4">
@@ -773,7 +787,7 @@ export function Auswertung() {
 }
 
 /* ─── Stundenkonto-Kalender (Wochenzeilen mit Summen) ─── */
-function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage, tSoll }) {
+function KontoKalender({ y, mo, ftMap, daySum, offenForDay = () => 0, abwForDay, arbeitstage, tSoll }) {
   // Wochenzeilen (Mo-Start), inkl. KW + Wochensumme
   const first = new Date(y, mo, 1)
   const startPad = (first.getDay() + 6) % 7
@@ -802,7 +816,7 @@ function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage, tSoll }) 
               <div className="text-[10px] text-ink-3 text-center flex items-center justify-center">{kw}</div>
               {wk.map((ds, di) => {
                 if (!ds) return <div key={di} className="min-h-[52px] rounded-md bg-gray-50/40" />
-                const sum = daySum(ds), ft = ftMap[ds], abw = abwForDay(ds), we = istWochenende(ds), heute = ds === todayStr()
+                const sum = daySum(ds), offen = offenForDay(ds), ft = ftMap[ds], abw = abwForDay(ds), we = istWochenende(ds), heute = ds === todayStr()
                 let bg = 'bg-gray-50/40'
                 if (ft) bg = 'bg-blue-50'
                 if (abw) bg = ABW[abw.typ]?.bg
@@ -812,6 +826,7 @@ function KontoKalender({ y, mo, ftMap, daySum, abwForDay, arbeitstage, tSoll }) 
                     {ft ? <><div className="text-[9px] text-blue-600 leading-tight truncate" title={ft}>{ft}</div>{sum > 0 && <div className="text-[10px] font-semibold text-blue-600">{fmtH(sum)}h</div>}</>
                       : abw ? <><div className={`text-[9px] leading-tight truncate ${ABW[abw.typ]?.text}`} title={ABW[abw.typ]?.label}>{ABW[abw.typ]?.label}{abw.halber_tag ? ' ½' : ''}</div>{sum > 0 && <div className={`text-[10px] font-semibold ${ABW[abw.typ]?.text}`}>{fmtH(sum)}h</div>}</>
                         : sum > 0 ? <div className="text-[11px] font-semibold text-[#ff6b01] mt-1">{fmtH(sum)}h</div> : null}
+                    {offen > 0 && <div className="text-[9px] font-medium text-[#9a5b00] leading-tight mt-0.5" title="Minijob-Stunden, noch nicht genehmigt">+{fmtH(offen)}h offen</div>}
                   </div>
                 )
               })}
