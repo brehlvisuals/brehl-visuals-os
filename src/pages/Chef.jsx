@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import Finanzen from '../components/Finanzen'
 
 // Chefbereich – nur Admin (Route adminOnly + RLS auf os_chef_erinnerungen).
 // Wiederkehrende Erinnerungen werden rechtzeitig (Vorlauf) als Aufgabe auf dem Dashboard angelegt;
@@ -102,28 +103,7 @@ export default function Chef() {
         )}
       </div>
 
-      {/* Finanzen – Vorschau, kommt als Nächstes */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-[17px] font-semibold text-ink tracking-tight">Finanzen</h2>
-          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#ff9f0a]/15 text-[#9a5b00]">In Planung</span>
-        </div>
-        <p className="text-xs text-ink-2 mb-4">Hier kommt deine Finanzübersicht hin.</p>
-        <div className="grid sm:grid-cols-3 gap-2 mb-4">
-          {[['Einnahmen', '#34c759'], ['Ausgaben', '#ff3b30'], ['Übrig nach Steuern', '#7c3aed']].map(([l, f]) => (
-            <div key={l} className="rounded-2xl bg-white/60 border border-white px-3.5 py-3">
-              <p className="text-[11px] text-ink-2 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: f }} />{l}</p>
-              <div className="h-6 mt-1.5 w-20 rounded-md bg-black/[0.06] animate-pulse" />
-            </div>
-          ))}
-        </div>
-        <ul className="text-xs text-ink-2 space-y-1.5 list-disc pl-4">
-          <li>Einnahmen & Ausgaben pro Monat als Grafik, Jahresverlauf</li>
-          <li>Steuer-Rechner: was vor und nach Steuern übrig bleibt</li>
-          <li>Daten aus deiner Excel-Tabelle – oder direkt live aus lexoffice</li>
-          <li>KI-Auswertung: Auffälligkeiten, Trends, Tipps</li>
-        </ul>
-      </div>
+      <Finanzen />
 
       {bearbeiten && <ErinnerungFormular start={bearbeiten} onSave={speichern} onDelete={loeschen} onClose={() => setBearbeiten(null)} />}
     </div>

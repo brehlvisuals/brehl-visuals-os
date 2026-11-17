@@ -1,6 +1,16 @@
 {
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "rewrites": [
-    { "source": "/((?!api/|\\.well-known/).*)", "destination": "/" }
-  ]
+    {
+      "source": "/((?!api/|\\.well-known/).*)",
+      "destination": "/"
+    }
+  ],
+  "functions": {
+    "api/lexoffice.js": {
+      "maxDuration": 60
+    }
+  }
 }
