@@ -23,6 +23,7 @@ const NAV = [
     { to: '/kalender', icon: 'calendar', label: 'Kalender' },
   ]},
   { section: 'Admin', items: [
+    { to: '/chef', icon: 'lock', label: 'Chefbereich', adminOnly: true },
     { to: '/team', icon: 'team', label: 'Team', adminOnly: true },
     { to: '/papierkorb', icon: 'trash', label: 'Papierkorb', adminOnly: true },
     { to: '/einstellungen', icon: 'settings', label: 'Einstellungen' },
@@ -51,6 +52,7 @@ export function MIcon({ name, size = 22, stroke = 1.8 }) {
     chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
     dots: <><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" /></>,
     play: <><rect x="3" y="4" width="18" height="16" rx="4" /><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none" /></>,
+    lock: <><rect x="4.5" y="10.5" width="15" height="10" rx="2.5" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></>,
     trash: <><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12a2 2 0 0 0 2 1.8h7a2 2 0 0 0 2-1.8l1-12M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7" /></>,
     logout: <><path d="M14.5 4.5H18a1.8 1.8 0 0 1 1.8 1.8v11.4A1.8 1.8 0 0 1 18 19.5h-3.5" /><path d="M10 8l-4 4 4 4M6.2 12H16" /></>,
     settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></>,
@@ -195,7 +197,7 @@ export default function Sidebar() {
                 ...(canAccess('projekte') ? [{ to: '/projekte', icon: 'film', label: 'Projekte' }] : []),
                 { to: '/kundenvideos', icon: 'play', label: 'Kundenvideos' },
                 ...((canAccess('crm') || canAccess('crm_darsteller')) ? [{ to: '/crm', icon: 'people', label: 'CRM' }] : []),
-                ...(isAdmin ? [{ to: '/team', icon: 'team', label: 'Team' }, { to: '/papierkorb', icon: 'trash', label: 'Papierkorb' }] : []),
+                ...(isAdmin ? [{ to: '/chef', icon: 'lock', label: 'Chefbereich' }, { to: '/team', icon: 'team', label: 'Team' }, { to: '/papierkorb', icon: 'trash', label: 'Papierkorb' }] : []),
                 { to: '/einstellungen', icon: 'settings', label: 'Einstellungen' },
               ].map(item => (
                 <NavLink key={item.to} to={item.to} onClick={() => setMobileMenuOpen(false)}

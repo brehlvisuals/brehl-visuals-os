@@ -62,6 +62,8 @@ export default function Dashboard() {
   }, [])
 
   async function laden() {
+    // Chef-Erinnerungen (nur Admin): fällige als Aufgabe anlegen, bevor die Liste geladen wird
+    if (isAdmin) await supabase.rpc('chef_erinnerungen_pruefen')
     const seit = addTage(heute0(), -30).toISOString()
     const q = supabase.from('os_aufgaben').select('*').or(`erledigt.eq.false,erledigt_am.gte.${seit}`).order('faellig_am', { ascending: true, nullsFirst: false })
     const [a, p, d] = await Promise.all([
@@ -263,6 +265,9 @@ function AufgabenListe({ aufgaben, personen, zeigePerson, personVon, drehVon, on
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {ueber && g.k === '0000' && <span className="text-[11px] font-medium text-[#d70015]">{new Date(a.faellig_am).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span>}
                       {zeitText(a) && <span className={`text-[11px] font-medium ${ueber ? 'text-[#d70015]' : 'text-ink-2'}`}>{zeitText(a)}</span>}
+                      {a.erinnerung_id && (
+                        <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.06] text-ink">🔒 Chef-Erinnerung</span>
+                      )}
                       {a.quelle !== 'manuell' && (
                         <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#7c3aed]/10 text-[#6d28d9]">
                           {a.quelle === 'deadline_raw' ? 'Deadline RAW' : 'Deadline Cutting'}{dreh ? ` · ${dreh.kunde_name}` : ''}

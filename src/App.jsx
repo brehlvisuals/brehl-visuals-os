@@ -10,6 +10,7 @@ import { Kalender, Team, Einstellungen } from './pages/OtherPages'
 import { Zeiterfassung, Urlaub, Auswertung } from './pages/Zeiterfassung'
 import MeineStunden from './pages/MeineStunden'
 import Papierkorb from './pages/Papierkorb'
+import Chef from './pages/Chef'
 import Kundenvideos from './pages/Kundenvideos'
 
 function Layout({ children }) {
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/dashboard" element={<Protected dashboard><Layout><Dashboard /></Layout></Protected>} />
           <Route path="/kundenvideos" element={<Protected><Layout><Kundenvideos /></Layout></Protected>} />
           <Route path="/papierkorb" element={<Protected adminOnly><Layout><Papierkorb /></Layout></Protected>} />
+          <Route path="/chef" element={<Protected adminOnly><Layout><Chef /></Layout></Protected>} />
           <Route path="/projekte" element={<Protected mod="projekte" externOk><Layout><Projekte /></Layout></Protected>} />
           <Route path="/meine-stunden" element={<Protected externOk needsZeit><Layout><MeineStunden /></Layout></Protected>} />
           <Route path="/crm" element={<Protected anyMod={['crm', 'crm_darsteller']}><Layout><CRM /></Layout></Protected>} />
