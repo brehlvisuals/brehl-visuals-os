@@ -1,26 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
-import { BEREICHE, monatlich, planRechnung, steuerJahr, lexwareSync, lexwareUeberfaellig, kundeFuer, zaehlt, eur, firmenwagenVorteil } from '../lib/finanzen'
+import { BEREICHE, monatlich, planRechnung, monatsRechnung, steuerOptionen, ausgabenArt, lexwareSync, lexwareUeberfaellig, kundeFuer, zaehlt, eur } from '../lib/finanzen'
 
 // Chefbereich – nur Admin (Route adminOnly + RLS auf allen Chef-/Finanz-Tabellen) und zusätzlich mit Passwort gesperrt:
 // nach dem Entsperren bleibt er offen, bis man länger als 3 Minuten weg ist (Tab im Hintergrund oder andere Seite).
+// Aufbau: Startseite mit zwei großen Kacheln → „Finanzen“ (Plan vs. Lexware, Kunden, Stundensatz, Posten, Einstellungen)
+// und „Team & Erinnerungen“ (wiederkehrende Erinnerungen pro Monat/Halbjahr abhaken).
 
 const SPERRE_MS = 3 * 60 * 1000
 let entsperrt = false, wegSeit = null
 const istGesperrt = () => !entsperrt || (wegSeit && Date.now() - wegSeit > SPERRE_MS)
 
-const TABS = [
-  ['uebersicht', 'Übersicht'], ['ist', 'Ist-Zahlen'], ['stundensatz', 'Stundensatz'],
-  ['posten', 'Posten'], ['erinnerungen', 'Erinnerungen'], ['einstellungen', 'Einstellungen'],
-]
+const FIN_TABS = [['uebersicht', 'Plan & Ist'], ['kunden', 'Kunden'], ['stundensatz', 'Stundensatz'], ['posten', 'Posten'], ['einstellungen', 'Einstellungen']]
 const MONATE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+const MONATE_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+const merk = (k, d) => { try { return sessionStorage.getItem(k) || d } catch { return d } }
+const speicher = (k, v) => { try { sessionStorage.setItem(k, v) } catch { /* egal */ } }
 
 export default function Chef() {
   const { isAdmin, profile } = useAuth()
   const [gesperrt, setGesperrt] = useState(istGesperrt())
-  const [tab, setTab] = useState(() => { try { return sessionStorage.getItem('os-chef-tab') || 'uebersicht' } catch { return 'uebersicht' } })
-  useEffect(() => { try { sessionStorage.setItem('os-chef-tab', tab) } catch { /* egal */ } }, [tab])
+  const [bereich, setBereich] = useState(() => merk('os-chef-bereich', 'start'))
+  const [tab, setTab] = useState(() => { const t = merk('os-chef-tab', 'uebersicht'); return FIN_TABS.some(x => x[0] === t) ? t : 'uebersicht' })
+  useEffect(() => speicher('os-chef-bereich', bereich), [bereich])
+  useEffect(() => speicher('os-chef-tab', tab), [tab])
 
   // Sperre: Tab im Hintergrund oder Seite verlassen → Zeit merken; nach > 3 Min. wieder Passwort
   useEffect(() => {
@@ -37,11 +41,13 @@ export default function Chef() {
   if (!isAdmin) return <div className="p-6 text-center text-sm text-ink-3">Kein Zugriff.</div>
   if (gesperrt) return <Sperre email={profile?.email} onOk={() => { entsperrt = true; wegSeit = null; setGesperrt(false) }} />
 
+  const titel = bereich === 'finanzen' ? 'Finanzen' : bereich === 'team' ? 'Team & Erinnerungen' : 'Chefbereich'
   return (
     <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 space-y-5 max-w-5xl">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="page-title">Chefbereich</h1>
+          {bereich !== 'start' && <button onClick={() => setBereich('start')} className="text-[13px] font-medium text-[#ff6b01] mb-1 hover:opacity-70">‹ Chefbereich</button>}
+          <h1 className="page-title">{titel}</h1>
           <p className="text-[13px] text-ink-2 mt-1.5 flex items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.06] text-ink">🔒 Nur für dich</span>
             sperrt sich nach 3 Min. Abwesenheit
@@ -49,15 +55,80 @@ export default function Chef() {
         </div>
         <button onClick={() => { entsperrt = false; setGesperrt(true) }} className="btn-secondary !py-1.5 !px-3 text-xs">🔒 Sperren</button>
       </div>
-      <div className="seg overflow-x-auto max-w-full">
-        {TABS.map(([id, l]) => <button key={id} onClick={() => setTab(id)} className={`seg-btn ${tab === id ? 'is-active' : ''}`}>{l}</button>)}
-      </div>
-      {tab === 'uebersicht' && <Uebersicht />}
-      {tab === 'ist' && <IstZahlen />}
-      {tab === 'stundensatz' && <Stundensatz />}
-      {tab === 'posten' && <Posten />}
-      {tab === 'erinnerungen' && <Erinnerungen />}
-      {tab === 'einstellungen' && <Einstellungen />}
+      {bereich === 'start' && <Start onOpen={setBereich} />}
+      {bereich === 'finanzen' && (
+        <>
+          <div className="seg overflow-x-auto max-w-full">
+            {FIN_TABS.map(([id, l]) => <button key={id} onClick={() => setTab(id)} className={`seg-btn ${tab === id ? 'is-active' : ''}`}>{l}</button>)}
+          </div>
+          {tab === 'uebersicht' && <PlanIst />}
+          {tab === 'kunden' && <Kunden />}
+          {tab === 'stundensatz' && <Stundensatz />}
+          {tab === 'posten' && <Posten />}
+          {tab === 'einstellungen' && <Einstellungen />}
+        </>
+      )}
+      {bereich === 'team' && <Erinnerungen />}
+    </div>
+  )
+}
+
+// ── Startseite: zwei große Kacheln ───────────────────────────
+function Start({ onOpen }) {
+  const { posten, einst, laden } = useFinanzDaten()
+  const [ist, setIst] = useState(null)
+  const [erin, setErin] = useState(null)
+  useEffect(() => {
+    const j = new Date().getFullYear()
+    // Ø pro abgeschlossenem Monat dieses Jahres (Lohn kommt aus den Posten, Finanzamt/Krankenkassen zählen nicht als Betriebskosten)
+    const n = Math.max(1, new Date().getMonth())
+    const bis = `${j}-${String(n + 1).padStart(2, '0')}-01`
+    supabase.from('os_finanz_belege').select('art, status, netto, brutto, kontakt').gte('datum', `${j}-01-01`).lt('datum', bis)
+      .then(({ data }) => {
+        let ein = 0, aus = 0
+        for (const b of data || []) { if (!zaehlt(b)) continue; if (b.art === 'einnahme') ein += nettoVon(b); else if (ausgabenArt(b.kontakt) === 'betrieb') aus += nettoVon(b) }
+        setIst({ ein: ein / n, aus: aus / n, jahr: j, bisMonat: MONATE[n - 1] })
+      })
+    supabase.rpc('chef_erinnerungen_pruefen').then(() => supabase.from('os_chef_erinnerungen').select('*').eq('aktiv', true).order('naechster_termin')).then(({ data }) => setErin(data || []))
+  }, [])
+  const plan = !laden && einst ? planRechnung(posten, einst) : null
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      <button onClick={() => onOpen('finanzen')} className="tile !rounded-[28px] p-6 text-left w-full min-h-[220px] flex flex-col fade-up">
+        <div className="flex items-center gap-3">
+          <span className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl text-white shadow-sm" style={{ background: 'linear-gradient(135deg,#34c759,#38b6ff)' }}>€</span>
+          <div><p className="text-[22px] font-bold text-ink tracking-tight leading-tight">Finanzen</p><p className="text-xs text-ink-2">Plan & Lexware · Kunden · Stundensatz</p></div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-auto pt-5">
+          <div className="rounded-2xl bg-white/70 border border-white p-3">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-3">Theoretisch</p>
+            <p className="text-[19px] font-bold tabular-nums text-ink mt-0.5">{plan ? eur(plan.gewinn) : '…'}</p>
+            <p className="text-[11px] text-ink-2">Gewinn / Monat laut Plan</p>
+          </div>
+          <div className="rounded-2xl bg-white/70 border border-white p-3">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-3">Praktisch</p>
+            <p className="text-[19px] font-bold tabular-nums text-ink mt-0.5">{ist && plan ? eur(ist.ein - ist.aus - plan.lohn) : '…'}</p>
+            <p className="text-[11px] text-ink-2">Ø Gewinn / Monat laut Lexware (Jan–{ist?.bisMonat ?? ''})</p>
+          </div>
+        </div>
+      </button>
+      <button onClick={() => onOpen('team')} className="tile !rounded-[28px] p-6 text-left w-full min-h-[220px] flex flex-col fade-up">
+        <div className="flex items-center gap-3">
+          <span className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-sm" style={{ background: 'linear-gradient(135deg,#ff6b01,#7c3aed)' }}>🎉</span>
+          <div><p className="text-[22px] font-bold text-ink tracking-tight leading-tight">Team & Erinnerungen</p><p className="text-xs text-ink-2">Firmenessen, Hausparty … abhaken</p></div>
+        </div>
+        <div className="mt-auto pt-5 space-y-1.5">
+          {!erin ? <p className="text-xs text-ink-3">…</p> : erin.length === 0 ? <p className="text-xs text-ink-3">Keine aktiven Erinnerungen.</p> : erin.map(e => {
+            const st = periodeStatus(e)
+            return (
+              <div key={e.id} className="rounded-2xl bg-white/70 border border-white px-3 py-2 flex items-center justify-between gap-2">
+                <span className="text-[13px] font-medium text-ink truncate">{e.titel}</span>
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${st.offen ? 'bg-[#ff9f0a]/15 text-[#9a5b00]' : 'bg-[#34c759]/12 text-[#248a3d]'}`}>{st.kurz}</span>
+              </div>
+            )
+          })}
+        </div>
+      </button>
     </div>
   )
 }
@@ -116,76 +187,19 @@ function Kachel({ l, w, f }) {
   )
 }
 
-// ── Übersicht (Plan, wie die Excel) ──────────────────────────
-function Uebersicht() {
-  const { posten, einst, laden } = useFinanzDaten()
-  if (laden) return <Lader />
-  const r = planRechnung(posten, einst)
-  const fw = einst?.firmenwagen || {}
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Kachel l="Umsatz / Monat" w={r.umsatz} f="#34c759" />
-        <Kachel l="Gewinn vor Steuer" w={r.gewinn} f="#7c3aed" />
-        <Kachel l="Steuerrücklage" w={r.ruecklage} f="#ff3b30" />
-        <Kachel l="Übrig nach allem" w={r.ueberschussNachInvest} f="#ff6b01" />
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card overflow-hidden">
-          <p className="px-4 pt-4 pb-2 text-[15px] font-semibold text-ink">Monat (Plan aus deinen Posten)</p>
-          <div className="divide-y divide-black/[0.05]">
-            <Zeile l="Umsatz (netto)" w={eur(r.umsatz, 2)} ton="plus" />
-            <Zeile l="Fixkosten Business (netto)" w={'− ' + eur(r.business, 2)} ton="minus" />
-            <Zeile l="Lohnkosten" w={'− ' + eur(r.lohn, 2)} ton="minus" />
-            <Zeile l="Gewinn vor Steuer" w={eur(r.gewinn, 2)} fett ton="plus" />
-            <Zeile l="Marge" w={(r.marge * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' %'} klein />
-            <Zeile l={`Steuer (ESt + GewSt) + ${einst?.sicherheit_prozent ?? 10} % Sicherheit`} w={'− ' + eur(r.ruecklage, 2)} ton="minus" />
-            <Zeile l="Nettogewinn" w={eur(r.nettogewinn, 2)} fett ton="plus" />
-            <Zeile l="Privat-Fixkosten" w={'− ' + eur(r.privat, 2)} ton="minus" />
-            <Zeile l="Überschuss vor Invest" w={eur(r.ueberschuss, 2)} fett />
-            <Zeile l="Festes Invest" w={'− ' + eur(r.invest, 2)} ton="minus" />
-            <Zeile l="Überschuss nach Invest" w={eur(r.ueberschussNachInvest, 2)} fett ton="plus" />
-          </div>
-        </div>
-        <div className="card overflow-hidden">
-          <p className="px-4 pt-4 pb-1 text-[15px] font-semibold text-ink">Steuer-Bänder (Jahr)</p>
-          <p className="px-4 pb-2 text-xs text-ink-2">Zu versteuern: {eur(r.gewinnJahrSteuer)} = (Gewinn{r.vorteil ? ` + ${eur(r.vorteil, 2)} Firmenwagen` : ''}) × 12</p>
-          <table className="w-full text-[12.5px]">
-            <thead><tr className="text-[10.5px] text-ink-3 uppercase tracking-wider"><th className="text-left font-semibold px-4 py-1">Von – bis</th><th className="text-right font-semibold px-2">Satz</th><th className="text-right font-semibold px-2">Betrag</th><th className="text-right font-semibold px-4">Steuer</th></tr></thead>
-            <tbody>
-              {r.steuerZeilen.map((z, i) => (
-                <tr key={i} className={`border-t border-black/[0.05] ${z.betrag ? '' : 'opacity-40'}`}>
-                  <td className="px-4 py-1.5 tabular-nums">{eur(z.von)} – {z.bis == null ? '∞' : eur(z.bis)}</td>
-                  <td className="px-2 text-right tabular-nums">{z.satz} %</td>
-                  <td className="px-2 text-right tabular-nums">{eur(z.betrag)}</td>
-                  <td className="px-4 text-right tabular-nums">{eur(z.steuer)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="divide-y divide-black/[0.05] border-t border-black/[0.08] mt-1">
-            <Zeile l="Steuer Jahr" w={eur(r.steuerJahr, 2)} fett ton="minus" />
-            <Zeile l="Steuer Monat" w={eur(r.steuerMonat, 2)} ton="minus" />
-          </div>
-          {fw.aktiv && (
-            <p className="px-4 py-3 text-[11.5px] text-ink-2 bg-[#ff9f0a]/10 leading-relaxed">
-              <b className="text-ink">Firmenwagen {fw.name}:</b> Privatnutzung {String(fw.prozent).replace('.', ',')} % von {eur(fw.listenpreis)} Listenpreis = {eur(r.vorteil, 2)}/Monat.
-              Das erhöht nur den <b>zu versteuernden</b> Gewinn – es ist kein Geld, das reinkommt, und zählt daher nicht zum Umsatz/Überschuss (in deiner Excel stand es beim Umsatz). Details unter Einstellungen.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Ist-Zahlen aus Lexware (netto) ───────────────────────────
+// ── Lexware-Belege (Netto-Cache) + Abgleich ──────────────────
+// Lädt das Jahr UND das Vorjahr (für „Geldeingang“: Rechnung im Dezember, bezahlt im Januar)
 function useBelege(jahr) {
   const [belege, setBelege] = useState(null)
   const [sync, setSync] = useState({ laeuft: false, info: null, fehler: null })
   const laden = async () => {
-    const { data } = await supabase.from('os_finanz_belege').select('*').gte('datum', `${jahr}-01-01`).lte('datum', `${jahr}-12-31`)
-    setBelege(data || [])
+    const alle = []
+    for (let von = 0; ; von += 1000) {
+      const { data } = await supabase.from('os_finanz_belege').select('*').gte('datum', `${jahr - 1}-01-01`).lte('datum', `${jahr}-12-31`).order('datum').range(von, von + 999)
+      alle.push(...(data || []))
+      if (!data || data.length < 1000) break
+    }
+    setBelege(alle)
   }
   const synchron = async () => {
     setSync({ laeuft: true, info: null, fehler: null })
@@ -195,14 +209,13 @@ function useBelege(jahr) {
   useEffect(() => { setBelege(null); laden().then(synchron) /* eslint-disable-next-line */ }, [jahr])
   return { belege, sync, synchron }
 }
-function SyncZeile({ sync, synchron, belege }) {
-  const ohneNetto = (belege || []).filter(b => zaehlt(b) && b.netto == null).length
+function SyncZeile({ sync, synchron }) {
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-ink-2">
       <span>
         {sync.laeuft ? `Lexware wird abgeglichen… ${sync.info ? `${sync.info.gesamt - sync.info.offen} von ${sync.info.gesamt} Belegen` : ''}`
           : sync.fehler ? <span className="text-[#d70015]">Lexware: {sync.fehler}</span>
-          : `Netto-Beträge aus Lexware${ohneNetto ? ` · ${ohneNetto} Belege noch ohne Netto (geschätzt mit 19 %)` : ''}`}
+          : 'Netto-Beträge aus Lexware · aktuell'}
       </span>
       <button className="btn-secondary !py-1.5 !px-3 text-xs" disabled={sync.laeuft} onClick={synchron}>{sync.laeuft ? '…' : '↻ Abgleichen'}</button>
     </div>
@@ -218,78 +231,206 @@ function JahrWahl({ jahr, setJahr }) {
   )
 }
 const nettoVon = b => b.netto != null ? Number(b.netto) : Number(b.brutto) / 1.19
+// Welches Datum zählt: Rechnungsdatum oder Tag des Geldeingangs/-ausgangs
+const belegDatum = (b, basis) => basis === 'zahlung' ? b.bezahlt_am : b.datum
 
-function IstZahlen() {
+function useEinstellung(key, start) {
+  const [v, setV] = useState(() => { try { const x = localStorage.getItem(key); return x == null ? start : JSON.parse(x) } catch { return start } })
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* egal */ } }, [key, v])
+  return [v, setV]
+}
+
+// Ist-Monate aus Lexware: Einnahmen, Betriebsausgaben, Sozialversicherung, Finanzamt (keine Betriebskosten), Lohn
+function istMonate(belege, jahr, basis, lohnAusPosten, lohnPlan) {
+  const m = MONATE.map(() => ({ ein: 0, betrieb: 0, sozial: 0, fa: 0, lohn: 0 }))
+  for (const b of belege) {
+    const d = belegDatum(b, basis)
+    if (!zaehlt(b) || !d || Number(d.slice(0, 4)) !== jahr) continue
+    const i = Number(d.slice(5, 7)) - 1, n = nettoVon(b)
+    if (b.art === 'einnahme') m[i].ein += n
+    else { const art = ausgabenArt(b.kontakt); m[i][art === 'finanzamt' ? 'fa' : art] += n }
+  }
+  const heute = new Date()
+  const bis = jahr === heute.getFullYear() ? heute.getMonth() : 11          // bis zu diesem Monat anzeigen
+  const voll = jahr === heute.getFullYear() ? Math.max(0, heute.getMonth() - 1) : 11   // letzter abgeschlossener Monat
+  m.forEach((x, i) => {
+    x.lohn = i > bis ? 0 : lohnAusPosten ? lohnPlan : x.sozial
+    x.aus = x.betrieb + x.lohn
+    x.gewinn = x.ein - x.aus
+  })
+  return { m, bis, voll }
+}
+
+// ── Plan (theoretisch) vs. Ist (praktisch, Lexware) ──────────
+function PlanIst() {
   const [jahr, setJahr] = useState(new Date().getFullYear())
   const { belege, sync, synchron } = useBelege(jahr)
-  const { posten, einst } = useFinanzDaten()
-  const [lohnAbziehen, setLohnAbziehen] = useState(() => { try { return localStorage.getItem('os-chef-lohn') !== '0' } catch { return true } })
+  const { posten, einst, laden } = useFinanzDaten()
+  const [basis, setBasis] = useEinstellung('os-chef-basis', 'rechnung')
+  const [lohnAusPosten, setLohnAusPosten] = useEinstellung('os-chef-lohnposten', true)
+  const [zeitraum, setZeitraum] = useState('schnitt')     // 'schnitt' oder Monatsindex
   const [ueber, setUeber] = useState(null)
   useEffect(() => { lexwareUeberfaellig().then(setUeber).catch(() => setUeber([])) }, [])
-  useEffect(() => { try { localStorage.setItem('os-chef-lohn', lohnAbziehen ? '1' : '0') } catch { /* egal */ } }, [lohnAbziehen])
 
-  const a = useMemo(() => {
-    if (!belege || !einst) return null
-    const m = MONATE.map(() => ({ ein: 0, aus: 0 }))
-    for (const b of belege) {
-      if (!zaehlt(b) || !b.datum) continue
-      const i = Number(b.datum.slice(5, 7)) - 1
-      if (b.art === 'einnahme') m[i].ein += nettoVon(b); else m[i].aus += nettoVon(b)
-    }
-    const lohnMonat = lohnAbziehen ? posten.filter(p => p.bereich === 'lohn' && p.aktiv).reduce((s, p) => s + monatlich(p), 0) : 0
-    const heute = new Date(), bis = jahr === heute.getFullYear() ? heute.getMonth() : 11
-    m.forEach((x, i) => { x.lohn = i <= bis ? lohnMonat : 0; x.gewinn = x.ein - x.aus - x.lohn })
-    const sum = k => m.slice(0, bis + 1).reduce((s, x) => s + x[k], 0)
-    const ein = sum('ein'), aus = sum('aus'), lohn = sum('lohn'), gewinn = ein - aus - lohn
-    const hoch = gewinn / (bis + 1) * 12
-    const st = steuerJahr(hoch + firmenwagenVorteil(einst) * 12, einst.steuerbaender || []).steuer
-    return { m, bis, ein, aus, lohn, gewinn, hoch, steuerJahr: st }
-  }, [belege, posten, einst, lohnAbziehen, jahr])
+  const plan = useMemo(() => (!laden && einst ? planRechnung(posten, einst) : null), [posten, einst, laden])
+  const ist = useMemo(() => {
+    if (!belege || !plan) return null
+    const a = istMonate(belege, jahr, basis, lohnAusPosten, plan.lohn)
+    const auswahl = zeitraum === 'schnitt' ? a.m.slice(0, a.voll + 1) : [a.m[zeitraum]]
+    const n = Math.max(1, auswahl.length)
+    const s = k => auswahl.reduce((x, y) => x + y[k], 0) / n
+    const r = monatsRechnung({ umsatz: s('ein'), business: s('betrieb'), lohn: s('lohn'), privat: plan.privat, invest: plan.invest }, einst)
+    const jahrSumme = k => a.m.slice(0, a.bis + 1).reduce((x, y) => x + y[k], 0)
+    return { ...a, r, fa: s('fa'), faJahr: jahrSumme('fa'), sozial: s('sozial'),
+      label: zeitraum === 'schnitt' ? `Ø ${a.voll === 0 ? MONATE[0] : `Jan–${MONATE[a.voll]}`} ${jahr}` : `${MONATE_LANG[zeitraum]} ${jahr}` }
+  }, [belege, plan, jahr, basis, lohnAusPosten, zeitraum, einst])
 
+  if (laden || !plan) return <Lader />
+  const zeilen = [
+    ['Umsatz (netto)', 'umsatz', +1, true],
+    ['Business-Ausgaben (netto)', 'business', -1],
+    ['Lohnkosten', 'lohn', -1],
+    ['Gewinn vor Steuer', 'gewinn', +1, true],
+    ['Steuer-Rücklage', 'ruecklage', -1],
+    ['Nettogewinn', 'nettogewinn', +1, true],
+    ['Privat-Fixkosten', 'privat', -1, false, true],
+    ['Festes Invest', 'invest', -1, false, true],
+    ['Übrig nach allem', 'ueberschussNachInvest', +1, true],
+  ]
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap"><JahrWahl jahr={jahr} setJahr={setJahr} /><div className="flex-1 min-w-[200px]"><SyncZeile sync={sync} synchron={synchron} belege={belege} /></div></div>
-      {!a ? <Lader /> : (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <Kachel l="Einnahmen netto" w={a.ein} f="#34c759" />
-            <Kachel l={`Ausgaben netto${a.lohn ? ' + Löhne' : ''}`} w={a.aus + a.lohn} f="#ff3b30" />
-            <Kachel l="Gewinn bisher" w={a.gewinn} f="#7c3aed" />
-            <Kachel l="Steuer aufs Jahr (hochgerechnet)" w={a.steuerJahr} f="#ff6b01" />
-          </div>
-          <div className="card p-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
-              <p className="text-[15px] font-semibold text-ink">Monatsverlauf {jahr} (netto)</p>
-              <label className="flex items-center gap-2 text-xs text-ink-2 cursor-pointer">
-                <input type="checkbox" checked={lohnAbziehen} onChange={e => setLohnAbziehen(e.target.checked)} />
-                Lohnkosten aus den Posten abziehen (falls Löhne nicht als Beleg in Lexware sind)
-              </label>
-            </div>
-            <MonatsGrafik m={a.m} bis={a.bis} />
-            <p className="text-[11px] text-ink-3 mt-1">Hochgerechnet aufs Jahr: Gewinn {eur(a.hoch)} → Steuer inkl. GewSt ca. {eur(a.steuerJahr)} – also rund {eur(a.steuerJahr / 12)} pro Monat zurücklegen (plus {einst?.sicherheit_prozent ?? 10} % Sicherheit).</p>
-          </div>
-          {ueber && ueber.length > 0 && (
-            <div className="card p-4">
-              <p className="text-[15px] font-semibold text-[#d70015] mb-2">Überfällige Rechnungen</p>
-              <div className="space-y-1">
-                {ueber.map(b => (
-                  <div key={b.id} className="flex items-center justify-between gap-3 text-[13px]">
-                    <span className="text-ink truncate">{b.kontakt}{b.nummer ? ` · ${b.nummer}` : ''}</span>
-                    <span className="text-ink-2 whitespace-nowrap tabular-nums">fällig {b.faellig ? new Date(b.faellig + 'T12:00').toLocaleDateString('de-DE') : '–'} · <b className="text-[#d70015]">{eur(b.offen)}</b> offen</span>
-                  </div>
-                ))}
+      <div className="flex items-center gap-2 flex-wrap">
+        <JahrWahl jahr={jahr} setJahr={j => { setJahr(j); setZeitraum('schnitt') }} />
+        <div className="seg">
+          <button className={`seg-btn ${basis === 'rechnung' ? 'is-active' : ''}`} onClick={() => setBasis('rechnung')}>Nach Rechnungsdatum</button>
+          <button className={`seg-btn ${basis === 'zahlung' ? 'is-active' : ''}`} onClick={() => setBasis('zahlung')}>Nach Geldeingang</button>
+        </div>
+        <select className="input !w-auto !py-1.5 text-sm" value={zeitraum} onChange={e => setZeitraum(e.target.value === 'schnitt' ? 'schnitt' : Number(e.target.value))}>
+          <option value="schnitt">Ø pro Monat (abgeschlossene Monate)</option>
+          {MONATE_LANG.map((l, i) => (ist && i <= ist.bis) && <option key={i} value={i}>{l} {jahr}</option>)}
+        </select>
+      </div>
+      <SyncZeile sync={sync} synchron={synchron} />
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <Seite titel="Theoretisch" unter="Plan aus deinen Posten · pro Monat" farbe="#7c3aed" r={plan} />
+        {ist ? <Seite titel="Praktisch" unter={`Lexware · ${ist.label}${basis === 'zahlung' ? ' · Geldeingang' : ''}`} farbe="#34c759" r={ist.r} /> : <div className="card"><Lader /></div>}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="table-scroll">
+          <table className="w-full min-w-[520px] text-[13px]">
+            <thead><tr className="text-[10.5px] text-ink-3 uppercase tracking-wider">
+              <th className="text-left font-semibold px-4 py-2">pro Monat</th>
+              <th className="text-right font-semibold px-3">Theoretisch</th>
+              <th className="text-right font-semibold px-3">Praktisch</th>
+              <th className="text-right font-semibold px-4">Differenz</th>
+            </tr></thead>
+            <tbody>
+              {zeilen.map(([l, k, richtung, fett, ausPlan]) => {
+                const p = plan[k], i = ist?.r[k], d = i == null ? null : i - p
+                const gut = d == null || Math.abs(d) < 1 ? null : d * richtung > 0
+                return (
+                  <tr key={k} className={`border-t border-black/[0.05] ${fett ? 'bg-white/50 font-semibold' : ''}`}>
+                    <td className="px-4 py-2 text-ink">{l}</td>
+                    <td className="px-3 text-right tabular-nums">{eur(p)}</td>
+                    <td className="px-3 text-right tabular-nums">{i == null ? '…' : ausPlan ? <span className="text-ink-3">wie Plan</span> : eur(i)}</td>
+                    <td className="px-4 text-right tabular-nums font-semibold" style={{ color: gut == null ? '#a1a1a6' : gut ? '#248a3d' : '#d70015' }}>{d == null || ausPlan ? '' : `${d > 0 ? '+' : ''}${eur(d)}`}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-4 py-3 border-t border-black/[0.05] space-y-2">
+          <label className="flex items-start gap-2 text-xs text-ink-2 cursor-pointer">
+            <input type="checkbox" className="mt-0.5" checked={lohnAusPosten} onChange={e => setLohnAusPosten(e.target.checked)} />
+            <span>Lohnkosten im „Praktisch“ aus deinen Posten nehmen (empfohlen) – in Lexware stehen nur Krankenkassen/Knappschaft ({eur(ist?.sozial ?? 0)} Ø/Monat), nicht die Netto-Löhne selbst.</span>
+          </label>
+          {ist && <p className="text-[11.5px] text-ink-2">Nicht als Kosten gezählt: Überweisungen ans <b>Finanzamt</b> (USt-Vorauszahlungen, Lohnsteuer, Steuer-Vorauszahlungen) – {eur(ist.fa)} Ø/Monat, {eur(ist.faJahr)} in {jahr}.</p>}
+        </div>
+      </div>
+
+      {ist && (
+        <div className="card p-4">
+          <p className="text-[15px] font-semibold text-ink mb-2">Monatsverlauf {jahr} (netto{basis === 'zahlung' ? ', nach Geldeingang' : ''})</p>
+          <MonatsGrafik m={ist.m} bis={ist.bis} planUmsatz={plan.umsatz} planGewinn={plan.gewinn} />
+        </div>
+      )}
+
+      <SteuerKarte r={plan} einst={einst} />
+
+      {ueber && ueber.length > 0 && (
+        <div className="card p-4">
+          <p className="text-[15px] font-semibold text-[#d70015] mb-2">Überfällige Rechnungen</p>
+          <div className="space-y-1">
+            {ueber.map(b => (
+              <div key={b.id} className="flex items-center justify-between gap-3 text-[13px]">
+                <span className="text-ink truncate">{b.kontakt}{b.nummer ? ` · ${b.nummer}` : ''}</span>
+                <span className="text-ink-2 whitespace-nowrap tabular-nums">fällig {b.faellig ? new Date(b.faellig + 'T12:00').toLocaleDateString('de-DE') : '–'} · <b className="text-[#d70015]">{eur(b.offen)}</b> offen</span>
               </div>
-            </div>
-          )}
-        </>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-function MonatsGrafik({ m, bis }) {
-  const W = 640, H = 210, P = { l: 52, r: 8, t: 10, b: 22 }
-  const max = Math.max(1, ...m.flatMap(x => [x.ein, x.aus + x.lohn]))
+function Seite({ titel, unter, farbe, r }) {
+  return (
+    <div className="card p-5 relative overflow-hidden">
+      <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-[0.12]" style={{ background: farbe }} />
+      <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: farbe }}>{titel}</p>
+      <p className="text-xs text-ink-2 mb-3">{unter}</p>
+      <div className="grid grid-cols-3 gap-2">
+        {[['Umsatz', r.umsatz], ['Gewinn v. St.', r.gewinn], ['Übrig', r.ueberschussNachInvest]].map(([l, w]) => (
+          <div key={l}><p className="text-[11px] text-ink-2">{l}</p><p className="text-[18px] md:text-[20px] font-bold tracking-tight tabular-nums text-ink">{eur(w)}</p></div>
+        ))}
+      </div>
+      <p className="text-[11px] text-ink-3 mt-2">Marge {(r.marge * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} % · Steuer-Rücklage {eur(r.ruecklage)}/Monat</p>
+    </div>
+  )
+}
+
+// ── Steuer: echter Tarif 2026 vs. deine Excel-Bänder ─────────
+function SteuerKarte({ r, einst }) {
+  const o = steuerOptionen(einst), e = r.steuer.echt, b = r.steuer.baender
+  const diff = b.steuer - e.gesamt
+  const fw = einst?.firmenwagen || {}
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-4 pt-4 pb-2">
+        <p className="text-[15px] font-semibold text-ink">Steuer aufs Jahr (Plan)</p>
+        <p className="text-xs text-ink-2">Gerechnet wird mit: <b>{o.modus === 'baender' ? 'deinen Excel-Bändern' : 'echtem Tarif 2026'}</b> (umstellbar unter Einstellungen)</p>
+      </div>
+      <div className="divide-y divide-black/[0.05]">
+        <Zeile l={`Zu versteuernder Gewinn (Gewinn × 12${r.vorteil ? ' + Firmenwagen' : ''})`} w={eur(r.gewinnJahrSteuer)} />
+        {o.abzuege > 0 && <Zeile l="− Abzüge (Kranken-/Rentenversicherung u. a.)" w={eur(o.abzuege)} klein />}
+        <Zeile l="Einkommensteuer (Tarif 2026, ledig)" w={eur(e.estTarif)} klein />
+        <Zeile l="− Anrechnung Gewerbesteuer (§ 35)" w={'− ' + eur(e.anrechnung)} klein />
+        <Zeile l="Solidaritätszuschlag" w={eur(e.soli)} klein />
+        {e.kist > 0 && <Zeile l={`Kirchensteuer (${o.kirche} %)`} w={eur(e.kist)} klein />}
+        <Zeile l={`Gewerbesteuer (Hebesatz ${o.hebesatz} %)`} w={eur(e.gewst)} klein />
+        <Zeile l="Steuer gesamt (echt)" w={eur(e.gesamt)} fett ton="minus" />
+        <Zeile l="Ø-Steuersatz · jeder weitere Euro" w={`${(e.quote * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} % · ${(e.grenzsatz * 100).toLocaleString('de-DE', { maximumFractionDigits: 0 })} %`} klein />
+      </div>
+      <div className={`px-4 py-3 text-[12px] leading-relaxed ${Math.abs(diff) > 500 ? 'bg-[#ff9f0a]/10' : 'bg-[#34c759]/10'}`}>
+        <b className="text-ink">Deine Excel-Bänder:</b> {eur(b.steuer)} – das sind {eur(Math.abs(diff))} {diff < 0 ? 'weniger' : 'mehr'} als der echte Tarif
+        {diff < 0 ? ' (die Bänder unterschätzen vor allem Soli und Spitzensatz).' : '.'} Mit {einst?.sicherheit_prozent ?? 10} % Sicherheit legst du {eur(r.ruecklage)} pro Monat zurück.
+      </div>
+      {fw.aktiv && (
+        <p className="px-4 py-3 text-[11.5px] text-ink-2 border-t border-black/[0.05] leading-relaxed">
+          <b className="text-ink">Firmenwagen {fw.name}:</b> {String(fw.prozent).replace('.', ',')} % von {eur(fw.listenpreis)} = {eur(r.vorteil, 2)}/Monat – erhöht nur den zu versteuernden Gewinn, kein Geld auf dem Konto.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function MonatsGrafik({ m, bis, planUmsatz, planGewinn }) {
+  const W = 640, H = 220, P = { l: 52, r: 8, t: 10, b: 22 }
+  const max = Math.max(1, planUmsatz || 0, ...m.flatMap(x => [x.ein, x.aus]))
   const min = Math.min(0, ...m.slice(0, bis + 1).map(x => x.gewinn))
   const y = v => P.t + (max - v) / (max - min) * (H - P.t - P.b)
   const bw = (W - P.l - P.r) / 12
@@ -304,20 +445,113 @@ function MonatsGrafik({ m, bis }) {
           return (
             <g key={i}>
               <rect x={xx + bw * 0.14} y={y(x.ein)} width={bw * 0.34} height={Math.max(0, y(0) - y(x.ein))} rx="3" fill="#34c759" opacity={blass}><title>{MONATE[i]}: Einnahmen {eur(x.ein)}</title></rect>
-              <rect x={xx + bw * 0.52} y={y(x.aus + x.lohn)} width={bw * 0.34} height={Math.max(0, y(0) - y(x.aus + x.lohn))} rx="3" fill="#ff3b30" opacity={blass * 0.9}><title>{MONATE[i]}: Ausgaben {eur(x.aus)}{x.lohn ? ` + Löhne ${eur(x.lohn)}` : ''}</title></rect>
+              <rect x={xx + bw * 0.52} y={y(x.aus)} width={bw * 0.34} height={Math.max(0, y(0) - y(x.aus))} rx="3" fill="#ff3b30" opacity={blass * 0.9}><title>{MONATE[i]}: Ausgaben {eur(x.betrieb)} + Löhne {eur(x.lohn)}</title></rect>
               <text x={xx + bw / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="#a1a1a6">{MONATE[i]}</text>
             </g>
           )
         })}
+        {planUmsatz > 0 && <line x1={P.l} x2={W - P.r} y1={y(planUmsatz)} y2={y(planUmsatz)} stroke="#34c759" strokeWidth="1.5" strokeDasharray="5 4"><title>Plan-Umsatz {eur(planUmsatz)}</title></line>}
+        {planGewinn != null && <line x1={P.l} x2={W - P.r} y1={y(planGewinn)} y2={y(planGewinn)} stroke="#7c3aed" strokeWidth="1.5" strokeDasharray="5 4"><title>Plan-Gewinn {eur(planGewinn)}</title></line>}
         <path d={linie} fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         {m.slice(0, bis + 1).map((x, i) => <circle key={i} cx={P.l + bw * i + bw / 2} cy={y(x.gewinn)} r="3" fill="#fff" stroke="#7c3aed" strokeWidth="2"><title>{MONATE[i]}: Gewinn {eur(x.gewinn)}</title></circle>)}
       </svg>
       <div className="flex flex-wrap gap-3 text-[11px] text-ink-2">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#34c759]" />Einnahmen</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#ff3b30]" />Ausgaben (+ Löhne)</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#ff3b30]" />Ausgaben + Löhne</span>
         <span className="flex items-center gap-1"><span className="w-3 h-[3px] rounded bg-[#7c3aed]" />Gewinn</span>
+        <span className="flex items-center gap-1"><span className="w-3 border-t-2 border-dashed border-[#34c759]" />Plan-Umsatz</span>
+        <span className="flex items-center gap-1"><span className="w-3 border-t-2 border-dashed border-[#7c3aed]" />Plan-Gewinn</span>
       </div>
     </>
+  )
+}
+
+// ── Kunden: Plan (Posten) vs. Ist (Lexware) ──────────────────
+function Kunden() {
+  const [jahr, setJahr] = useState(new Date().getFullYear())
+  const { belege, sync, synchron } = useBelege(jahr)
+  const { posten, kunden, laden } = useFinanzDaten()
+  const [basis] = useEinstellung('os-chef-basis', 'rechnung')
+  const t = useMemo(() => {
+    if (!belege || laden) return null
+    const heute = new Date()
+    const voll = jahr === heute.getFullYear() ? Math.max(0, heute.getMonth() - 1) : 11
+    const letzte3 = [Math.max(0, voll - 2), voll]
+    const rows = new Map()
+    const ein = posten.filter(p => p.bereich === 'einnahme')
+    // Suchnamen: Posten-Name + ggf. verknüpfter OS-Kunde
+    const such = []
+    for (const p of ein) {
+      rows.set('p' + p.id, { name: p.name, plan: p.aktiv ? monatlich(p) : 0, inaktiv: !p.aktiv, jahr: 0, l3: 0, monate: Array(12).fill(0) })
+      such.push({ name: p.name, key: 'p' + p.id })
+      const k = p.kunde_id && kunden.find(x => x.id === p.kunde_id)
+      if (k) such.push({ name: k.name, key: 'p' + p.id })
+    }
+    for (const b of belege) {
+      const d = belegDatum(b, basis)
+      if (b.art !== 'einnahme' || !zaehlt(b) || !d || Number(d.slice(0, 4)) !== jahr) continue
+      const treffer = kundeFuer(b.kontakt, such)
+      const key = treffer ? treffer.key : 'k' + (b.kontakt || '?')
+      if (!rows.has(key)) rows.set(key, { name: b.kontakt || 'Unbekannt', plan: 0, ohnePlan: true, jahr: 0, l3: 0, monate: Array(12).fill(0) })
+      const r = rows.get(key), i = Number(d.slice(5, 7)) - 1, n = nettoVon(b)
+      r.jahr += n; r.monate[i] += n
+      if (i >= letzte3[0] && i <= letzte3[1]) r.l3 += n
+    }
+    const n3 = letzte3[1] - letzte3[0] + 1
+    const liste = [...rows.values()].map(r => ({ ...r, l3: r.l3 / n3, schnitt: r.monate.slice(0, voll + 1).reduce((a, b) => a + b, 0) / (voll + 1) }))
+      .filter(r => r.plan || r.jahr).sort((a, b) => (b.plan - a.plan) || (b.jahr - a.jahr))
+    return { liste, letzte3, voll, summe: { plan: liste.reduce((s, r) => s + r.plan, 0), l3: liste.reduce((s, r) => s + r.l3, 0), jahr: liste.reduce((s, r) => s + r.jahr, 0) } }
+  }, [belege, posten, kunden, laden, jahr, basis])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap"><JahrWahl jahr={jahr} setJahr={setJahr} /><div className="flex-1 min-w-[200px]"><SyncZeile sync={sync} synchron={synchron} /></div></div>
+      {!t ? <Lader /> : (
+        <div className="card overflow-hidden">
+          <div className="px-4 pt-4 pb-2">
+            <p className="text-[15px] font-semibold text-ink">Umsatz pro Kunde – theoretisch vs. praktisch</p>
+            <p className="text-xs text-ink-2">Netto · Plan aus deinen Einnahmen-Posten · Ist aus Lexware ({basis === 'zahlung' ? 'nach Geldeingang' : 'nach Rechnungsdatum'}), Ø der letzten 3 abgeschlossenen Monate ({MONATE[t.letzte3[0]]}–{MONATE[t.letzte3[1]]})</p>
+          </div>
+          <div className="table-scroll">
+            <table className="w-full min-w-[620px] text-[13px]">
+              <thead><tr className="text-[10.5px] text-ink-3 uppercase tracking-wider">
+                <th className="text-left font-semibold px-4 py-2">Kunde</th>
+                <th className="text-right font-semibold px-3">Plan / Monat</th>
+                <th className="text-right font-semibold px-3">Ist Ø 3 Mon.</th>
+                <th className="text-right font-semibold px-3">Differenz</th>
+                <th className="text-right font-semibold px-4">Ist {jahr} gesamt</th>
+              </tr></thead>
+              <tbody>
+                {t.liste.map(r => {
+                  const d = r.l3 - r.plan
+                  return (
+                    <tr key={r.name} className={`border-t border-black/[0.05] ${r.inaktiv ? 'opacity-50' : ''}`}>
+                      <td className="px-4 py-2 text-ink">
+                        <span className="font-medium">{r.name}</span>
+                        {r.ohnePlan && <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/[0.05] text-ink-3">nicht im Plan</span>}
+                        {r.plan > 0 && r.jahr === 0 && <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#ff9f0a]/15 text-[#9a5b00]">keine Rechnung in Lexware gefunden</span>}
+                      </td>
+                      <td className="px-3 text-right tabular-nums">{r.plan ? eur(r.plan) : '–'}</td>
+                      <td className="px-3 text-right tabular-nums">{eur(r.l3)}</td>
+                      <td className="px-3 text-right tabular-nums font-semibold" style={{ color: Math.abs(d) < 1 ? '#a1a1a6' : d > 0 ? '#248a3d' : '#d70015' }}>{Math.abs(d) < 1 ? '±0' : `${d > 0 ? '+' : ''}${eur(d)}`}</td>
+                      <td className="px-4 text-right tabular-nums text-ink-2">{eur(r.jahr)}</td>
+                    </tr>
+                  )
+                })}
+                <tr className="border-t border-black/[0.1] bg-white/50 font-semibold">
+                  <td className="px-4 py-2">Summe</td>
+                  <td className="px-3 text-right tabular-nums">{eur(t.summe.plan)}</td>
+                  <td className="px-3 text-right tabular-nums">{eur(t.summe.l3)}</td>
+                  <td className="px-3 text-right tabular-nums" style={{ color: t.summe.l3 >= t.summe.plan ? '#248a3d' : '#d70015' }}>{`${t.summe.l3 - t.summe.plan > 0 ? '+' : ''}${eur(t.summe.l3 - t.summe.plan)}`}</td>
+                  <td className="px-4 text-right tabular-nums">{eur(t.summe.jahr)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="px-4 py-3 text-[11px] text-ink-3 border-t border-black/[0.05]">Zuordnung über den Namen in Lexware. Passt etwas nicht, im Posten den OS-Kunden verknüpfen oder den Posten-Namen an den Lexware-Kontakt angleichen.</p>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -504,15 +738,44 @@ function PostenFormular({ start, kunden, onSave, onDelete, onClose }) {
   )
 }
 
-// ── Erinnerungen ──────────────────────────────────────────────
-const RHYTHMUS = [['woechentlich', 'Jede Woche'], ['monatlich', 'Jeden Monat'], ['quartalsweise', 'Jedes Quartal'], ['halbjaehrlich', 'Jedes halbe Jahr'], ['jaehrlich', 'Jedes Jahr']]
+// ── Team & Erinnerungen (pro Zeitraum: Monat, Quartal, Halbjahr, Jahr) ──
+const RHYTHMUS = [['monatlich', 'Jeden Monat'], ['quartalsweise', 'Jedes Quartal'], ['halbjaehrlich', 'Jedes halbe Jahr'], ['jaehrlich', 'Jedes Jahr'], ['woechentlich', 'Jede Woche']]
 const rhythmusText = r => RHYTHMUS.find(x => x[0] === r)?.[1] || r
-const datum = d => new Date(d + 'T12:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
-function inTagen(d) {
-  const h = new Date(); h.setHours(0, 0, 0, 0)
-  const n = Math.round((new Date(d + 'T00:00') - h) / 86400000)
-  return n === 0 ? 'heute' : n === 1 ? 'morgen' : n < 0 ? `seit ${-n} Tag${n === -1 ? '' : 'en'} fällig` : `in ${n} Tagen`
+const MONATE_ZAHL = { monatlich: 1, quartalsweise: 3, halbjaehrlich: 6, jaehrlich: 12 }
+const isoTag = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const alsDatum = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+function terminWeiter(start, r) {
+  const d = alsDatum(start)
+  return r === 'woechentlich' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7) : new Date(d.getFullYear(), d.getMonth() + MONATE_ZAHL[r], 1)
 }
+const periodeEnde = (start, r) => { const n = terminWeiter(start, r); return new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1) }
+function periodeText(start, r) {
+  const a = alsDatum(start), e = periodeEnde(start, r)
+  if (r === 'monatlich') return `${MONATE_LANG[a.getMonth()]} ${a.getFullYear()}`
+  if (r === 'woechentlich') return `Woche ab ${a.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}`
+  if (r === 'jaehrlich' && a.getMonth() === 0) return String(a.getFullYear())
+  return `${MONATE[a.getMonth()]}${a.getFullYear() !== e.getFullYear() ? ' ' + a.getFullYear() : ''}–${MONATE[e.getMonth()]} ${e.getFullYear()}`
+}
+// Vorheriger Zeitraum (für „✓ November erledigt“)
+function vorherStart(start, r) {
+  const d = alsDatum(start)
+  return isoTag(r === 'woechentlich' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7) : new Date(d.getFullYear(), d.getMonth() - MONATE_ZAHL[r], 1))
+}
+// Status des laufenden Zeitraums
+function periodeStatus(e) {
+  const heute = new Date(); heute.setHours(0, 0, 0, 0)
+  const start = alsDatum(e.naechster_termin)
+  if (start <= heute) {
+    const ende = periodeEnde(e.naechster_termin, e.rhythmus)
+    const tage = Math.round((ende - heute) / 86400000)
+    return { offen: true, zeitraum: periodeText(e.naechster_termin, e.rhythmus), ende, tage,
+      kurz: `${periodeText(e.naechster_termin, e.rhythmus).replace(/ \d{4}$/, '')} offen` }
+  }
+  const vorher = periodeText(vorherStart(e.naechster_termin, e.rhythmus), e.rhythmus)
+  return { offen: false, zeitraum: vorher, naechster: periodeText(e.naechster_termin, e.rhythmus), start,
+    kurz: e.zuletzt_erledigt ? `✓ ${vorher.replace(/ \d{4}$/, '')} erledigt` : `ab ${start.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}` }
+}
+
 function Erinnerungen() {
   const [liste, setListe] = useState(null)
   const [bearbeiten, setBearbeiten] = useState(null)
@@ -528,7 +791,7 @@ function Erinnerungen() {
     laden()
   }
   async function speichern(f) {
-    const row = { titel: f.titel.trim(), notiz: f.notiz?.trim() || null, rhythmus: f.rhythmus, naechster_termin: f.naechster_termin, vorlauf_tage: Number(f.vorlauf_tage) || 0, aktiv: f.aktiv, updated_at: new Date().toISOString() }
+    const row = { titel: f.titel.trim(), notiz: f.notiz?.trim() || null, rhythmus: f.rhythmus, naechster_termin: f.naechster_termin, vorlauf_tage: 0, aktiv: f.aktiv, updated_at: new Date().toISOString() }
     const { error } = f.id ? await supabase.from('os_chef_erinnerungen').update(row).eq('id', f.id) : await supabase.from('os_chef_erinnerungen').insert(row)
     if (error) { alert('Speichern fehlgeschlagen: ' + error.message); return }
     setBearbeiten(null); laden()
@@ -542,59 +805,76 @@ function Erinnerungen() {
     await supabase.from('os_chef_erinnerungen').delete().eq('id', e.id); setBearbeiten(null); laden()
   }
   if (!liste) return <Lader />
+  const monatJetzt = isoTag(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between mb-1 gap-3">
-        <h2 className="text-[17px] font-semibold text-ink tracking-tight">Wiederkehrende Erinnerungen</h2>
-        <button onClick={() => setBearbeiten({ rhythmus: 'monatlich', vorlauf_tage: 7, aktiv: true })} className="btn-primary text-xs !py-2 !px-4">＋ Erinnerung</button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-[13px] text-ink-2 max-w-xl">Jede Erinnerung gilt für einen Zeitraum (z. B. „November“ oder „Jan–Jun“). Ab dem 1. steht sie als Aufgabe auf deinem Dashboard, bis du sie abhakst – dann ist der nächste Zeitraum dran.</p>
+        <button onClick={() => setBearbeiten({ rhythmus: 'monatlich', naechster_termin: monatJetzt, aktiv: true })} className="btn-primary text-xs !py-2 !px-4">＋ Erinnerung</button>
       </div>
-      <p className="text-xs text-ink-2 mb-4">Erscheinen rechtzeitig als Aufgabe auf deinem Dashboard. „Erledigt“ hakt den aktuellen Termin ab und springt zum nächsten.</p>
-      <div className="space-y-2">
-        {liste.map(e => (
-          <div key={e.id} className={`rounded-2xl bg-white/70 border border-white px-4 py-3.5 flex items-start gap-3 ${e.aktiv ? '' : 'opacity-50'}`}>
-            <div className="w-11 h-11 rounded-2xl flex-shrink-0 flex flex-col items-center justify-center bg-[#ff6b01]/10 text-[#c2410c]">
-              <span className="text-[10px] font-semibold uppercase leading-none">{new Date(e.naechster_termin + 'T12:00').toLocaleDateString('de-DE', { month: 'short' })}</span>
-              <span className="text-[17px] font-bold leading-tight">{new Date(e.naechster_termin + 'T12:00').getDate()}</span>
-            </div>
-            <button onClick={() => setBearbeiten(e)} className="flex-1 min-w-0 text-left">
-              <p className="text-[15px] font-semibold text-ink tracking-tight">{e.titel}</p>
-              {e.notiz && <p className="text-xs text-ink-2 mt-0.5 line-clamp-2">{e.notiz}</p>}
-              <div className="flex flex-wrap gap-1 mt-2">
-                <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#7c3aed]/10 text-[#6d28d9]">{rhythmusText(e.rhythmus)}</span>
-                <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.05] text-ink-2">Nächster Termin {datum(e.naechster_termin)} · {inTagen(e.naechster_termin)}</span>
-                {e.zuletzt_erledigt && <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#34c759]/12 text-[#248a3d]">✓ zuletzt erledigt {new Date(e.zuletzt_erledigt + 'T12:00').toLocaleDateString('de-DE')}</span>}
+      <div className="grid md:grid-cols-2 gap-4">
+        {liste.map(e => {
+          const st = periodeStatus(e)
+          const a = alsDatum(e.naechster_termin)
+          return (
+            <div key={e.id} className={`card !rounded-[28px] p-5 flex flex-col gap-4 ${e.aktiv ? '' : 'opacity-50'}`}>
+              <div className="flex items-start gap-3">
+                <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex flex-col items-center justify-center ${st.offen ? 'bg-[#ff6b01]/12 text-[#c2410c]' : 'bg-[#34c759]/12 text-[#248a3d]'}`}>
+                  <span className="text-[10px] font-bold uppercase leading-none">{st.offen ? 'jetzt' : 'nächst.'}</span>
+                  <span className="text-[17px] font-bold leading-tight">{MONATE[a.getMonth()]}</span>
+                </div>
+                <button onClick={() => setBearbeiten(e)} className="flex-1 min-w-0 text-left">
+                  <p className="text-[17px] font-semibold text-ink tracking-tight leading-snug">{e.titel}</p>
+                  <span className="inline-block mt-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#7c3aed]/10 text-[#6d28d9]">{rhythmusText(e.rhythmus)}</span>
+                  {e.notiz && <p className="text-xs text-ink-2 mt-1.5 line-clamp-2">{e.notiz}</p>}
+                </button>
+                <button onClick={() => aktivSchalten(e)} role="switch" aria-checked={e.aktiv} title={e.aktiv ? 'Pausieren' : 'Aktivieren'}
+                  className={`relative inline-block w-[38px] h-[22px] rounded-full flex-shrink-0 transition-colors duration-300 ${e.aktiv ? 'bg-[#34c759]' : 'bg-black/[0.12]'}`}>
+                  <span className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-300 ${e.aktiv ? 'translate-x-[16px]' : ''}`} />
+                </button>
               </div>
-            </button>
-            <div className="flex flex-col items-end gap-2 flex-shrink-0">
-              <button onClick={() => erledigt(e)} disabled={!e.aktiv} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#34c759]/12 text-[#248a3d] hover:bg-[#34c759]/20 active:scale-95 transition disabled:opacity-40">✓ Erledigt</button>
-              <button onClick={() => aktivSchalten(e)} role="switch" aria-checked={e.aktiv} title={e.aktiv ? 'Pausieren' : 'Aktivieren'}
-                className={`relative inline-block w-[38px] h-[22px] rounded-full transition-colors duration-300 ${e.aktiv ? 'bg-[#34c759]' : 'bg-black/[0.12]'}`}>
-                <span className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-300 ${e.aktiv ? 'translate-x-[16px]' : ''}`} />
-              </button>
+              {st.offen ? (
+                <div className="rounded-2xl bg-[#ff9f0a]/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-ink">{st.zeitraum}</p>
+                    <p className="text-xs text-[#9a5b00]">noch offen · bis {st.ende.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} ({st.tage <= 0 ? 'heute' : `${st.tage} Tage`})</p>
+                  </div>
+                  <button onClick={() => erledigt(e)} disabled={!e.aktiv} className="btn-primary !py-2 !px-4 text-sm whitespace-nowrap flex-shrink-0 disabled:opacity-40">✓ Erledigt</button>
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-[#34c759]/10 px-4 py-3">
+                  <p className="text-[14px] font-semibold text-[#248a3d]">{e.zuletzt_erledigt ? `✓ ${st.zeitraum} erledigt` : 'Noch nicht gestartet'}</p>
+                  <p className="text-xs text-ink-2">Nächster Zeitraum: {st.naechster} · erscheint am {st.start.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} auf dem Dashboard</p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
-        {liste.length === 0 && <p className="text-sm text-ink-3 py-6 text-center">Noch keine Erinnerungen.</p>}
+          )
+        })}
       </div>
+      {liste.length === 0 && <p className="text-sm text-ink-3 py-6 text-center">Noch keine Erinnerungen.</p>}
       {bearbeiten && <ErinnerungFormular start={bearbeiten} onSave={speichern} onDelete={loeschen} onClose={() => setBearbeiten(null)} />}
     </div>
   )
 }
 function ErinnerungFormular({ start, onSave, onDelete, onClose }) {
-  const inEinerWoche = (() => { const d = new Date(); d.setDate(d.getDate() + 7); const z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })()
-  const [f, setF] = useState({ id: start.id, titel: start.titel || '', notiz: start.notiz || '', rhythmus: start.rhythmus || 'monatlich', naechster_termin: start.naechster_termin || inEinerWoche, vorlauf_tage: start.vorlauf_tage ?? 7, aktiv: start.aktiv ?? true })
+  const [f, setF] = useState({ id: start.id, titel: start.titel || '', notiz: start.notiz || '', rhythmus: start.rhythmus || 'monatlich', naechster_termin: start.naechster_termin, aktiv: start.aktiv ?? true })
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const ok = f.titel.trim() && f.naechster_termin
+  const woche = f.rhythmus === 'woechentlich'
   return (
     <Blatt titel={f.id ? 'Erinnerung bearbeiten' : 'Neue Erinnerung'} onClose={onClose}>
       <div className="space-y-3">
-        <div><label className="label">Woran erinnern?</label><input autoFocus className="input" value={f.titel} onChange={e => set('titel', e.target.value)} /></div>
+        <div><label className="label">Woran erinnern?</label><input autoFocus className="input" value={f.titel} onChange={e => set('titel', e.target.value)} placeholder="z. B. Firmenessen mit dem Team" /></div>
         <div><label className="label">Notiz</label><textarea className="input" rows={2} value={f.notiz} onChange={e => set('notiz', e.target.value)} /></div>
         <div className="grid grid-cols-2 gap-3">
           <div><label className="label">Wie oft</label><select className="input" value={f.rhythmus} onChange={e => set('rhythmus', e.target.value)}>{RHYTHMUS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-          <div><label className="label">Nächster Termin</label><input type="date" className="input" value={f.naechster_termin} onChange={e => set('naechster_termin', e.target.value)} /></div>
+          <div><label className="label">{woche ? 'Ab Tag' : 'Ab Monat'}</label>
+            {woche
+              ? <input type="date" className="input" value={f.naechster_termin || ''} onChange={e => set('naechster_termin', e.target.value)} />
+              : <input type="month" className="input" value={(f.naechster_termin || '').slice(0, 7)} onChange={e => set('naechster_termin', e.target.value ? e.target.value + '-01' : '')} />}
+          </div>
         </div>
-        <div><label className="label">Als Aufgabe … Tage vorher anzeigen</label><input type="number" min="0" max="90" className="input" value={f.vorlauf_tage} onChange={e => set('vorlauf_tage', e.target.value)} /></div>
+        {f.naechster_termin && <p className="text-xs text-ink-2">Erster Zeitraum: <b className="text-ink">{periodeText(woche ? f.naechster_termin : f.naechster_termin.slice(0, 7) + '-01', f.rhythmus)}</b> – erscheint ab dem {alsDatum(woche ? f.naechster_termin : f.naechster_termin.slice(0, 7) + '-01').toLocaleDateString('de-DE')} auf dem Dashboard.</p>}
         <div className="flex gap-2 pt-1">
           {f.id && <button onClick={() => onDelete(start)} className="btn-secondary !text-[#ff3b30]">Löschen</button>}
           <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
@@ -605,17 +885,19 @@ function ErinnerungFormular({ start, onSave, onDelete, onClose }) {
   )
 }
 
-// ── Einstellungen: Steuer-Bänder, Sicherheit, Firmenwagen ────
+// ── Einstellungen: Steuer, Sicherheit, Firmenwagen ───────────
 function Einstellungen() {
   const { einst, laden, neuLaden } = useFinanzDaten()
   const [f, setF] = useState(null)
   const [gespeichert, setGespeichert] = useState(false)
-  useEffect(() => { if (einst) setF({ baender: einst.steuerbaender, sicherheit: einst.sicherheit_prozent, fw: einst.firmenwagen || {} }) }, [einst])
+  useEffect(() => { if (einst) setF({ baender: einst.steuerbaender, sicherheit: einst.sicherheit_prozent, fw: einst.firmenwagen || {}, st: steuerOptionen(einst) }) }, [einst])
+  const zahl = v => Number(String(v ?? '').replace(',', '.')) || 0
   async function speichern() {
     const { error } = await supabase.from('os_finanz_einstellungen').update({
-      steuerbaender: f.baender.map(b => ({ bis: b.bis === '' || b.bis == null ? null : Number(String(b.bis).replace(',', '.')), satz: Number(String(b.satz).replace(',', '.')) || 0 })),
-      sicherheit_prozent: Number(String(f.sicherheit).replace(',', '.')) || 0,
-      firmenwagen: { ...f.fw, listenpreis: Number(String(f.fw.listenpreis ?? '').replace(',', '.')) || 0, prozent: Number(f.fw.prozent) || 0 },
+      steuerbaender: f.baender.map(b => ({ bis: b.bis === '' || b.bis == null ? null : zahl(b.bis), satz: zahl(b.satz) })),
+      sicherheit_prozent: zahl(f.sicherheit),
+      firmenwagen: { ...f.fw, listenpreis: zahl(f.fw.listenpreis), prozent: Number(f.fw.prozent) || 0 },
+      steuer: { modus: f.st.modus, hebesatz: zahl(f.st.hebesatz), kirche: zahl(f.st.kirche), abzuege: zahl(f.st.abzuege) },
       updated_at: new Date().toISOString(),
     }).eq('id', 1)
     if (error) { alert(error.message); return }
@@ -624,21 +906,37 @@ function Einstellungen() {
   if (laden || !f) return <Lader />
   const setB = (i, k, v) => setF(p => ({ ...p, baender: p.baender.map((b, j) => j === i ? { ...b, [k]: v } : b) }))
   const setFw = (k, v) => setF(p => ({ ...p, fw: { ...p.fw, [k]: v } }))
+  const setSt = (k, v) => setF(p => ({ ...p, st: { ...p.st, [k]: v } }))
   return (
     <div className="space-y-4">
       <div className="card p-5">
-        <p className="text-[15px] font-semibold text-ink mb-1">Steuer-Bänder (Jahresgewinn, Satz inkl. GewSt)</p>
-        <p className="text-xs text-ink-2 mb-3">Wie in deiner Excel: Jeder Euro im Band wird mit dem Satz des Bandes versteuert. Leeres „bis“ = ohne Obergrenze.</p>
-        <div className="space-y-2">
-          {f.baender.map((b, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-              <span className="text-xs text-ink-2 tabular-nums">ab {eur(i === 0 ? 0 : f.baender[i - 1].bis)}</span>
-              <input inputMode="decimal" className="input !py-1.5 text-sm" placeholder="bis (leer = ∞)" value={b.bis ?? ''} onChange={e => setB(i, 'bis', e.target.value)} />
-              <div className="flex items-center gap-1"><input inputMode="decimal" className="input !py-1.5 text-sm !w-20 text-right" value={b.satz} onChange={e => setB(i, 'satz', e.target.value)} /><span className="text-xs text-ink-2">%</span></div>
-            </div>
-          ))}
+        <p className="text-[15px] font-semibold text-ink mb-1">Steuer-Rechnung</p>
+        <p className="text-xs text-ink-2 mb-3">„Echter Tarif“ rechnet wie das Finanzamt 2026 (Einzelunternehmer, ledig): Einkommensteuer nach § 32a, Soli, ggf. Kirchensteuer und Gewerbesteuer abzüglich Anrechnung.</p>
+        <div className="seg mb-4">
+          <button className={`seg-btn ${f.st.modus === 'tarif' ? 'is-active' : ''}`} onClick={() => setSt('modus', 'tarif')}>Echter Tarif 2026</button>
+          <button className={`seg-btn ${f.st.modus === 'baender' ? 'is-active' : ''}`} onClick={() => setSt('modus', 'baender')}>Meine Excel-Bänder</button>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <div><label className="label">Gewerbesteuer-Hebesatz %</label><input inputMode="decimal" className="input" value={f.st.hebesatz} onChange={e => setSt('hebesatz', e.target.value)} /><p className="text-[10.5px] text-ink-3 mt-1">Köln: 475 %</p></div>
+          <div><label className="label">Kirchensteuer</label>
+            <select className="input" value={String(f.st.kirche)} onChange={e => setSt('kirche', e.target.value)}><option value="0">keine</option><option value="9">9 % (NRW)</option><option value="8">8 % (BY/BW)</option></select>
+          </div>
+          <div><label className="label">Abzüge pro Jahr €</label><input inputMode="decimal" className="input" value={f.st.abzuege} onChange={e => setSt('abzuege', e.target.value)} /><p className="text-[10.5px] text-ink-3 mt-1">Kranken-/Pflegeversicherung, Altersvorsorge u. a.</p></div>
         </div>
         <div className="flex items-center gap-2 mt-4"><span className="text-sm text-ink">Sicherheitsrücklage</span><input inputMode="decimal" className="input !py-1.5 !w-20 text-right" value={f.sicherheit} onChange={e => setF(p => ({ ...p, sicherheit: e.target.value }))} /><span className="text-xs text-ink-2">% auf die Steuer</span></div>
+        <details className="mt-4">
+          <summary className="text-[13px] font-semibold text-ink cursor-pointer">Meine Excel-Bänder (zum Vergleich)</summary>
+          <p className="text-xs text-ink-2 my-2">Jeder Euro im Band wird mit dem Satz des Bandes versteuert. Leeres „bis“ = ohne Obergrenze.</p>
+          <div className="space-y-2">
+            {f.baender.map((b, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                <span className="text-xs text-ink-2 tabular-nums">ab {eur(i === 0 ? 0 : f.baender[i - 1].bis)}</span>
+                <input inputMode="decimal" className="input !py-1.5 text-sm" placeholder="bis (leer = ∞)" value={b.bis ?? ''} onChange={e => setB(i, 'bis', e.target.value)} />
+                <div className="flex items-center gap-1"><input inputMode="decimal" className="input !py-1.5 text-sm !w-20 text-right" value={b.satz} onChange={e => setB(i, 'satz', e.target.value)} /><span className="text-xs text-ink-2">%</span></div>
+              </div>
+            ))}
+          </div>
+        </details>
       </div>
       <div className="card p-5">
         <p className="text-[15px] font-semibold text-ink mb-3">Firmenwagen (Privatnutzung)</p>
@@ -655,8 +953,7 @@ function Einstellungen() {
           </div>
         </div>
         <p className="text-[11.5px] text-ink-2 mt-3 leading-relaxed">
-          In deiner Excel standen 452,60 €/Monat (= 1 % von 45.260 €) beim Umsatz. Das ist hier korrigiert: Die Privatnutzung erhöht nur den <b>zu versteuernden</b> Gewinn, ist aber kein Geld, das reinkommt – sonst wirkt dein Überschuss jeden Monat 452,60 € zu hoch.
-          Bitte vom Steuerberater bestätigen lassen: der genaue Bruttolistenpreis (inkl. Sonderausstattung, abgerundet auf volle 100 €), ob der Tucson ein Plug-in-Hybrid ist (dann 0,5 %), und ob Fahrten Wohnung–Büro (0,03 %-Regel) sowie Umsatzsteuer auf die Privatnutzung dazukommen – die sind hier nicht eingerechnet.
+          Die Privatnutzung erhöht nur den <b>zu versteuernden</b> Gewinn – es ist kein Geld, das reinkommt. Bitte vom Steuerberater bestätigen lassen: genauer Bruttolistenpreis (inkl. Sonderausstattung, abgerundet auf volle 100 €), ob der Tucson ein Plug-in-Hybrid ist (dann 0,5 %), und ob Fahrten Wohnung–Büro (0,03 %-Regel) sowie Umsatzsteuer auf die Privatnutzung dazukommen.
         </p>
       </div>
       <button onClick={speichern} className="btn-primary !px-6">{gespeichert ? '✓ Gespeichert' : 'Einstellungen speichern'}</button>

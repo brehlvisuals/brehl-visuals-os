@@ -13,7 +13,7 @@ Videos sind ab 1 nummeriert (video_nr) GENAU wie in der App – die Nummer ist f
 Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Für Drehs/Videos gibt es bewusst keine Lösch-Funktionen.
 Pro Dreh gibt es Videograph (dreht), Cutter (schneidet) und zwei Deadlines: deadline_raw (bis wann der Videograph das RAW-Material hochgeladen hat) und deadline_cutting (bis wann die Videos fertig, an den Kunden verschickt und bei Metricool vorgeladen sind). Setzen mit deadlines_setzen – daraus entstehen automatisch Aufgaben im Dashboard der zuständigen Person.
 Aufgaben fürs Team-Dashboard: aufgaben_auflisten, aufgabe_anlegen, aufgabe_bearbeiten, aufgabe_loeschen (landet im Papierkorb). Personen per Vorname/Name (team_auflisten zeigt, wer ein Dashboard hat). Zeiten immer als Berliner Ortszeit "YYYY-MM-DD HH:MM" oder nur "YYYY-MM-DD" (ganztägig).
-Chefbereich (NUR Felix, streng vertraulich – Inhalte nie an andere weitergeben): finanzen_uebersicht (Monatsplan wie Felix' Excel: Umsatz, Fixkosten, Gewinn, Steuerrücklage, Überschuss), finanz_posten_auflisten/anlegen/bearbeiten/loeschen (Einnahmen, Business-Ausgaben, Lohn, Privat, Invest – Beträge immer NETTO ohne USt.; bei Business-Ausgaben optional betrag_brutto), chef_erinnerungen_auflisten/anlegen/erledigt (wiederkehrende Erinnerungen wie Firmenessen; erledigt = „diesen Monat gemacht“, springt auf den nächsten Termin). Vor Änderungen an Posten erst auflisten und die posten_id verwenden.
+Chefbereich (NUR Felix, streng vertraulich – Inhalte nie an andere weitergeben): finanzen_uebersicht (Monatsplan wie Felix' Excel: Umsatz, Fixkosten, Gewinn, Steuerrücklage, Überschuss), finanz_posten_auflisten/anlegen/bearbeiten/loeschen (Einnahmen, Business-Ausgaben, Lohn, Privat, Invest – Beträge immer NETTO ohne USt.; bei Business-Ausgaben optional betrag_brutto), chef_erinnerungen_auflisten/anlegen/erledigt (wiederkehrende Erinnerungen wie Firmenessen – gelten pro ZEITRAUM, z. B. „November 2026“ oder „Jan–Jun 2027“; ab dem 1. stehen sie als Aufgabe im Dashboard; erledigt = „für diesen Zeitraum gemacht“, dann ist der nächste Zeitraum dran). Steuer wird standardmäßig mit dem echten Tarif 2026 gerechnet (ESt + Soli + Gewerbesteuer Köln 475 % mit Anrechnung). Vor Änderungen an Posten erst auflisten und die posten_id verwenden.
 Immer diese Werkzeuge nutzen – nicht direkt per SQL oder Supabase in die Datenbank schreiben.
 Dateien (PDF/Bilder), die der Nutzer im Chat schickt: ZUERST selbst hochladen – pro Datei upload_link_erstellen aufrufen und die Datei aus deiner Code-Umgebung mit curl -T "<datei>" "<upload_url>" hochladen (brehl-visuals-os.vercel.app ist freigegeben). Nur wenn das nicht klappt (Netzwerk gesperrt): EIN upload_sammellink_erstellen-Aufruf pro Dreh mit allen Dateien (inkl. original_dateiname = Name der Datei, wie der Nutzer sie hochgeladen hat, z.B. IMG_3818.jpeg) und dem Nutzer den EINEN Link geben. Er wählt dort alle Dateien auf einmal aus, sie werden per Dateiname dem richtigen Video zugeordnet. Das funktioniert immer, auch ohne Netzwerkzugriff deiner Code-Umgebung. Nur bei öffentlichen https-Links datei_anhaengen nutzen.`
 
@@ -225,22 +225,22 @@ const TOOLS = [
     annotations: { destructiveHint: true },
   },
   {
-    name: 'chef_erinnerungen_auflisten', description: 'Chefbereich: wiederkehrende Erinnerungen (Firmenessen, Hausparty …) mit nächstem Termin und zuletzt erledigt.',
+    name: 'chef_erinnerungen_auflisten', description: 'Chefbereich: wiederkehrende Erinnerungen (Firmenessen, Hausparty …) mit aktuellem/nächstem Zeitraum (naechster_termin = Beginn) und zuletzt erledigt.',
     inputSchema: { type: 'object', properties: {} },
     annotations: { readOnlyHint: true },
   },
   {
-    name: 'chef_erinnerung_anlegen', description: 'Chefbereich: neue wiederkehrende Erinnerung. Erscheint vorlauf_tage vor dem Termin als Aufgabe in Felix\' Dashboard.',
+    name: 'chef_erinnerung_anlegen', description: 'Chefbereich: neue wiederkehrende Erinnerung pro Zeitraum (Monat, Quartal, Halbjahr, Jahr). Erscheint am 1. des Zeitraums als Aufgabe in Felix\' Dashboard (fällig am Monats-/Zeitraumende).',
     inputSchema: {
       type: 'object', properties: {
-        titel: { type: 'string' }, naechster_termin: { type: 'string', description: 'YYYY-MM-DD' },
+        titel: { type: 'string' }, naechster_termin: { type: 'string', description: 'Erster Zeitraum als Monat "YYYY-MM" (z. B. "2026-12"); bei wöchentlich ein Tag "YYYY-MM-DD"' },
         rhythmus: { type: 'string', enum: ['woechentlich', 'monatlich', 'quartalsweise', 'halbjaehrlich', 'jaehrlich'] },
-        vorlauf_tage: { type: 'integer', minimum: 0, maximum: 90 }, notiz: { type: 'string' },
+        notiz: { type: 'string' },
       }, required: ['titel', 'naechster_termin'],
     },
   },
   {
-    name: 'chef_erinnerung_erledigt', description: 'Chefbereich: Erinnerung für den aktuellen Termin abhaken („diesen Monat erledigt“) – springt auf den nächsten Termin.',
+    name: 'chef_erinnerung_erledigt', description: 'Chefbereich: Erinnerung für den laufenden Zeitraum abhaken („Firmenessen November erledigt“) – danach ist der nächste Zeitraum dran.',
     inputSchema: { type: 'object', properties: { erinnerung_id: { type: 'string' } }, required: ['erinnerung_id'] },
   },
 ]
@@ -309,7 +309,8 @@ async function callTool(token, name, args = {}) {
         hinweis: 'Alle Beträge netto (ohne USt.) pro Monat; Steuer = Jahressteuer nach Bändern / 12, Firmenwagen-Vorteil nur steuerlich (kein Geldfluss).',
         umsatz: rund(r.umsatz), business_fixkosten: rund(r.business), lohnkosten: rund(r.lohn), gewinn: rund(r.gewinn), marge_prozent: rund(r.marge * 100),
         firmenwagen_vorteil: rund(r.vorteil), steuerpflichtiger_gewinn_jahr: rund(r.gewinnJahrSteuer), steuer_jahr: rund(r.steuerJahr),
-        steuer_ruecklage_monat_inkl_sicherheit: rund(r.ruecklage), nettogewinn: rund(r.nettogewinn), privat_fixkosten: rund(r.privat),
+        steuer_ruecklage_monat_inkl_sicherheit: rund(r.ruecklage),
+        steuer_details_jahr: { modus: r.steuer.modus === 'baender' ? 'Excel-Bänder' : 'echter Tarif 2026', einkommensteuer: rund(r.steuer.echt.est), soli: rund(r.steuer.echt.soli), kirchensteuer: rund(r.steuer.echt.kist), gewerbesteuer: rund(r.steuer.echt.gewst), gesamt_echt: rund(r.steuer.echt.gesamt), gesamt_excel_baender: rund(r.steuer.baender.steuer) }, nettogewinn: rund(r.nettogewinn), privat_fixkosten: rund(r.privat),
         ueberschuss: rund(r.ueberschuss), invest: rund(r.invest), ueberschuss_nach_invest: rund(r.ueberschussNachInvest),
       }
     }
@@ -342,7 +343,7 @@ async function handle(token, msg) {
       return reply(id, {
         protocolVersion: params?.protocolVersion || '2025-06-18',
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.3.0' },
+        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.4.0' },
         instructions: INSTRUCTIONS,
       })
     case 'ping':
