@@ -38,6 +38,7 @@ export default function Finanzen() {
   const [daten, setDaten] = useState(null)
   const [kunden, setKunden] = useState([])
   const [stunden, setStunden] = useState({})
+  const [stundenAb, setStundenAb] = useState(null)
   const [laden, setLaden] = useState(true)
   const [fehler, setFehler] = useState(null)
 
@@ -48,12 +49,15 @@ export default function Finanzen() {
       const [lx, k, z, m] = await Promise.all([
         lexoffice(jahr),
         supabase.from('proj_kunden').select('id, name'),
-        supabase.from('zeiteintraege').select('kunde_id, stunden').gte('datum', `${jahr}-01-01`).lte('datum', `${jahr}-12-31`).not('kunde_id', 'is', null),
-        supabase.from('minijob_stunden').select('kunde_id, stunden, status').gte('datum', `${jahr}-01-01`).lte('datum', `${jahr}-12-31`).not('kunde_id', 'is', null),
+        supabase.from('zeiteintraege').select('kunde_id, stunden, datum').gte('datum', `${jahr}-01-01`).lte('datum', `${jahr}-12-31`).not('kunde_id', 'is', null),
+        supabase.from('minijob_stunden').select('kunde_id, stunden, status, datum').gte('datum', `${jahr}-01-01`).lte('datum', `${jahr}-12-31`).not('kunde_id', 'is', null),
       ])
       const h = {}
-      for (const r of [...(z.data || []), ...(m.data || []).filter(x => x.status !== 'abgelehnt')]) h[r.kunde_id] = (h[r.kunde_id] || 0) + Number(r.stunden || 0)
-      setDaten(lx); setKunden(k.data || []); setStunden(h)
+      const zeilen = [...(z.data || []), ...(m.data || []).filter(x => x.status !== 'abgelehnt')]
+      for (const r of zeilen) h[r.kunde_id] = (h[r.kunde_id] || 0) + Number(r.stunden || 0)
+      // € pro Stunde nur für den Zeitraum, in dem Stunden mit Kunde gebucht wurden (sonst Jahresumsatz ÷ wenige Monate Stunden)
+      const ab = zeilen.map(r => r.datum).sort()[0] || null
+      setDaten(lx); setKunden(k.data || []); setStunden(h); setStundenAb(ab)
     } catch (e) { setFehler(e.code === 'LEXOFFICE_KEY_FEHLT' ? 'In Vercel fehlt der Lexware-Schlüssel (LEXOFFICE_API_KEY).' : e.message) }
     setLaden(false)
   }
@@ -70,16 +74,18 @@ export default function Finanzen() {
         if (b.offen) offen += b.offen
         const ku = kundeFuer(b.kontakt, kunden)
         const key = ku ? ku.id : `x:${b.kontakt}`
-        const e = proKunde.get(key) || { name: ku?.name || b.kontakt, kundeId: ku?.id || null, umsatz: 0 }
-        e.umsatz += b.betrag; proKunde.set(key, e)
+        const e = proKunde.get(key) || { name: ku?.name || b.kontakt, kundeId: ku?.id || null, umsatz: 0, umsatzZeitraum: 0 }
+        e.umsatz += b.betrag
+        if (stundenAb && b.datum >= stundenAb) e.umsatzZeitraum += b.betrag
+        proKunde.set(key, e)
       } else { aus += b.betrag; if (m >= 0) proMonat[m].aus += b.betrag }
     }
     const kundenListe = [...proKunde.values()].map(k => {
       const h = k.kundeId ? (stunden[k.kundeId] || 0) : 0
-      return { ...k, stunden: h, proStunde: h > 0 ? k.umsatz / h : null }
+      return { ...k, stunden: h, proStunde: h > 0 ? k.umsatzZeitraum / h : null }
     }).sort((x, y) => y.umsatz - x.umsatz)
     return { ein, aus, ergebnis: ein - aus, offen, proMonat, kundenListe }
-  }, [daten, kunden, stunden])
+  }, [daten, kunden, stunden, stundenAb])
 
   return (
     <div className="card p-5">
@@ -122,7 +128,7 @@ export default function Finanzen() {
           <div className="rounded-[20px] bg-white/70 border border-white overflow-hidden">
             <div className="px-3.5 pt-3 pb-2 flex items-baseline justify-between gap-2">
               <p className="text-[13px] font-semibold text-ink">Umsatz & Stunden pro Kunde</p>
-              <p className="text-[11px] text-ink-3">Stunden aus Zeiterfassung + Minijob</p>
+              <p className="text-[11px] text-ink-3">{stundenAb ? `€/Std. = Umsatz seit ${new Date(stundenAb + 'T12:00').toLocaleDateString('de-DE')} ÷ gebuchte Stunden` : 'Noch keine Stunden mit Kunde gebucht'}</p>
             </div>
             <div className="table-scroll">
               <table className="w-full min-w-[420px] text-[13px]">
@@ -146,6 +152,8 @@ export default function Finanzen() {
               </table>
             </div>
           </div>
+
+          <p className="text-[11px] text-ink-3 -mt-2 px-1">Hinweis: € pro Stunde stimmt nur, wenn alle Arbeitszeit mit Kunde gebucht wird. Minijob-Stunden haben bisher keinen Kunden, intern gebuchte Zeit zählt nicht.</p>
 
           {daten.ueberfaellig.length > 0 && (
             <div className="rounded-[20px] bg-[#ff3b30]/[0.06] border border-[#ff3b30]/15 p-3.5">
