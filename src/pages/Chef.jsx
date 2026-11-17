@@ -203,7 +203,13 @@ function useBelege(jahr) {
   }
   const synchron = async () => {
     setSync({ laeuft: true, info: null, fehler: null })
-    try { await lexwareSync(jahr, info => setSync(s => ({ ...s, info }))); await laden(); setSync(s => ({ ...s, laeuft: false })) }
+    try {
+      await lexwareSync(jahr, info => setSync(s => ({ ...s, info: { ...info, jahr } })))
+      await laden()
+      // Vorjahr mit abgleichen (Rechnungen aus dem Dezember, die erst im Januar bezahlt wurden) – nach dem ersten Mal in Sekunden erledigt
+      await lexwareSync(jahr - 1, info => setSync(s => ({ ...s, info: { ...info, jahr: jahr - 1 } })))
+      await laden(); setSync(s => ({ ...s, laeuft: false }))
+    }
     catch (e) { setSync({ laeuft: false, info: null, fehler: e.code === 'LEXOFFICE_KEY_FEHLT' ? 'In Vercel fehlt der Lexware-Schlüssel.' : e.message }) }
   }
   useEffect(() => { setBelege(null); laden().then(synchron) /* eslint-disable-next-line */ }, [jahr])
@@ -213,7 +219,7 @@ function SyncZeile({ sync, synchron }) {
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-ink-2">
       <span>
-        {sync.laeuft ? `Lexware wird abgeglichen… ${sync.info ? `${sync.info.gesamt - sync.info.offen} von ${sync.info.gesamt} Belegen` : ''}`
+        {sync.laeuft ? `Lexware wird abgeglichen… ${sync.info ? `${sync.info.jahr}: ${sync.info.gesamt - sync.info.offen} von ${sync.info.gesamt} Belegen` : ''}`
           : sync.fehler ? <span className="text-[#d70015]">Lexware: {sync.fehler}</span>
           : 'Netto-Beträge aus Lexware · aktuell'}
       </span>
