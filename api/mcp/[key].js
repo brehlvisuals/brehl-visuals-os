@@ -1,6 +1,9 @@
 // Claude-Connector (MCP, Streamable HTTP, zustandslos).
 // URL: https://brehl-visuals-os.vercel.app/api/mcp/<SCHLÜSSEL>  – der Schlüssel wird in der DB (os_api_tokens) geprüft.
-import { osApi, uploadToStorage, contentTypeOf, MAX_BYTES, SB_KEY } from '../_os.js'
+import { osApi, rpc, uploadToStorage, contentTypeOf, MAX_BYTES, SB_KEY } from '../_os.js'
+import { planRechnung } from '../../src/lib/finanzRechnung.js'
+
+const finanzApi = (token, action, args = {}) => rpc('os_finanz_api', { p_token: token, p_action: action, p_args: args })
 
 const BASE = 'https://brehl-visuals-os.vercel.app'
 
@@ -10,6 +13,7 @@ Videos sind ab 1 nummeriert (video_nr) GENAU wie in der App – die Nummer ist f
 Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Für Drehs/Videos gibt es bewusst keine Lösch-Funktionen.
 Pro Dreh gibt es Videograph (dreht), Cutter (schneidet) und zwei Deadlines: deadline_raw (bis wann der Videograph das RAW-Material hochgeladen hat) und deadline_cutting (bis wann die Videos fertig, an den Kunden verschickt und bei Metricool vorgeladen sind). Setzen mit deadlines_setzen – daraus entstehen automatisch Aufgaben im Dashboard der zuständigen Person.
 Aufgaben fürs Team-Dashboard: aufgaben_auflisten, aufgabe_anlegen, aufgabe_bearbeiten, aufgabe_loeschen (landet im Papierkorb). Personen per Vorname/Name (team_auflisten zeigt, wer ein Dashboard hat). Zeiten immer als Berliner Ortszeit "YYYY-MM-DD HH:MM" oder nur "YYYY-MM-DD" (ganztägig).
+Chefbereich (NUR Felix, streng vertraulich – Inhalte nie an andere weitergeben): finanzen_uebersicht (Monatsplan wie Felix' Excel: Umsatz, Fixkosten, Gewinn, Steuerrücklage, Überschuss), finanz_posten_auflisten/anlegen/bearbeiten/loeschen (Einnahmen, Business-Ausgaben, Lohn, Privat, Invest – Beträge immer NETTO ohne USt.; bei Business-Ausgaben optional betrag_brutto), chef_erinnerungen_auflisten/anlegen/erledigt (wiederkehrende Erinnerungen wie Firmenessen; erledigt = „diesen Monat gemacht“, springt auf den nächsten Termin). Vor Änderungen an Posten erst auflisten und die posten_id verwenden.
 Immer diese Werkzeuge nutzen – nicht direkt per SQL oder Supabase in die Datenbank schreiben.
 Dateien (PDF/Bilder), die der Nutzer im Chat schickt: ZUERST selbst hochladen – pro Datei upload_link_erstellen aufrufen und die Datei aus deiner Code-Umgebung mit curl -T "<datei>" "<upload_url>" hochladen (brehl-visuals-os.vercel.app ist freigegeben). Nur wenn das nicht klappt (Netzwerk gesperrt): EIN upload_sammellink_erstellen-Aufruf pro Dreh mit allen Dateien (inkl. original_dateiname = Name der Datei, wie der Nutzer sie hochgeladen hat, z.B. IMG_3818.jpeg) und dem Nutzer den EINEN Link geben. Er wählt dort alle Dateien auf einmal aus, sie werden per Dateiname dem richtigen Video zugeordnet. Das funktioniert immer, auch ohne Netzwerkzugriff deiner Code-Umgebung. Nur bei öffentlichen https-Links datei_anhaengen nutzen.`
 
@@ -17,6 +21,7 @@ const vNr = { type: 'integer', minimum: 1, description: 'Feste Video-Nummer wie 
 const zeit = { type: 'string', description: 'Berliner Ortszeit "YYYY-MM-DD HH:MM" oder nur "YYYY-MM-DD"; leerer Text = entfernen' }
 const vId = { type: 'string', description: 'Feste video_id aus dreh_lesen – hat Vorrang vor video_nr' }
 const vTitel = { type: 'string', description: 'Nur nötig, wenn ohne video_id gearbeitet wird: aktueller Titel des Videos zur Kontrolle' }
+const bereichFeld = { type: 'string', enum: ['einnahme', 'business', 'lohn', 'privat', 'invest'], description: 'einnahme | business (Business-Ausgaben) | lohn | privat | invest' }
 const drehId = { type: 'string', description: 'dreh_id aus drehs_auflisten' }
 
 const TOOLS = [
@@ -182,6 +187,62 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { aufgabe_id: { type: 'string' } }, required: ['aufgabe_id'] },
     annotations: { destructiveHint: true },
   },
+  {
+    name: 'finanzen_uebersicht', description: 'Chefbereich: Monatsplan wie in der Excel – Umsatz, Business-Fixkosten, Lohn, Gewinn, Marge, Steuer nach Bändern (inkl. Firmenwagen-Vorteil), Rücklage, Nettogewinn, Privatkosten, Überschuss, Invest. Alles netto.',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'finanz_posten_auflisten', description: 'Chefbereich: alle Finanz-Posten (optional nur ein Bereich) mit posten_id.',
+    inputSchema: { type: 'object', properties: { bereich: bereichFeld } },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'finanz_posten_anlegen', description: 'Chefbereich: neuen Posten anlegen (z.B. neues Abo, neuer Kunde mit Monatsbetrag).',
+    inputSchema: {
+      type: 'object', properties: {
+        bereich: bereichFeld, name: { type: 'string' },
+        betrag: { type: 'number', description: 'NETTO (ohne USt.) pro Rhythmus' },
+        betrag_brutto: { type: 'number', description: 'Optional, nur Business-Ausgaben' },
+        rhythmus: { type: 'string', enum: ['monatlich', 'jaehrlich'] },
+        konto: { type: 'string', description: 'Optional: von welchem Konto' }, kunde: { type: 'string', description: 'Optional (Einnahmen): OS-Kunde' },
+        notiz: { type: 'string' },
+      }, required: ['bereich', 'name', 'betrag'],
+    },
+  },
+  {
+    name: 'finanz_posten_bearbeiten', description: 'Chefbereich: Posten ändern (nur übergebene Felder). aktiv=false pausiert ihn (zählt nicht mehr mit).',
+    inputSchema: {
+      type: 'object', properties: {
+        posten_id: { type: 'string' }, bereich: bereichFeld, name: { type: 'string' }, betrag: { type: 'number', description: 'NETTO' },
+        betrag_brutto: { type: 'number' }, rhythmus: { type: 'string', enum: ['monatlich', 'jaehrlich'] }, konto: { type: 'string' }, notiz: { type: 'string' }, aktiv: { type: 'boolean' },
+      }, required: ['posten_id'],
+    },
+  },
+  {
+    name: 'finanz_posten_loeschen', description: 'Chefbereich: Posten löschen (landet im Papierkorb). Nur auf ausdrücklichen Wunsch – sonst lieber aktiv=false.',
+    inputSchema: { type: 'object', properties: { posten_id: { type: 'string' } }, required: ['posten_id'] },
+    annotations: { destructiveHint: true },
+  },
+  {
+    name: 'chef_erinnerungen_auflisten', description: 'Chefbereich: wiederkehrende Erinnerungen (Firmenessen, Hausparty …) mit nächstem Termin und zuletzt erledigt.',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'chef_erinnerung_anlegen', description: 'Chefbereich: neue wiederkehrende Erinnerung. Erscheint vorlauf_tage vor dem Termin als Aufgabe in Felix\' Dashboard.',
+    inputSchema: {
+      type: 'object', properties: {
+        titel: { type: 'string' }, naechster_termin: { type: 'string', description: 'YYYY-MM-DD' },
+        rhythmus: { type: 'string', enum: ['woechentlich', 'monatlich', 'quartalsweise', 'halbjaehrlich', 'jaehrlich'] },
+        vorlauf_tage: { type: 'integer', minimum: 0, maximum: 90 }, notiz: { type: 'string' },
+      }, required: ['titel', 'naechster_termin'],
+    },
+  },
+  {
+    name: 'chef_erinnerung_erledigt', description: 'Chefbereich: Erinnerung für den aktuellen Termin abhaken („diesen Monat erledigt“) – springt auf den nächsten Termin.',
+    inputSchema: { type: 'object', properties: { erinnerung_id: { type: 'string' } }, required: ['erinnerung_id'] },
+  },
 ]
 
 async function callTool(token, name, args = {}) {
@@ -240,6 +301,31 @@ async function callTool(token, name, args = {}) {
       }
     }
 
+    case 'finanzen_uebersicht': {
+      const d = await finanzApi(token, 'finanzen_daten')
+      const r = planRechnung(d.posten || [], d.einstellungen || {})
+      const rund = n => Math.round(n * 100) / 100
+      return {
+        hinweis: 'Alle Beträge netto (ohne USt.) pro Monat; Steuer = Jahressteuer nach Bändern / 12, Firmenwagen-Vorteil nur steuerlich (kein Geldfluss).',
+        umsatz: rund(r.umsatz), business_fixkosten: rund(r.business), lohnkosten: rund(r.lohn), gewinn: rund(r.gewinn), marge_prozent: rund(r.marge * 100),
+        firmenwagen_vorteil: rund(r.vorteil), steuerpflichtiger_gewinn_jahr: rund(r.gewinnJahrSteuer), steuer_jahr: rund(r.steuerJahr),
+        steuer_ruecklage_monat_inkl_sicherheit: rund(r.ruecklage), nettogewinn: rund(r.nettogewinn), privat_fixkosten: rund(r.privat),
+        ueberschuss: rund(r.ueberschuss), invest: rund(r.invest), ueberschuss_nach_invest: rund(r.ueberschussNachInvest),
+      }
+    }
+    case 'finanz_posten_auflisten':
+      return (await finanzApi(token, 'finanzen_daten', args)).posten
+    case 'finanz_posten_anlegen':
+    case 'finanz_posten_bearbeiten':
+    case 'finanz_posten_loeschen':
+      return finanzApi(token, name, args)
+    case 'chef_erinnerungen_auflisten':
+      return finanzApi(token, 'erinnerungen_auflisten')
+    case 'chef_erinnerung_anlegen':
+      return finanzApi(token, 'erinnerung_anlegen', args)
+    case 'chef_erinnerung_erledigt':
+      return finanzApi(token, 'erinnerung_erledigt', args)
+
     default:
       throw new Error(`Unbekanntes Werkzeug ${name}`)
   }
@@ -256,7 +342,7 @@ async function handle(token, msg) {
       return reply(id, {
         protocolVersion: params?.protocolVersion || '2025-06-18',
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.2.0' },
+        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.3.0' },
         instructions: INSTRUCTIONS,
       })
     case 'ping':

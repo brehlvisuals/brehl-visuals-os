@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { MeineSpesen } from './Spesen'
+import { DrehAuswahl, useDrehs } from '../components/DrehAuswahl'
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
 
@@ -16,7 +17,8 @@ function hoursBetween(start, end) {
 }
 
 export default function MeineStunden({ userId }) {
-  const { user } = useAuth()
+  const { user, isExtern } = useAuth()
+  const drehs = useDrehs()
   const uid = userId || user.id
   const acting = !!userId   // Admin erfasst für eine andere Person (dann alle Monate bearbeitbar)
   const [month, setMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
@@ -25,7 +27,7 @@ export default function MeineStunden({ userId }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
-  const [form, setForm] = useState({ datum: '', start_zeit: '', end_zeit: '', notiz: '' })
+  const [form, setForm] = useState({ datum: '', start_zeit: '', end_zeit: '', notiz: '', dreh_id: '', kunde_id: '' })
 
 
   useEffect(() => { load() }, [month.y, month.m, uid])
@@ -53,6 +55,7 @@ export default function MeineStunden({ userId }) {
     // Admin (acting) trägt direkt genehmigt ein; Minijobler-Einträge gehen als "offen" in die Genehmigung
     const { error } = await supabase.from('minijob_stunden').insert({
       user_id: uid, datum: form.datum, start_zeit: form.start_zeit, end_zeit: form.end_zeit, stunden, notiz: form.notiz || null,
+      dreh_id: form.dreh_id || null, kunde_id: form.kunde_id || null,
       status: acting ? 'genehmigt' : 'offen',
       ...(acting ? { entschieden_von: user.id, entschieden_am: new Date().toISOString() } : {}),
     })
@@ -60,7 +63,7 @@ export default function MeineStunden({ userId }) {
     if (error) { setMsg('Fehler: ' + error.message); return }
     // Ansicht auf den Monat des neuen Eintrags springen, damit er sofort sichtbar ist
     const d = new Date(form.datum); setMonth({ y: d.getFullYear(), m: d.getMonth() })
-    setForm({ datum: '', start_zeit: '', end_zeit: '', notiz: '' }); load()
+    setForm({ datum: '', start_zeit: '', end_zeit: '', notiz: '', dreh_id: '', kunde_id: '' }); load()
   }
 
   async function del(id) {
@@ -116,6 +119,11 @@ export default function MeineStunden({ userId }) {
           <div><label className="label">Bis</label><input type="time" className="input text-sm" value={form.end_zeit} onChange={e => setForm(p => ({ ...p, end_zeit: e.target.value }))} /></div>
           <div className="flex items-end"><div className="text-xs text-ink-2 pb-2.5">{preview > 0 ? `= ${fmtH(preview)} Std.` : ''}</div></div>
         </div>
+        {!isExtern && (
+          <div><label className="label">Für welchen Dreh? (Kunde)</label>
+            <DrehAuswahl value={form.dreh_id} onChange={d => setForm(p => ({ ...p, dreh_id: d?.id || '', kunde_id: d?.kunde_id || '' }))} />
+          </div>
+        )}
         <div><label className="label">Notiz (optional)</label><input className="input text-sm" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} placeholder="z.B. Dreh Autohaus Müller" /></div>
         {msg && <p className="text-xs text-red-600">{msg}</p>}
         <button onClick={addEntry} disabled={saving} className="btn-primary text-sm w-full">{saving ? 'Speichert...' : '+ Stunden eintragen'}</button>
@@ -140,6 +148,7 @@ export default function MeineStunden({ userId }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-ink">{e.start_zeit?.slice(0, 5)}–{e.end_zeit?.slice(0, 5)} Uhr · <span className="font-medium">{fmtH(Number(e.stunden))} Std.</span></p>
+                  {e.dreh_id && <p className="text-xs text-ink-2 truncate">🎬 {drehs.find(d => d.id === e.dreh_id)?.kunde_name || 'Dreh'}</p>}
                   {e.notiz && <p className="text-xs text-ink-3 truncate">{e.notiz}</p>}
                 </div>
                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_PILL[st]}`}>{STATUS_LABEL[st]}</span>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { DrehAuswahl } from '../components/DrehAuswahl'
 
 export const KM_SATZ = 0.30
 const eur = n => Number(n || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
@@ -19,7 +20,7 @@ export function MeineSpesen({ month, userId }) {
   const uid = userId || profile.id
   const [von, bis] = monthRange(month)
   const [list, setList] = useState([])
-  const [form, setForm] = useState({ datum: '', art: 'fahrt', strecke: '', km: '', beschreibung: '', betrag: '' })
+  const [form, setForm] = useState({ datum: '', art: 'fahrt', strecke: '', km: '', beschreibung: '', betrag: '', dreh_id: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { load() }, [von, bis, uid])
@@ -35,11 +36,11 @@ export function MeineSpesen({ month, userId }) {
       user_id: uid, datum: form.datum, art: form.art,
       strecke: form.art === 'fahrt' ? (form.strecke || null) : null,
       km: form.art === 'fahrt' ? num(form.km) : null,
-      betrag, beschreibung: form.beschreibung || null,
+      betrag, beschreibung: form.beschreibung || null, dreh_id: form.dreh_id || null,
     })
     setSaving(false)
     if (error) { alert('Fehler: ' + error.message); return }
-    setForm({ datum: '', art: 'fahrt', strecke: '', km: '', beschreibung: '', betrag: '' })
+    setForm({ datum: '', art: 'fahrt', strecke: '', km: '', beschreibung: '', betrag: '', dreh_id: '' })
     load()
   }
   async function del(id) { await supabase.from('spesen').delete().eq('id', id); load() }
@@ -74,6 +75,11 @@ export function MeineSpesen({ month, userId }) {
           </>
         )}
       </div>
+      {profile?.role !== 'extern' && (
+        <div><label className="label">Für welchen Dreh? (Kunde)</label>
+          <DrehAuswahl className="input text-xs" value={form.dreh_id} onChange={d => setForm(p => ({ ...p, dreh_id: d?.id || '' }))} />
+        </div>
+      )}
       <button onClick={add} disabled={saving} className="btn-primary text-sm w-full">{saving ? 'Speichert...' : '+ Hinzufügen'}</button>
       {list.length > 0 && (
         <div className="divide-y divide-black/[0.05]">
