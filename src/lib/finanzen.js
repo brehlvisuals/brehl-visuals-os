@@ -9,7 +9,7 @@ export const BEREICHE = [
   { id: 'privat', label: 'Privat-Fixkosten', hinweis: 'Private monatliche Kosten' },
   { id: 'invest', label: 'Festes Invest', hinweis: 'Monatliche Sparraten / Investments' },
 ]
-export { monatlich, steuerJahr, firmenwagenVorteil, planRechnung } from './finanzRechnung'
+export { monatlich, steuerJahr, firmenwagenVorteil, planRechnung, monatsRechnung, steuerOptionen, steuerEcht, jahresSteuer, ausgabenArt } from './finanzRechnung'
 
 // Lexware-Sync (läuft in Etappen, bis alle Netto-Beträge da sind)
 export async function lexwareSync(jahr, onFortschritt) {
@@ -19,6 +19,7 @@ export async function lexwareSync(jahr, onFortschritt) {
     let body = null
     try { body = await r.json() } catch { /* leer */ }
     if (!r.ok) { const e = new Error(body?.fehler || `Fehler ${r.status}`); e.code = body?.fehler; throw e }
+    if (!body || typeof body.offen !== 'number') throw new Error('Abgleich gerade nicht erreichbar')
     onFortschritt?.(body)
     if (!body.offen) return body
   }

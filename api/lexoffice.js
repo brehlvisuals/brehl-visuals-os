@@ -63,6 +63,14 @@ async function details(b) {
   return { netto: brutto - steuer, steuer }
 }
 
+// Datum des (letzten) Geldeingangs/-ausgangs – nur bei bezahlten Belegen
+const BEZAHLT = ['paid', 'paidoff']
+async function zahlung(b) {
+  const p = await lx(`/payments/${b.id}`)
+  const daten = (p?.paymentItems || []).filter(i => i.paymentItemType !== 'cashDiscount').map(i => (i.postingDate || '').slice(0, 10)).filter(Boolean).sort()
+  return daten[daten.length - 1] || (p?.paidDate || '').slice(0, 10) || null
+}
+
 async function sb(jwt, pfad, opts = {}) {
   const r = await fetch(`${SB_URL}/rest/v1/${pfad}`, { ...opts, headers: { apikey: SB_KEY, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } })
   const text = await r.text()
@@ -92,29 +100,34 @@ export default async function handler(req, res) {
         ...(await liste(EINNAHMEN.join(','), 'any', von, bis)).map(b => ({ ...b, art: 'einnahme' })),
         ...(await liste(AUSGABEN.join(','), 'any', von, bis)).map(b => ({ ...b, art: 'ausgabe' })),
       ]
-      const vorhanden = await sb(jwt, `os_finanz_belege?select=id,lx_updated,netto&datum=gte.${von}&datum=lte.${bis}`)
+      const vorhanden = await sb(jwt, `os_finanz_belege?select=id,lx_updated,netto,steuer,bezahlt_am&datum=gte.${von}&datum=lte.${bis}`)
       const stand = new Map((vorhanden || []).map(r => [r.id, r]))
       const zuTun = lxBelege.filter(b => {
         const s = stand.get(b.id)
         const ohneDetails = ['draft', 'voided'].includes(b.voucherStatus)
-        return !s || (s.netto == null && !ohneDetails) || !s.lx_updated || new Date(s.lx_updated).getTime() < new Date(b.updatedDate).getTime()
+        return !s || (s.netto == null && !ohneDetails) || (BEZAHLT.includes(b.voucherStatus) && !s.bezahlt_am) || !s.lx_updated || new Date(s.lx_updated).getTime() < new Date(b.updatedDate).getTime()
       })
       const zeilen = []
       let fertig = 0
       for (const b of zuTun) {
         if (Date.now() - start > BUDGET_MS) break
         const vz = gutschrift(b.voucherType) ? -1 : 1
-        let netto = null, steuer = null
+        const s = stand.get(b.id)
+        const geaendert = !s || !s.lx_updated || new Date(s.lx_updated).getTime() < new Date(b.updatedDate).getTime()
+        let netto = s?.netto ?? null, steuer = s?.steuer ?? null, bezahlt = s?.bezahlt_am ?? null, fehler = false
         // Entwürfe/Storno brauchen keine Details (zählen nicht)
-        if (!['draft', 'voided'].includes(b.voucherStatus)) {
-          try { const d = await details(b); netto = vz * d.netto; steuer = vz * d.steuer } catch { /* nächster Durchlauf */ }
+        if (!['draft', 'voided'].includes(b.voucherStatus) && (geaendert || netto == null)) {
+          try { const d = await details(b); netto = vz * d.netto; steuer = vz * d.steuer } catch { fehler = true }
         }
+        if (BEZAHLT.includes(b.voucherStatus) && (geaendert || !bezahlt)) {
+          try { bezahlt = (await zahlung(b)) || (b.updatedDate || '').slice(0, 10) || null } catch { fehler = true }
+        } else if (!BEZAHLT.includes(b.voucherStatus)) bezahlt = null
         zeilen.push({
           id: b.id, art: b.art, typ: b.voucherType, status: b.voucherStatus, nummer: b.voucherNumber || null,
           datum: (b.voucherDate || '').slice(0, 10) || null, faellig: (b.dueDate || '').slice(0, 10) || null,
           kontakt: b.contactName || 'Sammelkunde', kontakt_id: b.contactId || null,
-          brutto: vz * Number(b.totalAmount || 0), netto, steuer, offen: b.openAmount == null ? null : Number(b.openAmount),
-          lx_updated: netto == null && !['draft', 'voided'].includes(b.voucherStatus) ? null : b.updatedDate, synced_at: new Date().toISOString(),
+          brutto: vz * Number(b.totalAmount || 0), netto, steuer, offen: b.openAmount == null ? null : Number(b.openAmount), bezahlt_am: bezahlt,
+          lx_updated: fehler ? null : b.updatedDate, synced_at: new Date().toISOString(),
         })
         fertig++
         if (zeilen.length >= 25) { await sb(jwt, 'os_finanz_belege', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(zeilen.splice(0)) }) }
