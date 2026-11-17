@@ -47,6 +47,10 @@ Das Schema `os_backup` (Stände 11.11. und 12.11.2026) bleibt mindestens bis **1
 
 ## Chefbereich (nur Admin)
 - Seite `/chef` (adminOnly) + Tabelle `os_chef_erinnerungen` (RLS nur Admin). Fällige Erinnerungen legt `chef_erinnerungen_pruefen()` als Aufgabe für den Admin an (`os_aufgaben.erinnerung_id`), Abhaken schaltet per Trigger `trg_erinnerung_weiter` zum nächsten Termin. Nichts davon darf für andere Rollen sichtbar werden.
+- Sperre: `/chef` verlangt das OS-Passwort erneut (Re-Login per `signInWithPassword`), sobald der Tab >3 Min. verlassen wurde (`SPERRE_MS` in `src/pages/Chef.jsx`).
+- Finanzen (ersetzt Felix' Excel „Finanzen.numbers“): `os_finanz_posten` (bereich einnahme|business|lohn|privat|invest, Beträge NETTO), `os_finanz_einstellungen` (Steuerbänder, Sicherheit %, Firmenwagen 1 %-Regel = nur steuerlicher Vorteil, kein Geldfluss), `os_finanz_belege` (Lexware-Netto-Cache, gefüllt von `api/lexoffice.js?aktion=sync`). Alles RLS nur Admin. Rechenlogik rein in `src/lib/finanzRechnung.js` (auch vom MCP genutzt).
+- Stundensatz ab 09/2026 pro Kunde × Monat: (Lexware-Umsatz netto − Fahrtkosten) ÷ Stunden. Stunden/Fahrtkosten werden per Dreh-Auswahl (`src/components/DrehAuswahl.jsx`) dem Kunden zugeordnet (`minijob_stunden.dreh_id/kunde_id`, `spesen.dreh_id`).
+- Claude-Chat: Finanz-/Erinnerungs-Tools laufen über `os_finanz_api` – nur mit Schlüssel `os_api_tokens.chef = true` (aktuell nur „Claude Chat (Felix)“). Neue Schlüssel nie mit chef=true anlegen, außer Felix will es ausdrücklich.
 
 ## Kundenvideos (Metricool)
 - Zählregel Monatsziel: nur Video-Beiträge auf Instagram/TikTok/YouTube/Facebook (je Beitrag einmal), reine LinkedIn-Beiträge nie; pro Kunde einschränkbar über `proj_kunden.zaehl_netzwerke` (Bierschneider = nur TikTok). Freigabe-Warnungen zählen ALLE Beiträge (auch LinkedIn). Logik in `src/lib/kundenvideos.js` (`alsVideo`, `auswerten`).
