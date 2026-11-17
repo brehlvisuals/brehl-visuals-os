@@ -96,7 +96,8 @@ export default async function handler(req, res) {
       const stand = new Map((vorhanden || []).map(r => [r.id, r]))
       const zuTun = lxBelege.filter(b => {
         const s = stand.get(b.id)
-        return !s || s.netto == null || !s.lx_updated || new Date(s.lx_updated).getTime() < new Date(b.updatedDate).getTime()
+        const ohneDetails = ['draft', 'voided'].includes(b.voucherStatus)
+        return !s || (s.netto == null && !ohneDetails) || !s.lx_updated || new Date(s.lx_updated).getTime() < new Date(b.updatedDate).getTime()
       })
       const zeilen = []
       let fertig = 0
