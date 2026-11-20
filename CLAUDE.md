@@ -47,7 +47,7 @@ Das Schema `os_backup` (Stände 11.11. und 12.11.2026) bleibt mindestens bis **1
 
 ## Aufgaben: Orientierungszeit & gebrauchte Zeit
 - `os_aufgaben.dauer_std` = Orientierungszeit (max. Dauer, Std.); Cutting-Deadline-Aufgaben übernehmen sie per Trigger aus `proj_drehs.cutting_dauer_std` (Videograph/RAW bewusst ohne).
-- Mitarbeiter haken NUR über `aufgabe_abschliessen(p_id, p_ist_std, p_grund)` ab: Zeit Pflicht, über `dauer_std` zusätzlich Begründung Pflicht (`ist_std`, `ist_grund`). `aufgabe_erledigt_setzen(…, true)` ist nur noch für Admin. Auswertung: Chefbereich → Team & Erinnerungen → „Aufgaben-Zeiten“.
+- Mitarbeiter haken NUR über `aufgabe_abschliessen(p_id, p_ist_std, p_grund)` ab: Zeit Pflicht (`ist_std`). Begründung bei Überschreitung (`ist_grund`) hat Felix am 20.11.2026 vorerst ausgeschaltet – Spalte bleibt. `aufgabe_erledigt_setzen(…, true)` ist nur noch für Admin. Auswertung: Chefbereich → Team & Erinnerungen → „Aufgaben-Zeiten“.
 
 ## Chefbereich (nur Admin)
 - Seite `/chef` (adminOnly) + Tabelle `os_chef_erinnerungen` (RLS nur Admin). Fällige Erinnerungen legt `chef_erinnerungen_pruefen()` als Aufgabe für den Admin an (`os_aufgaben.erinnerung_id`), Abhaken schaltet per Trigger `trg_erinnerung_weiter` zum nächsten Termin. Nichts davon darf für andere Rollen sichtbar werden.

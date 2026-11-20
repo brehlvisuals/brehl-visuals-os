@@ -13,7 +13,7 @@ import { DauerEingabe, stdText } from '../components/Dauer'
 // – Mitarbeiter mit Dashboard-Zugang: eigene Aufgaben, abhaken
 // Deadlines aus den Drehs erscheinen automatisch als Aufgaben (DB-Trigger).
 // Orientierungszeit (dauer_std) = wie lange es max. dauern sollte; beim Abhaken tragen Mitarbeiter die gebrauchte Zeit ein
-// (Pflicht, RPC aufgabe_abschliessen) – liegt sie darüber, ist eine Begründung Pflicht.
+// (Pflicht, RPC aufgabe_abschliessen). Begründung bei Überschreitung ist vorerst ausgeschaltet.
 
 const PERSON_FARBEN = ['#7c3aed', '#38b6ff', '#34c759', '#ff6b01', '#ff2d55', '#5856d6', '#ff9f0a', '#30b0c7']
 const farbeVon = (id, liste) => PERSON_FARBEN[Math.max(0, liste.findIndex(p => p.id === id)) % PERSON_FARBEN.length]
@@ -441,19 +441,17 @@ function AufgabeFormular({ start, personen, onSave, onDelete, onClose }) {
   )
 }
 
-// Beim Abhaken: Wie lange hast du gebraucht? (Pflicht) – über der Orientierungszeit zusätzlich „Warum?“ (Pflicht)
+// Beim Abhaken: Wie lange hast du gebraucht? (Pflicht) – Begründung bei Überschreitung vorerst ausgeschaltet (Felix, 20.11.2026)
 function ZeitDialog({ aufgabe, onSave, onClose }) {
   const [std, setStd] = useState(aufgabe.ist_std ?? null)
-  const [grund, setGrund] = useState(aufgabe.ist_grund || '')
   const [fehler, setFehler] = useState('')
   const [busy, setBusy] = useState(false)
   const plan = aufgabe.dauer_std != null ? Number(aufgabe.dauer_std) : null
-  const drueber = plan != null && std != null && std > plan
-  const ok = std != null && std > 0 && (!drueber || grund.trim().length > 0)
+  const ok = std != null && std > 0
   async function absenden() {
     if (!ok) return
     setBusy(true); setFehler('')
-    const f = await onSave(aufgabe, std, drueber ? grund.trim() : null)
+    const f = await onSave(aufgabe, std, null)
     setBusy(false); if (f) setFehler(f)
   }
   return (
@@ -467,12 +465,6 @@ function ZeitDialog({ aufgabe, onSave, onClose }) {
           <label className="label">Wie lange hast du gebraucht?</label>
           <DauerEingabe value={std} onChange={setStd} autoFocus leerText="0" />
         </div>
-        {drueber && (
-          <div className="fade-up">
-            <label className="label !text-[#d70015]">Das ist {stdText(std - plan)} länger als geplant – warum hat es länger gedauert?</label>
-            <textarea className="input" rows={3} value={grund} onChange={e => setGrund(e.target.value)} placeholder="z. B. Kunde wollte mehr Korrekturen, Material fehlte …" />
-          </div>
-        )}
         {fehler && <p className="text-xs text-[#d70015]">{fehler}</p>}
         <div className="flex gap-2">
           <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
