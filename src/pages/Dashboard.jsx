@@ -5,12 +5,15 @@ import { useAuth } from '../components/AuthProvider'
 import { BrandMark } from '../components/BrandMark'
 import KundenvideosWarnungen from '../components/KundenvideosWarnungen'
 import { Avatar } from '../components/Avatar'
+import { DauerEingabe, stdText } from '../components/Dauer'
 
 // Dashboard
 // – Admin (Felix): Master-Dashboard mit den Aufgaben aller Personen mit Dashboard-Zugang, Liste oder Kalender,
 //   Aufgaben anlegen / bearbeiten / löschen (Papierkorb)
 // – Mitarbeiter mit Dashboard-Zugang: eigene Aufgaben, abhaken
 // Deadlines aus den Drehs erscheinen automatisch als Aufgaben (DB-Trigger).
+// Orientierungszeit (dauer_std) = wie lange es max. dauern sollte; beim Abhaken tragen Mitarbeiter die gebrauchte Zeit ein
+// (Pflicht, RPC aufgabe_abschliessen) – liegt sie darüber, ist eine Begründung Pflicht.
 
 const PERSON_FARBEN = ['#7c3aed', '#38b6ff', '#34c759', '#ff6b01', '#ff2d55', '#5856d6', '#ff9f0a', '#30b0c7']
 const farbeVon = (id, liste) => PERSON_FARBEN[Math.max(0, liste.findIndex(p => p.id === id)) % PERSON_FARBEN.length]
@@ -42,6 +45,7 @@ export default function Dashboard() {
   const [monat, setMonat] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
   const [bearbeiten, setBearbeiten] = useState(null)   // null | {} (neu) | aufgabe
   const [tagAuswahl, setTagAuswahl] = useState(null)
+  const [zeitFuer, setZeitFuer] = useState(null)        // Aufgabe, für die gerade die gebrauchte Zeit eingetragen wird
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend'
@@ -78,13 +82,20 @@ export default function Dashboard() {
   }
 
   async function abhaken(a) {
+    // Mitarbeiter: beim Abhaken gebrauchte Zeit angeben (Pflicht) – Admin hakt direkt ab
+    if (!a.erledigt && !isAdmin) { setZeitFuer(a); return }
     setAufgaben(prev => prev.map(x => x.id === a.id ? { ...x, erledigt: !a.erledigt, erledigt_am: !a.erledigt ? new Date().toISOString() : null } : x))
     const { error } = await supabase.rpc('aufgabe_erledigt_setzen', { p_id: a.id, p_wert: !a.erledigt })
     if (error) { alert('Konnte nicht gespeichert werden: ' + error.message); laden() }
   }
+  async function zeitSpeichern(a, std, grund) {
+    const { error } = await supabase.rpc('aufgabe_abschliessen', { p_id: a.id, p_ist_std: std, p_grund: grund || null })
+    if (error) return error.message
+    setZeitFuer(null); laden(); return null
+  }
 
   async function speichern(f) {
-    const row = { titel: f.titel.trim(), beschreibung: f.beschreibung?.trim() || null, assignee_id: f.assignee_id || null, faellig_am: f.faellig_am, ganztags: f.ganztags }
+    const row = { titel: f.titel.trim(), beschreibung: f.beschreibung?.trim() || null, assignee_id: f.assignee_id || null, faellig_am: f.faellig_am, ganztags: f.ganztags, dauer_std: f.dauer_std ?? null }
     const { error } = f.id
       ? await supabase.from('os_aufgaben').update({ ...row, updated_at: new Date().toISOString() }).eq('id', f.id)
       : await supabase.from('os_aufgaben').insert({ ...row, quelle: 'manuell', created_by: profile.id })
@@ -156,6 +167,17 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Automatisch erledigte Aufgaben (z. B. Cutting-Deadline beim Statuswechsel) ohne eingetragene Zeit */}
+      {!isAdmin && (() => {
+        const fehlt = aufgaben.filter(a => a.erledigt && a.ist_std == null && a.assignee_id === profile.id && !a.erinnerung_id)
+        return fehlt.length > 0 && (
+          <div className="card p-4 flex items-center justify-between gap-3 border-l-4 !border-l-[#ff9f0a]">
+            <p className="text-[13px] text-ink"><b>{fehlt.length === 1 ? '1 erledigte Aufgabe' : `${fehlt.length} erledigte Aufgaben`}</b> ohne Zeitangabe – bitte noch eintragen, wie lange du gebraucht hast.</p>
+            <button onClick={() => setZeitFuer(fehlt[0])} className="btn-primary !py-2 !px-4 text-xs whitespace-nowrap">⏱ Eintragen</button>
+          </div>
+        )
+      })()}
+
       {/* Freigabe-Warnungen aus Metricool – für alle mit Dashboard */}
       <KundenvideosWarnungen />
 
@@ -179,7 +201,7 @@ export default function Dashboard() {
 
       {ansicht === 'liste' ? (
         <AufgabenListe aufgaben={sichtbar} personen={personen} zeigePerson={isAdmin && filterPerson === 'alle'}
-          personVon={personVon} drehVon={drehVon} onAbhaken={abhaken} onOeffnen={oeffnen} />
+          personVon={personVon} drehVon={drehVon} onAbhaken={abhaken} onOeffnen={oeffnen} onZeit={a => setZeitFuer(a)} ichId={profile.id} />
       ) : (
         <Kalender monat={monat} setMonat={setMonat} aufgaben={sichtbar} personen={personen} onTag={setTagAuswahl} />
       )}
@@ -188,11 +210,13 @@ export default function Dashboard() {
       {tagAuswahl && (
         <Sheet titel={new Date(tagAuswahl + 'T12:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })} onClose={() => setTagAuswahl(null)}>
           <AufgabenListe kompakt aufgaben={sichtbar.filter(a => a.faellig_am && tagKey(new Date(a.faellig_am)) === tagAuswahl)} personen={personen}
-            zeigePerson={isAdmin} personVon={personVon} drehVon={drehVon} onAbhaken={abhaken}
+            zeigePerson={isAdmin} personVon={personVon} drehVon={drehVon} onAbhaken={abhaken} onZeit={a => { setTagAuswahl(null); setZeitFuer(a) }} ichId={profile.id}
             onOeffnen={a => { setTagAuswahl(null); oeffnen(a) }} />
           {isAdmin && <button onClick={() => { const t = tagAuswahl; setTagAuswahl(null); setBearbeiten({ datum: t, assignee_id: filterPerson !== 'alle' ? filterPerson : '' }) }} className="dashed-add mt-3">＋ Aufgabe an diesem Tag</button>}
         </Sheet>
       )}
+
+      {zeitFuer && <ZeitDialog aufgabe={zeitFuer} onSave={zeitSpeichern} onClose={() => setZeitFuer(null)} />}
 
       {bearbeiten && (
         <AufgabeFormular start={bearbeiten} personen={personen} onSave={speichern} onDelete={loeschen} onClose={() => setBearbeiten(null)} />
@@ -221,7 +245,7 @@ function Haken({ an, onClick }) {
 }
 
 // Liste nach Tagen gruppiert: Überfällig, Heute, Morgen, weitere Tage, ohne Datum
-function AufgabenListe({ aufgaben, personen, zeigePerson, personVon, drehVon, onAbhaken, onOeffnen, kompakt }) {
+function AufgabenListe({ aufgaben, personen, zeigePerson, personVon, drehVon, onAbhaken, onOeffnen, onZeit, ichId, kompakt }) {
   const gruppen = useMemo(() => {
     const h = tagKey(new Date()), m = tagKey(addTage(new Date(), 1))
     const map = new Map()
@@ -262,9 +286,21 @@ function AufgabenListe({ aufgaben, personen, zeigePerson, personVon, drehVon, on
                   <div className="flex-1 min-w-0">
                     <p className={`text-[14px] leading-snug ${a.erledigt ? 'line-through text-ink-3' : 'text-ink font-medium'}`}>{a.titel}</p>
                     {a.beschreibung && <p className="text-xs text-ink-2 mt-0.5 line-clamp-2">{a.beschreibung}</p>}
+                    {a.ist_grund && <p className="text-xs text-[#9a5b00] mt-0.5 italic">„{a.ist_grund}“</p>}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {ueber && g.k === '0000' && <span className="text-[11px] font-medium text-[#d70015]">{new Date(a.faellig_am).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span>}
                       {zeitText(a) && <span className={`text-[11px] font-medium ${ueber ? 'text-[#d70015]' : 'text-ink-2'}`}>{zeitText(a)}</span>}
+                      {a.dauer_std != null && !a.erledigt && (
+                        <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#38b6ff]/12 text-[#0a6fb0]">⏱ max. {stdText(a.dauer_std)}</span>
+                      )}
+                      {a.ist_std != null && (
+                        <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full ${a.dauer_std != null && Number(a.ist_std) > Number(a.dauer_std) ? 'bg-[#ff3b30]/12 text-[#d70015]' : 'bg-[#34c759]/12 text-[#248a3d]'}`}>
+                          ✓ {stdText(a.ist_std)} gebraucht{a.dauer_std != null ? ` · Plan ${stdText(a.dauer_std)}` : ''}
+                        </span>
+                      )}
+                      {a.erledigt && a.ist_std == null && a.assignee_id === ichId && !a.erinnerung_id && onZeit && (
+                        <button onClick={e => { e.stopPropagation(); onZeit(a) }} className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#ff9f0a]/15 text-[#9a5b00] hover:bg-[#ff9f0a]/25">⏱ Zeit eintragen</button>
+                      )}
                       {a.erinnerung_id && (
                         <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.06] text-ink">🔒 Chef-Erinnerung</span>
                       )}
@@ -364,6 +400,7 @@ function AufgabeFormular({ start, personen, onSave, onDelete, onClose }) {
     id: start.id, titel: start.titel || '', beschreibung: start.beschreibung || '', assignee_id: start.assignee_id || '',
     datum: start.datum || (d0 ? tagKey(d0) : tagKey(new Date())),
     zeit: d0 && !start.ganztags ? `${z(d0.getHours())}:${z(d0.getMinutes())}` : '',
+    dauer_std: start.dauer_std ?? null,
   })
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   function absenden() {
@@ -389,6 +426,9 @@ function AufgabeFormular({ start, personen, onSave, onDelete, onClose }) {
             <div><label className="label">Datum</label><input type="date" className="input" value={f.datum} onChange={e => set('datum', e.target.value)} /></div>
             <div><label className="label">Uhrzeit (optional)</label><input type="time" className="input" value={f.zeit} onChange={e => set('zeit', e.target.value)} /></div>
           </div>
+          <div><label className="label">Orientierungszeit (so lange sollte es max. dauern)</label>
+            <DauerEingabe value={f.dauer_std} onChange={v => set('dauer_std', v)} leerText="–" />
+          </div>
           <div><label className="label">Notiz</label><textarea className="input" rows={2} value={f.beschreibung} onChange={e => set('beschreibung', e.target.value)} placeholder="Optional" /></div>
           <div className="flex gap-2 pt-1">
             {f.id && <button onClick={() => onDelete(start)} className="btn-secondary !text-[#ff3b30]">Löschen</button>}
@@ -397,6 +437,48 @@ function AufgabeFormular({ start, personen, onSave, onDelete, onClose }) {
           </div>
         </div>
       )}
+    </Sheet>
+  )
+}
+
+// Beim Abhaken: Wie lange hast du gebraucht? (Pflicht) – über der Orientierungszeit zusätzlich „Warum?“ (Pflicht)
+function ZeitDialog({ aufgabe, onSave, onClose }) {
+  const [std, setStd] = useState(aufgabe.ist_std ?? null)
+  const [grund, setGrund] = useState(aufgabe.ist_grund || '')
+  const [fehler, setFehler] = useState('')
+  const [busy, setBusy] = useState(false)
+  const plan = aufgabe.dauer_std != null ? Number(aufgabe.dauer_std) : null
+  const drueber = plan != null && std != null && std > plan
+  const ok = std != null && std > 0 && (!drueber || grund.trim().length > 0)
+  async function absenden() {
+    if (!ok) return
+    setBusy(true); setFehler('')
+    const f = await onSave(aufgabe, std, drueber ? grund.trim() : null)
+    setBusy(false); if (f) setFehler(f)
+  }
+  return (
+    <Sheet titel="Aufgabe erledigt 🎉" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-2xl bg-white/70 border border-white px-4 py-3">
+          <p className="text-[14px] font-semibold text-ink leading-snug">{aufgabe.titel}</p>
+          {plan != null && <p className="text-xs text-ink-2 mt-0.5">Orientierungszeit: max. {stdText(plan)}</p>}
+        </div>
+        <div>
+          <label className="label">Wie lange hast du gebraucht?</label>
+          <DauerEingabe value={std} onChange={setStd} autoFocus leerText="0" />
+        </div>
+        {drueber && (
+          <div className="fade-up">
+            <label className="label !text-[#d70015]">Das ist {stdText(std - plan)} länger als geplant – warum hat es länger gedauert?</label>
+            <textarea className="input" rows={3} value={grund} onChange={e => setGrund(e.target.value)} placeholder="z. B. Kunde wollte mehr Korrekturen, Material fehlte …" />
+          </div>
+        )}
+        {fehler && <p className="text-xs text-[#d70015]">{fehler}</p>}
+        <div className="flex gap-2">
+          <button onClick={onClose} className="btn-secondary flex-1">Abbrechen</button>
+          <button onClick={absenden} disabled={!ok || busy} className="btn-primary flex-1 disabled:opacity-40">{busy ? 'Speichert…' : '✓ Erledigt'}</button>
+        </div>
+      </div>
     </Sheet>
   )
 }

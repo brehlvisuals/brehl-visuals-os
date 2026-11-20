@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
 import { useLiveDatensatz } from '../lib/useLiveDatensatz'
 import { Avatar } from '../components/Avatar'
+import { DauerEingabe } from '../components/Dauer'
 import { metricool, auswerten } from '../lib/kundenvideos'
 
 const STATUSES = [
@@ -1135,6 +1136,13 @@ function DrehDetail({ dreh, kunden, darsteller, profiles, onClose, onStatusChang
                   <DeadlineZeile titel="Videos fertig & bei Metricool" unter="Cutter · an Kunden verschickt + vorgeladen" wert={form.deadline_cutting}
                     fertig={['posting', 'abgeschlossen'].includes(form.status)} disabled={ro}
                     onChange={v => set('deadline_cutting', v)} />
+                  <div className="px-3.5 py-2.5 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-ink">Orientierungszeit Cutting</p>
+                      <p className="text-[11px] text-ink-3 truncate">So lange sollte der Cutter max. brauchen</p>
+                    </div>
+                    <DauerEingabe value={form.cutting_dauer_std} disabled={ro} onChange={v => set('cutting_dauer_std', v)} />
+                  </div>
                 </div>
                 {!ro && <VideosFehlen kunde={kunden.find(k => k.id === form.kunde_id)} deadline={form.deadline_cutting} />}
                 <p className="text-[11px] text-ink-3 mt-1.5 pl-0.5">Deadlines erscheinen automatisch als Aufgabe im Dashboard der zuständigen Person.</p>
