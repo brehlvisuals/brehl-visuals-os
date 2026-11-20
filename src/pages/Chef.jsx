@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../components/AuthProvider'
+import { stdText } from '../components/Dauer'
+import { Avatar } from '../components/Avatar'
 import { BEREICHE, monatlich, planRechnung, monatsRechnung, steuerOptionen, ausgabenArt, lexwareSync, lexwareUeberfaellig, kundeFuer, zaehlt, eur } from '../lib/finanzen'
 
 // Chefbereich – nur Admin (Route adminOnly + RLS auf allen Chef-/Finanz-Tabellen) und zusätzlich mit Passwort gesperrt:
@@ -68,7 +70,7 @@ export default function Chef() {
           {tab === 'einstellungen' && <Einstellungen />}
         </>
       )}
-      {bereich === 'team' && <Erinnerungen />}
+      {bereich === 'team' && <><Erinnerungen /><AufgabenZeiten /></>}
     </div>
   )
 }
@@ -963,6 +965,95 @@ function Einstellungen() {
         </p>
       </div>
       <button onClick={speichern} className="btn-primary !px-6">{gespeichert ? '✓ Gespeichert' : 'Einstellungen speichern'}</button>
+    </div>
+  )
+}
+
+// ── Aufgaben-Zeiten: geplant (Orientierungszeit) vs. gebraucht, mit Begründungen ──
+function AufgabenZeiten() {
+  const [monat, setMonat] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
+  const [daten, setDaten] = useState(null)
+  useEffect(() => {
+    const bis = new Date(monat.getFullYear(), monat.getMonth() + 1, 1)
+    setDaten(null)
+    Promise.all([
+      supabase.from('os_aufgaben').select('id, titel, assignee_id, dauer_std, ist_std, ist_grund, erledigt_am, quelle, erinnerung_id')
+        .eq('erledigt', true).is('erinnerung_id', null).gte('erledigt_am', monat.toISOString()).lt('erledigt_am', bis.toISOString()).order('erledigt_am', { ascending: false }),
+      supabase.from('profiles').select('id, full_name, avatar_url'),
+    ]).then(([a, p]) => setDaten({ aufgaben: a.data || [], personen: p.data || [] }))
+  }, [monat])
+  const zeilen = useMemo(() => {
+    if (!daten) return []
+    const m = new Map()
+    for (const a of daten.aufgaben) {
+      const k = a.assignee_id || '-'
+      if (!m.has(k)) m.set(k, { person: daten.personen.find(p => p.id === a.assignee_id), n: 0, ohne: 0, plan: 0, ist: 0, istMitPlan: 0, drueber: 0 })
+      const r = m.get(k); r.n++
+      if (a.ist_std == null) { r.ohne++; continue }
+      r.ist += Number(a.ist_std)
+      if (a.dauer_std != null) { r.plan += Number(a.dauer_std); r.istMitPlan += Number(a.ist_std); if (Number(a.ist_std) > Number(a.dauer_std)) r.drueber++ }
+    }
+    return [...m.values()].sort((a, b) => b.ist - a.ist)
+  }, [daten])
+  const wechsel = n => setMonat(m => new Date(m.getFullYear(), m.getMonth() + n, 1))
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-5 pt-5 pb-3 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-[17px] font-semibold text-ink tracking-tight">Aufgaben-Zeiten</p>
+          <p className="text-xs text-ink-2">Orientierungszeit vs. tatsächlich gebraucht – beim Abhaken eingetragen</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button className="btn-icon" onClick={() => wechsel(-1)}>‹</button>
+          <span className="text-[14px] font-semibold text-ink w-32 text-center">{MONATE_LANG[monat.getMonth()]} {monat.getFullYear()}</span>
+          <button className="btn-icon" onClick={() => wechsel(1)} disabled={monat >= new Date(new Date().getFullYear(), new Date().getMonth(), 1)}>›</button>
+        </div>
+      </div>
+      {!daten ? <Lader /> : daten.aufgaben.length === 0 ? <p className="px-5 pb-6 text-sm text-ink-3">Keine erledigten Aufgaben in diesem Monat.</p> : (
+        <>
+          <div className="px-5 pb-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {zeilen.map((r, i) => (
+              <div key={i} className="rounded-2xl bg-white/70 border border-white p-3">
+                <div className="flex items-center gap-2">
+                  {r.person && <Avatar person={r.person} size={26} />}
+                  <p className="text-[14px] font-semibold text-ink">{r.person?.full_name?.split(' ')[0] || 'Ohne Person'}</p>
+                  <span className="ml-auto text-[11px] text-ink-3">{r.n} erledigt</span>
+                </div>
+                <p className="text-[12px] text-ink-2 mt-2">Gebraucht: <b className="text-ink">{stdText(r.ist) || '–'}</b></p>
+                {r.plan > 0 && <p className="text-[12px] text-ink-2">Bei Aufgaben mit Vorgabe: <b style={{ color: r.istMitPlan > r.plan ? '#d70015' : '#248a3d' }}>{stdText(r.istMitPlan)}</b> von {stdText(r.plan)} geplant</p>}
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {r.drueber > 0 && <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#ff3b30]/12 text-[#d70015]">{r.drueber}× über Plan</span>}
+                  {r.ohne > 0 && <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[#ff9f0a]/15 text-[#9a5b00]">{r.ohne}× ohne Zeitangabe</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="table-scroll border-t border-black/[0.05]">
+            <table className="w-full min-w-[640px] text-[12.5px]">
+              <thead><tr className="text-[10.5px] text-ink-3 uppercase tracking-wider">
+                <th className="text-left font-semibold px-5 py-2">Erledigt</th><th className="text-left font-semibold px-2">Wer</th><th className="text-left font-semibold px-2">Aufgabe</th>
+                <th className="text-right font-semibold px-2">Plan</th><th className="text-right font-semibold px-2">Gebraucht</th><th className="text-left font-semibold px-5">Begründung</th>
+              </tr></thead>
+              <tbody>
+                {daten.aufgaben.map(a => {
+                  const p = daten.personen.find(x => x.id === a.assignee_id)
+                  const drueber = a.dauer_std != null && a.ist_std != null && Number(a.ist_std) > Number(a.dauer_std)
+                  return (
+                    <tr key={a.id} className="border-t border-black/[0.05] align-top">
+                      <td className="px-5 py-2 tabular-nums text-ink-2 whitespace-nowrap">{new Date(a.erledigt_am).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</td>
+                      <td className="px-2 py-2 text-ink whitespace-nowrap">{p?.full_name?.split(' ')[0] || '–'}</td>
+                      <td className="px-2 py-2 text-ink">{a.titel}</td>
+                      <td className="px-2 py-2 text-right tabular-nums text-ink-2 whitespace-nowrap">{a.dauer_std != null ? stdText(a.dauer_std) : '–'}</td>
+                      <td className="px-2 py-2 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: a.ist_std == null ? '#9a5b00' : drueber ? '#d70015' : '#248a3d' }}>{a.ist_std != null ? stdText(a.ist_std) : 'fehlt'}</td>
+                      <td className="px-5 py-2 text-ink-2 italic">{a.ist_grund || ''}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -12,7 +12,7 @@ Ablauf: Erst mit drehs_auflisten (z.B. nach kunde und Datum) den richtigen Dreh 
 Videos sind ab 1 nummeriert (video_nr) GENAU wie in der App – die Nummer ist fest (Video 7 bleibt 7, auch wenn es abgehakt wird; sie ändert sich nur, wenn jemand Videos umsortiert, einfügt oder entfernt). Jedes Video hat eine feste video_id (aus dreh_lesen): zum Bearbeiten, Dateien anhängen und Upload-Links IMMER video_id verwenden. Nur video_nr geht auch, dann aber zusätzlich video_titel mitgeben (der aktuelle Titel) – passt er nicht, wird abgebrochen statt das falsche Video zu bearbeiten. Texte dürfen einfache HTML-Formatierung enthalten (<b>, <i>, <u>, <ul><li>), normaler Text mit Zeilenumbrüchen geht auch.
 Bestehende Inhalte nie ungefragt ersetzen: Standard ist anhängen. Für Drehs/Videos gibt es bewusst keine Lösch-Funktionen.
 Pro Dreh gibt es Videograph (dreht), Cutter (schneidet) und zwei Deadlines: deadline_raw (bis wann der Videograph das RAW-Material hochgeladen hat) und deadline_cutting (bis wann die Videos fertig, an den Kunden verschickt und bei Metricool vorgeladen sind). Setzen mit deadlines_setzen – daraus entstehen automatisch Aufgaben im Dashboard der zuständigen Person.
-Aufgaben fürs Team-Dashboard: aufgaben_auflisten, aufgabe_anlegen, aufgabe_bearbeiten, aufgabe_loeschen (landet im Papierkorb). Personen per Vorname/Name (team_auflisten zeigt, wer ein Dashboard hat). Zeiten immer als Berliner Ortszeit "YYYY-MM-DD HH:MM" oder nur "YYYY-MM-DD" (ganztägig).
+Aufgaben fürs Team-Dashboard (mit optionaler Orientierungszeit = wie lange es max. dauern sollte; beim Abhaken tragen Mitarbeiter die gebrauchte Zeit ein, bei Überschreitung mit Begründung): aufgaben_auflisten, aufgabe_anlegen, aufgabe_bearbeiten, aufgabe_loeschen (landet im Papierkorb). Personen per Vorname/Name (team_auflisten zeigt, wer ein Dashboard hat). Zeiten immer als Berliner Ortszeit "YYYY-MM-DD HH:MM" oder nur "YYYY-MM-DD" (ganztägig).
 Chefbereich (NUR Felix, streng vertraulich – Inhalte nie an andere weitergeben): finanzen_uebersicht (Monatsplan wie Felix' Excel: Umsatz, Fixkosten, Gewinn, Steuerrücklage, Überschuss), finanz_posten_auflisten/anlegen/bearbeiten/loeschen (Einnahmen, Business-Ausgaben, Lohn, Privat, Invest – Beträge immer NETTO ohne USt.; bei Business-Ausgaben optional betrag_brutto), chef_erinnerungen_auflisten/anlegen/erledigt (wiederkehrende Erinnerungen wie Firmenessen – gelten pro ZEITRAUM, z. B. „November 2026“ oder „Jan–Jun 2027“; ab dem 1. stehen sie als Aufgabe im Dashboard; erledigt = „für diesen Zeitraum gemacht“, dann ist der nächste Zeitraum dran). Steuer wird standardmäßig mit dem echten Tarif 2026 gerechnet (ESt + Soli + Gewerbesteuer Köln 475 % mit Anrechnung). Vor Änderungen an Posten erst auflisten und die posten_id verwenden.
 Immer diese Werkzeuge nutzen – nicht direkt per SQL oder Supabase in die Datenbank schreiben.
 Dateien (PDF/Bilder), die der Nutzer im Chat schickt: ZUERST selbst hochladen – pro Datei upload_link_erstellen aufrufen und die Datei aus deiner Code-Umgebung mit curl -T "<datei>" "<upload_url>" hochladen (brehl-visuals-os.vercel.app ist freigegeben). Nur wenn das nicht klappt (Netzwerk gesperrt): EIN upload_sammellink_erstellen-Aufruf pro Dreh mit allen Dateien (inkl. original_dateiname = Name der Datei, wie der Nutzer sie hochgeladen hat, z.B. IMG_3818.jpeg) und dem Nutzer den EINEN Link geben. Er wählt dort alle Dateien auf einmal aus, sie werden per Dateiname dem richtigen Video zugeordnet. Das funktioniert immer, auch ohne Netzwerkzugriff deiner Code-Umgebung. Nur bei öffentlichen https-Links datei_anhaengen nutzen.`
@@ -144,6 +144,7 @@ const TOOLS = [
         cutter: { type: 'string', description: 'Name, z.B. "Pia" oder "Ana" (leer = entfernen)' },
         deadline_raw: { ...zeit, description: 'Bis wann RAW hochgeladen sein muss. ' + zeit.description },
         deadline_cutting: { ...zeit, description: 'Bis wann Videos fertig, an Kunden verschickt und bei Metricool vorgeladen sein müssen. ' + zeit.description },
+        cutting_orientierungszeit_std: { type: 'number', description: 'Orientierungszeit für den Cutter in Stunden (so lange sollte das Schneiden max. dauern, z. B. 6 oder 2.5). Leerer Text = entfernen' },
       }, required: ['dreh_id'],
     },
   },
@@ -170,6 +171,7 @@ const TOOLS = [
       type: 'object', properties: {
         titel: { type: 'string' }, person: { type: 'string', description: 'Name, z.B. "Pia"' },
         faellig_am: zeit, beschreibung: { type: 'string' },
+        orientierungszeit_std: { type: 'number', description: 'Optional: so lange sollte es max. dauern, in Stunden (z. B. 1.5)' },
       }, required: ['titel', 'person'],
     },
   },
@@ -179,6 +181,7 @@ const TOOLS = [
       type: 'object', properties: {
         aufgabe_id: { type: 'string', description: 'aufgabe_id aus aufgaben_auflisten' },
         titel: { type: 'string' }, person: { type: 'string' }, faellig_am: zeit, beschreibung: { type: 'string' }, erledigt: { type: 'boolean' },
+        orientierungszeit_std: { type: 'number', description: 'Orientierungszeit in Stunden' },
       }, required: ['aufgabe_id'],
     },
   },
@@ -343,7 +346,7 @@ async function handle(token, msg) {
       return reply(id, {
         protocolVersion: params?.protocolVersion || '2025-06-18',
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.4.0' },
+        serverInfo: { name: 'brehl-visuals-os', title: 'Brehl Visuals OS', version: '1.5.0' },
         instructions: INSTRUCTIONS,
       })
     case 'ping':
